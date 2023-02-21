@@ -21,20 +21,33 @@ func main() {
 	graph := map[string][]string{"A": {"B", "C"}}
 
 	fmt.Println("Graph: ", graph)
-	d := mkDrawing(0, 0)
+	totalDrawing := mkDrawing(0, 0)
 	for node, edges := range graph {
-		nd := drawBox(node)
-		d = *mergeDrawings(&d, nd, coord{0, 0})
-		nodeWidth, _ := getDrawingSize(nd)
-		for i, edge := range edges {
-			fmt.Println("Edge: ", edge)
-			ed := drawBox(edge)
-			d = *mergeDrawings(&d, ed, coord{nodeWidth + paddingBetweenX, (paddingBetweenY + boxHeight) * i})
-		}
+		nodeSubdrawing := *drawNodeWithEdges(node, edges)
+		totalDrawing = *mergeDrawings(&totalDrawing, &nodeSubdrawing, coord{0, 0})
 	}
-	s := drawingToString(&d)
+	s := drawingToString(&totalDrawing)
 	fmt.Println(s)
 }
+
+func drawNodeWithEdges(node string, edges []string) *drawing {
+	nodeSubdrawing := mkDrawing(0, 0)
+	nd := drawBox(node)
+	nodeSubdrawing = *mergeDrawings(&nodeSubdrawing, nd, coord{0, 0})
+	nodeWidth, nodeHeight := getDrawingSize(nd)
+	arrowFrom := coord{nodeWidth, nodeHeight / 2}
+	for i, edge := range edges {
+		fmt.Println("Edge: ", edge)
+		edgeDrawing := drawBox(edge)
+		edgeStart := coord{nodeWidth + paddingBetweenX, (paddingBetweenY + boxHeight) * i}
+		arrowTo := coord{edgeStart.x, edgeStart.y + boxHeight/2}
+		arrowDrawing := drawArrow(arrowFrom, arrowTo)
+		nodeSubdrawing = *mergeDrawings(&nodeSubdrawing, edgeDrawing, edgeStart)
+		nodeSubdrawing = *mergeDrawings(&nodeSubdrawing, arrowDrawing, coord{0, 0})
+	}
+	return &nodeSubdrawing
+}
+
 func drawBox(text string) *drawing {
 	from := coord{0, 0}
 	// -1 because we start at 0
@@ -82,10 +95,13 @@ func drawArrow(from coord, to coord) *drawing {
 		arrowDrawing[rotateCoord.x][y] = "|" // Vertical line
 	}
 	// Draw from rotate to end
-	for x := rotateCoord.x; x <= to.x; x++ {
+	for x := rotateCoord.x; x < to.x; x++ {
 		arrowDrawing[x][rotateCoord.y] = "-" // Horizontal line
 	}
-	arrowDrawing[rotateCoord.x][rotateCoord.y] = "+" // Corner
+	if from.x != to.x && from.y != to.y {
+		arrowDrawing[rotateCoord.x][rotateCoord.y] = "+" // Corner
+	}
+	arrowDrawing[to.x-1][to.y] = ">" // Arrow head
 	return &arrowDrawing
 }
 func mergeDrawings(d1 *drawing, d2 *drawing, mergeCoord coord) *drawing {
@@ -103,7 +119,10 @@ func mergeDrawings(d1 *drawing, d2 *drawing, mergeCoord coord) *drawing {
 	// Copy d2 with offset
 	for x := 0; x < maxX2; x++ {
 		for y := 0; y < maxY2; y++ {
-			mergedDrawing[x+mergeCoord.x][y+mergeCoord.y] = (*d2)[x][y]
+			c := (*d2)[x][y]
+			if c != " " {
+				mergedDrawing[x+mergeCoord.x][y+mergeCoord.y] = (*d2)[x][y]
+			}
 		}
 	}
 	return &mergedDrawing
