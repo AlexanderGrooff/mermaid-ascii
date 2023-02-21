@@ -7,6 +7,9 @@ import (
 
 const boxBorderWidth = 1
 const boxBorderPadding = 1
+const paddingBetweenX = 5
+const paddingBetweenY = 2
+const boxHeight = boxBorderPadding*2 + boxBorderWidth*2 + 1
 
 type coord struct {
 	x int
@@ -22,10 +25,11 @@ func main() {
 	for node, edges := range graph {
 		nd := drawBox(node)
 		d = *mergeDrawings(&d, nd, coord{0, 0})
+		nodeWidth, _ := getDrawingSize(nd)
 		for i, edge := range edges {
 			fmt.Println("Edge: ", edge)
 			ed := drawBox(edge)
-			d = *mergeDrawings(&d, ed, coord{5, 5 * i})
+			d = *mergeDrawings(&d, ed, coord{nodeWidth + paddingBetweenX, (paddingBetweenY + boxHeight) * i})
 		}
 	}
 	s := drawingToString(&d)
