@@ -18,13 +18,14 @@ type coord struct {
 type drawing [][]string
 
 func main() {
-	graph := map[string][]string{"A": {"B", "C"}}
+	graph := map[string][]string{"Some text": {"B", "C"}, "D": {"E", "F"}}
 
 	fmt.Println("Graph: ", graph)
 	totalDrawing := mkDrawing(0, 0)
 	for node, edges := range graph {
 		nodeSubdrawing := *drawNodeWithEdges(node, edges)
-		totalDrawing = *mergeDrawings(&totalDrawing, &nodeSubdrawing, coord{0, 0})
+		totalWidth, _ := getDrawingSize(&totalDrawing)
+		totalDrawing = *mergeDrawings(&totalDrawing, &nodeSubdrawing, coord{totalWidth, 0})
 	}
 	s := drawingToString(&totalDrawing)
 	fmt.Println(s)
@@ -35,17 +36,63 @@ func drawNodeWithEdges(node string, edges []string) *drawing {
 	nd := drawBox(node)
 	nodeSubdrawing = *mergeDrawings(&nodeSubdrawing, nd, coord{0, 0})
 	nodeWidth, nodeHeight := getDrawingSize(nd)
-	arrowFrom := coord{nodeWidth, nodeHeight / 2}
 	for i, edge := range edges {
 		fmt.Println("Edge: ", edge)
 		edgeDrawing := drawBox(edge)
 		edgeStart := coord{nodeWidth + paddingBetweenX, (paddingBetweenY + boxHeight) * i}
+		arrowFrom := getArrowStart(nodeWidth, nodeHeight, coord{0, 0}, edgeStart)
 		arrowTo := coord{edgeStart.x, edgeStart.y + boxHeight/2}
 		arrowDrawing := drawArrow(arrowFrom, arrowTo)
 		nodeSubdrawing = *mergeDrawings(&nodeSubdrawing, edgeDrawing, edgeStart)
 		nodeSubdrawing = *mergeDrawings(&nodeSubdrawing, arrowDrawing, coord{0, 0})
 	}
 	return &nodeSubdrawing
+}
+
+func getArrowStart(startBoxWidth int, startBoxHeight int, from coord, to coord) coord {
+	// Find the coord on the first box where the arrow should start.
+	// This is the middle of one of the sides, depending on the direction of the arrow.
+	// Note that the coord returned is relative to the start box.
+	if from.x == to.x {
+		// Vertical arrow
+		if from.y < to.y {
+			// Down
+			return coord{startBoxWidth / 2, startBoxHeight}
+		} else {
+			// Up
+			return coord{startBoxWidth / 2, 0}
+		}
+	} else if from.y == to.y {
+		// Horizontal arrow
+		if from.x < to.x {
+			// Right
+			return coord{startBoxWidth, startBoxHeight / 2}
+		} else {
+			// Left
+			return coord{0, startBoxHeight / 2}
+		}
+	} else {
+		// Diagonal arrow
+		if from.x < to.x {
+			// Right
+			if from.y < to.y {
+				// Down
+				return coord{startBoxWidth / 2, startBoxHeight}
+			} else {
+				// Up
+				return coord{startBoxWidth / 2, 0}
+			}
+		} else {
+			// Left
+			if from.y < to.y {
+				// Down
+				return coord{startBoxWidth / 2, startBoxHeight}
+			} else {
+				// Up
+				return coord{startBoxWidth / 2, 0}
+			}
+		}
+	}
 }
 
 func drawBox(text string) *drawing {
