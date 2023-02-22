@@ -16,22 +16,26 @@ type coord struct {
 	y int
 }
 type drawing [][]string
+type graph map[string][]string
 
 func main() {
-	graph := map[string][]string{"Some text": {"B", "C"}, "D": {"E", "F"}}
+	totalGraph := graph{"Some text": {"B", "C"}, "B": {"D"}, "E": {"F", "G", "H"}}
 
-	fmt.Println("Graph: ", graph)
+	fmt.Println("Graph: ", totalGraph)
 	totalDrawing := mkDrawing(0, 0)
-	for node, edges := range graph {
-		nodeSubdrawing := *drawNodeWithEdges(node, edges)
+	for node, edges := range totalGraph {
+		nodeSubdrawing, _ := drawNodeWithEdges(totalGraph, node, edges)
 		totalWidth, _ := getDrawingSize(&totalDrawing)
-		totalDrawing = *mergeDrawings(&totalDrawing, &nodeSubdrawing, coord{totalWidth, 0})
+		totalDrawing = *mergeDrawings(&totalDrawing, nodeSubdrawing, coord{totalWidth, 0})
 	}
 	s := drawingToString(&totalDrawing)
 	fmt.Println(s)
 }
 
-func drawNodeWithEdges(node string, edges []string) *drawing {
+func drawNodeWithEdges(subGraph graph, node string, edges []string) (*drawing, graph) {
+	// Remove the node from the subgraph, so we don't draw it again.
+	delete(subGraph, node)
+
 	nodeSubdrawing := mkDrawing(0, 0)
 	nd := drawBox(node)
 	nodeSubdrawing = *mergeDrawings(&nodeSubdrawing, nd, coord{0, 0})
@@ -45,8 +49,31 @@ func drawNodeWithEdges(node string, edges []string) *drawing {
 		arrowDrawing := drawArrow(arrowFrom, arrowTo)
 		nodeSubdrawing = *mergeDrawings(&nodeSubdrawing, edgeDrawing, edgeStart)
 		nodeSubdrawing = *mergeDrawings(&nodeSubdrawing, arrowDrawing, coord{0, 0})
+		if _, ok := subGraph[edge]; ok {
+			edgeSubdrawing, _ := drawNodeWithEdges(subGraph, edge, subGraph[edge])
+			nodeSubdrawing = *mergeDrawings(&nodeSubdrawing, edgeSubdrawing, edgeStart)
+		}
 	}
-	return &nodeSubdrawing
+	return &nodeSubdrawing, subGraph
+}
+
+func doDrawingsCollide(drawing1 *drawing, drawing2 *drawing, offset coord) bool {
+	// Check if any of the drawing2 characters overlap with drawing1 characters.
+	// The offset is the coord of drawing2 relative to drawing1.
+	drawing1Width, drawing1Height := getDrawingSize(drawing1)
+	drawing2Width, drawing2Height := getDrawingSize(drawing2)
+	for x := 0; x < drawing2Width; x++ {
+		for y := 0; y < drawing2Height; y++ {
+			// Check if drawing2[x][y] overlaps with drawing1[x+offset.x][y+offset.y]
+			if x+offset.x >= 0 && x+offset.x < drawing1Width &&
+				y+offset.y >= 0 && y+offset.y < drawing1Height &&
+				(*drawing2)[x][y] != " " &&
+				(*drawing1)[x+offset.x][y+offset.y] != " " {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func getArrowStart(startBoxWidth int, startBoxHeight int, from coord, to coord) coord {
