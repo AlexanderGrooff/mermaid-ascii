@@ -27,3 +27,25 @@ func TestDrawPlainBox(t *testing.T) {
 		t.Error("Expected boxString to be ", expected, " got ", boxString)
 	}
 }
+
+func TestDrawRightArrow(t *testing.T) {
+	arrowDrawing := drawArrow(coord{0, 0}, coord{3, 0})
+	boxString := drawingToString(arrowDrawing)
+	expected := `-->`
+	if boxString != expected {
+		t.Error("Expected boxString to be ", expected, " got ", boxString)
+	}
+}
+
+func TestDrawDownRightArrow(t *testing.T) {
+	arrowDrawing := drawArrow(coord{0, 0}, coord{3, 3})
+	boxString := drawingToString(arrowDrawing)
+	expected :=
+		`|  
+|  
+|  
++->`
+	if boxString != expected {
+		t.Error("Expected boxString to be ", expected, " got ", boxString)
+	}
+}

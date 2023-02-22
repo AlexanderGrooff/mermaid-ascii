@@ -160,7 +160,8 @@ func drawBox(text string) *drawing {
 }
 
 func drawArrow(from coord, to coord) *drawing {
-	arrowDrawing := mkDrawing(Max(from.x, to.x), Max(from.y, to.y))
+	// Stop arrow one character before the end coord to stop just before the target
+	arrowDrawing := mkDrawing(Max(from.x, to.x) - 1, Max(from.y, to.y))
 	fmt.Println("Drawing arrow from ", from, " to ", to)
 	// Find the coord where the arrow should rotate
 	rotateCoord := coord{from.x, to.y}
