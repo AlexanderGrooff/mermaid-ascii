@@ -40,6 +40,10 @@ type graph struct {
 	drawing drawing
 }
 
+func (g *graph) appendNode(n node) {
+	g.nodes = append(g.nodes, n)
+}
+
 func (g graph) getEdgesFromNode(node node) []edge {
 	edges := []edge{}
 	for _, edge := range g.edges {
@@ -80,12 +84,28 @@ func (g graph) getRootNodes() []node {
 	return nodes
 }
 
-func (g *graph) placeRootNode(root node) coord {
+func (g *graph) getOrCreateRootNode(name string) node {
+	// Check if the node already exists.
+	for _, existingRootNode := range g.nodes {
+		if existingRootNode.name == name {
+			fmt.Println("Found existing root node", existingRootNode.name, "at", existingRootNode.coord)
+			return existingRootNode
+		}
+	}
+	parentCoord := g.positionNextRootNode()
+	fmt.Println("Creating new root node", name, "at", parentCoord)
+	parentNode := node{name: name, drawing: drawBox(name), coord: parentCoord}
+	g.drawNode(parentNode)
+	g.appendNode(parentNode)
+	return parentNode
+}
+
+func (g graph) positionNextRootNode() coord {
 	previousRootNodes := g.getRootNodes()
 	return coord{len(previousRootNodes) * 10, 0}
 }
 
-func (g *graph) placeChildNode(parent node, child node) coord {
+func (g graph) findPositionChildNode(parent node, child node) coord {
 	// Find a place to put the node, so it doesn't collide with any other nodes.
 	// Place the node next to its parent node, if possible. Otherwise, place it
 	// under the previous child node.
@@ -141,17 +161,13 @@ func main() {
 func mkGraph(data graphData) graph {
 	g := graph{drawing: mkDrawing(0, 0)}
 	for nodeName, children := range data {
-		parentNode := node{name: nodeName, drawing: drawBox(nodeName)}
-		parentCoord := g.placeRootNode(parentNode)
-		parentNode.setCoord(parentCoord)
-		g.drawNode(parentNode)
-		g.nodes = append(g.nodes, parentNode)
+		parentNode := g.getOrCreateRootNode(nodeName)
 		for _, childNodeName := range children {
 			childNode := node{name: childNodeName, drawing: drawBox(childNodeName)}
-			g.nodes = append(g.nodes, parentNode)
-			childCoord := g.placeChildNode(parentNode, childNode)
+			childCoord := g.findPositionChildNode(parentNode, childNode)
 			childNode.setCoord(childCoord)
 			g.drawNode(childNode)
+			g.appendNode(childNode)
 			fmt.Println("Placed child node: ", childNode.coord)
 			e := edge{from: parentNode, to: childNode, text: ""}
 			g.drawEdge(e)
