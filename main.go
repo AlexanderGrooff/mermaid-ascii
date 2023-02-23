@@ -82,7 +82,7 @@ func (g graph) getRootNodes() []node {
 
 func (g *graph) placeRootNode(root node) coord {
 	previousRootNodes := g.getRootNodes()
-	return coord{len(previousRootNodes) * 15, 0}
+	return coord{len(previousRootNodes) * 10, 0}
 }
 
 func (g *graph) placeChildNode(parent node, child node) coord {
@@ -122,8 +122,11 @@ func (g *graph) drawNode(n node) {
 }
 
 func (g *graph) drawEdge(e edge) {
-	arrowStart := getArrowStart(e.from, e.to)
-	arrow := drawArrow(coord{x: e.from.coord.x + arrowStart.x, y: e.from.coord.y + arrowStart.y}, e.to.coord)
+	arrowStart, arrowEnd := getArrowStartEndOffset(e.from, e.to)
+	arrow := drawArrow(
+		coord{x: e.from.coord.x + arrowStart.x, y: e.from.coord.y + arrowStart.y},
+		coord{x: e.to.coord.x + arrowEnd.x, y: e.to.coord.y + arrowEnd.y},
+	)
 	m := mergeDrawings(g.drawing, arrow, coord{x: 0, y: 0})
 	g.drawing = m
 }
@@ -177,28 +180,29 @@ func doDrawingsCollide(drawing1 drawing, drawing2 drawing, offset coord) bool {
 	return false
 }
 
-func getArrowStart(from node, to node) coord {
-	// Find the coord on the first box where the arrow should start.
+func getArrowStartEndOffset(from node, to node) (coord, coord) {
+	// Find which sides the arrow should start/end.
 	// This is the middle of one of the sides, depending on the direction of the arrow.
-	// Note that the coord returned is relative to the start box.
-	startBoxWidth, startBoxHeight := getDrawingSize(from.drawing)
+	// Note that the coord returned is relative to the box.
+	fromBoxWidth, fromBoxHeight := getDrawingSize(from.drawing)
+	toBoxWidth, toBoxHeight := getDrawingSize(to.drawing)
 	if from.coord.x == to.coord.x {
 		// Vertical arrow
 		if from.coord.y < to.coord.y {
 			// Down
-			return coord{startBoxWidth / 2, startBoxHeight}
+			return coord{fromBoxWidth / 2, fromBoxHeight}, coord{toBoxWidth / 2, 0}
 		} else {
 			// Up
-			return coord{startBoxWidth / 2, 0}
+			return coord{fromBoxWidth / 2, 0}, coord{toBoxWidth / 2, toBoxHeight}
 		}
 	} else if from.coord.y == to.coord.y {
 		// Horizontal arrow
 		if from.coord.x < to.coord.x {
 			// Right
-			return coord{startBoxWidth, startBoxHeight / 2}
+			return coord{fromBoxWidth, fromBoxHeight / 2}, coord{0, toBoxHeight / 2}
 		} else {
 			// Left
-			return coord{0, startBoxHeight / 2}
+			return coord{0, fromBoxHeight / 2}, coord{toBoxWidth, toBoxHeight / 2}
 		}
 	} else {
 		// Diagonal arrow
@@ -206,19 +210,19 @@ func getArrowStart(from node, to node) coord {
 			// Right
 			if from.coord.y < to.coord.y {
 				// Down
-				return coord{startBoxWidth / 2, startBoxHeight}
+				return coord{fromBoxWidth / 2, fromBoxHeight}, coord{0, toBoxHeight / 2}
 			} else {
 				// Up
-				return coord{startBoxWidth / 2, 0}
+				return coord{fromBoxWidth / 2, 0}, coord{0, toBoxHeight / 2}
 			}
 		} else {
 			// Left
 			if from.coord.y < to.coord.y {
 				// Down
-				return coord{startBoxWidth / 2, startBoxHeight}
+				return coord{fromBoxWidth / 2, fromBoxHeight}, coord{toBoxWidth, toBoxHeight / 2}
 			} else {
 				// Up
-				return coord{startBoxWidth / 2, 0}
+				return coord{fromBoxWidth / 2, 0}, coord{toBoxWidth, toBoxHeight / 2}
 			}
 		}
 	}
