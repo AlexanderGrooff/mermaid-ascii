@@ -16,48 +16,149 @@ type coord struct {
 	y int
 }
 type drawing [][]string
-type graph map[string][]string
+type graphData map[string][]string
+
+type node struct {
+	name    string
+	drawing drawing
+	coord   coord
+}
+
+func (n *node) setCoord(c coord) {
+	n.coord = c
+}
+
+type edge struct {
+	from node
+	to   node
+	text string
+}
+
+type graph struct {
+	nodes   []node
+	edges   []edge
+	drawing drawing
+}
+
+func (g graph) getEdgesFromNode(node node) []edge {
+	edges := []edge{}
+	for _, edge := range g.edges {
+		if (edge.from.name) == (node.name) {
+			edges = append(edges, edge)
+		}
+	}
+	return edges
+}
+
+func (g graph) getEdgesToNode(node node) []edge {
+	edges := []edge{}
+	for _, edge := range g.edges {
+		if (&edge.to) == (&node) {
+			edges = append(edges, edge)
+		}
+	}
+	return edges
+}
+
+func (g graph) getChildren(n node) []node {
+	edges := g.getEdgesFromNode(n)
+	children := []node{}
+	for _, edge := range edges {
+		children = append(children, edge.to)
+	}
+	return children
+}
+
+func (g graph) getRootNodes() []node {
+	nodes := []node{}
+	for _, node := range g.nodes {
+		edges := g.getEdgesToNode(node)
+		if len(edges) == 0 {
+			nodes = append(nodes, node)
+		}
+	}
+	return nodes
+}
+
+func (g *graph) placeRootNode(root node) coord {
+	previousRootNodes := g.getRootNodes()
+	return coord{len(previousRootNodes) * 15, 0}
+}
+
+func (g *graph) placeChildNode(parent node, child node) coord {
+	// Find a place to put the node, so it doesn't collide with any other nodes.
+	// Place the node next to its parent node, if possible. Otherwise, place it
+	// under the previous child node.
+	parentWidth, _ := getDrawingSize(parent.drawing)
+
+	// Check if the child node can be placed next to the parent node.
+	coordNextToParent := coord{parent.coord.x + parentWidth + paddingBetweenX, parent.coord.y}
+	if !doDrawingsCollide(g.drawing, child.drawing, coordNextToParent) {
+		fmt.Println("Placing child node", child.name, "next to parent node", parent.name)
+		return coordNextToParent
+	} else {
+		// The child node can't be placed next to the parent node.
+		// Find the last child node, and place the node under that one.
+		// If there are no child nodes, place it under the parent node.
+		children := g.getChildren(parent)
+		if len(children) == 0 {
+			fmt.Println("Couldn't find position for child node", child.name, "for parent node", parent.name)
+			return coord{x: 15, y: 15}
+		}
+		lastChildNode := children[len(children)-1]
+		_, lastChildNodeHeight := getDrawingSize(lastChildNode.drawing)
+		fmt.Println("Placing child node", child.name, "under last child node", lastChildNode.name, "for parent node", parent.name)
+		return coord{x: lastChildNode.coord.x, y: lastChildNode.coord.y + lastChildNodeHeight + paddingBetweenY}
+	}
+}
+
+func (g graph) dimensions() (int, int) {
+	return getDrawingSize(g.drawing)
+}
+
+func (g *graph) drawNode(n node) {
+	m := mergeDrawings(g.drawing, n.drawing, n.coord)
+	g.drawing = m
+}
+
+func (g *graph) drawEdge(e edge) {
+	arrowStart := getArrowStart(e.from, e.to)
+	arrow := drawArrow(coord{x: e.from.coord.x + arrowStart.x, y: e.from.coord.y + arrowStart.y}, e.to.coord)
+	m := mergeDrawings(g.drawing, arrow, coord{x: 0, y: 0})
+	g.drawing = m
+}
 
 func main() {
-	totalGraph := graph{"Some text": {"B", "C"}, "B": {"D"}, "E": {"F", "G", "H"}}
-
-	fmt.Println("Graph: ", totalGraph)
-	totalDrawing := mkDrawing(0, 0)
-	for node, edges := range totalGraph {
-		nodeSubdrawing, _ := drawNodeWithEdges(totalGraph, node, edges)
-		totalWidth, _ := getDrawingSize(&totalDrawing)
-		totalDrawing = *mergeDrawings(&totalDrawing, nodeSubdrawing, coord{totalWidth, 0})
-	}
-	s := drawingToString(&totalDrawing)
+	data := graphData{"Some text": {"B", "C"}, "B": {"D"}, "E": {"F", "G", "H"}}
+	totalGraph := mkGraph(data)
+	s := drawingToString(totalGraph.drawing)
 	fmt.Println(s)
 }
 
-func drawNodeWithEdges(subGraph graph, node string, edges []string) (*drawing, graph) {
-	// Remove the node from the subgraph, so we don't draw it again.
-	delete(subGraph, node)
-
-	nodeSubdrawing := mkDrawing(0, 0)
-	nd := drawBox(node)
-	nodeSubdrawing = *mergeDrawings(&nodeSubdrawing, nd, coord{0, 0})
-	nodeWidth, nodeHeight := getDrawingSize(nd)
-	for i, edge := range edges {
-		fmt.Println("Edge: ", edge)
-		edgeDrawing := drawBox(edge)
-		edgeStart := coord{nodeWidth + paddingBetweenX, (paddingBetweenY + boxHeight) * i}
-		arrowFrom := getArrowStart(nodeWidth, nodeHeight, coord{0, 0}, edgeStart)
-		arrowTo := coord{edgeStart.x, edgeStart.y + boxHeight/2}
-		arrowDrawing := drawArrow(arrowFrom, arrowTo)
-		nodeSubdrawing = *mergeDrawings(&nodeSubdrawing, edgeDrawing, edgeStart)
-		nodeSubdrawing = *mergeDrawings(&nodeSubdrawing, arrowDrawing, coord{0, 0})
-		if _, ok := subGraph[edge]; ok {
-			edgeSubdrawing, _ := drawNodeWithEdges(subGraph, edge, subGraph[edge])
-			nodeSubdrawing = *mergeDrawings(&nodeSubdrawing, edgeSubdrawing, edgeStart)
+func mkGraph(data graphData) graph {
+	g := graph{drawing: mkDrawing(0, 0)}
+	for nodeName, children := range data {
+		parentNode := node{name: nodeName, drawing: drawBox(nodeName)}
+		parentCoord := g.placeRootNode(parentNode)
+		parentNode.setCoord(parentCoord)
+		g.drawNode(parentNode)
+		g.nodes = append(g.nodes, parentNode)
+		for _, childNodeName := range children {
+			childNode := node{name: childNodeName, drawing: drawBox(childNodeName)}
+			g.nodes = append(g.nodes, parentNode)
+			childCoord := g.placeChildNode(parentNode, childNode)
+			childNode.setCoord(childCoord)
+			g.drawNode(childNode)
+			fmt.Println("Placed child node: ", childNode.coord)
+			e := edge{from: parentNode, to: childNode, text: ""}
+			g.drawEdge(e)
+			g.edges = append(g.edges, e)
 		}
 	}
-	return &nodeSubdrawing, subGraph
+	return g
 }
 
-func doDrawingsCollide(drawing1 *drawing, drawing2 *drawing, offset coord) bool {
+func doDrawingsCollide(drawing1 drawing, drawing2 drawing, offset coord) bool {
 	// Check if any of the drawing2 characters overlap with drawing1 characters.
 	// The offset is the coord of drawing2 relative to drawing1.
 	drawing1Width, drawing1Height := getDrawingSize(drawing1)
@@ -67,8 +168,8 @@ func doDrawingsCollide(drawing1 *drawing, drawing2 *drawing, offset coord) bool 
 			// Check if drawing2[x][y] overlaps with drawing1[x+offset.x][y+offset.y]
 			if x+offset.x >= 0 && x+offset.x < drawing1Width &&
 				y+offset.y >= 0 && y+offset.y < drawing1Height &&
-				(*drawing2)[x][y] != " " &&
-				(*drawing1)[x+offset.x][y+offset.y] != " " {
+				drawing2[x][y] != " " &&
+				drawing1[x+offset.x][y+offset.y] != " " {
 				return true
 			}
 		}
@@ -76,22 +177,23 @@ func doDrawingsCollide(drawing1 *drawing, drawing2 *drawing, offset coord) bool 
 	return false
 }
 
-func getArrowStart(startBoxWidth int, startBoxHeight int, from coord, to coord) coord {
+func getArrowStart(from node, to node) coord {
 	// Find the coord on the first box where the arrow should start.
 	// This is the middle of one of the sides, depending on the direction of the arrow.
 	// Note that the coord returned is relative to the start box.
-	if from.x == to.x {
+	startBoxWidth, startBoxHeight := getDrawingSize(from.drawing)
+	if from.coord.x == to.coord.x {
 		// Vertical arrow
-		if from.y < to.y {
+		if from.coord.y < to.coord.y {
 			// Down
 			return coord{startBoxWidth / 2, startBoxHeight}
 		} else {
 			// Up
 			return coord{startBoxWidth / 2, 0}
 		}
-	} else if from.y == to.y {
+	} else if from.coord.y == to.coord.y {
 		// Horizontal arrow
-		if from.x < to.x {
+		if from.coord.x < to.coord.x {
 			// Right
 			return coord{startBoxWidth, startBoxHeight / 2}
 		} else {
@@ -100,9 +202,9 @@ func getArrowStart(startBoxWidth int, startBoxHeight int, from coord, to coord) 
 		}
 	} else {
 		// Diagonal arrow
-		if from.x < to.x {
+		if from.coord.x < to.coord.x {
 			// Right
-			if from.y < to.y {
+			if from.coord.y < to.coord.y {
 				// Down
 				return coord{startBoxWidth / 2, startBoxHeight}
 			} else {
@@ -111,7 +213,7 @@ func getArrowStart(startBoxWidth int, startBoxHeight int, from coord, to coord) 
 			}
 		} else {
 			// Left
-			if from.y < to.y {
+			if from.coord.y < to.coord.y {
 				// Down
 				return coord{startBoxWidth / 2, startBoxHeight}
 			} else {
@@ -122,7 +224,7 @@ func getArrowStart(startBoxWidth int, startBoxHeight int, from coord, to coord) 
 	}
 }
 
-func drawBox(text string) *drawing {
+func drawBox(text string) drawing {
 	from := coord{0, 0}
 	// -1 because we start at 0
 	to := coord{len(text) + boxBorderPadding*2 + boxBorderWidth*2 - 1, boxBorderWidth*2 + boxBorderPadding*2}
@@ -156,12 +258,12 @@ func drawBox(text string) *drawing {
 	boxDrawing[from.x][to.y] = "+"   // Bottom left corner
 	boxDrawing[to.x][to.y] = "+"     // Bottom right corner
 
-	return &boxDrawing
+	return boxDrawing
 }
 
-func drawArrow(from coord, to coord) *drawing {
+func drawArrow(from coord, to coord) drawing {
 	// Stop arrow one character before the end coord to stop just before the target
-	arrowDrawing := mkDrawing(Max(from.x, to.x) - 1, Max(from.y, to.y))
+	arrowDrawing := mkDrawing(Max(from.x, to.x)-1, Max(from.y, to.y))
 	fmt.Println("Drawing arrow from ", from, " to ", to)
 	// Find the coord where the arrow should rotate
 	rotateCoord := coord{from.x, to.y}
@@ -177,9 +279,9 @@ func drawArrow(from coord, to coord) *drawing {
 		arrowDrawing[rotateCoord.x][rotateCoord.y] = "+" // Corner
 	}
 	arrowDrawing[to.x-1][to.y] = ">" // Arrow head
-	return &arrowDrawing
+	return arrowDrawing
 }
-func mergeDrawings(d1 *drawing, d2 *drawing, mergeCoord coord) *drawing {
+func mergeDrawings(d1 drawing, d2 drawing, mergeCoord coord) drawing {
 	maxX1, maxY1 := getDrawingSize(d1)
 	maxX2, maxY2 := getDrawingSize(d2)
 	maxX := Max(maxX1, maxX2+mergeCoord.x)
@@ -188,28 +290,28 @@ func mergeDrawings(d1 *drawing, d2 *drawing, mergeCoord coord) *drawing {
 	// Copy d1
 	for x := 0; x < maxX1; x++ {
 		for y := 0; y < maxY1; y++ {
-			mergedDrawing[x][y] = (*d1)[x][y]
+			mergedDrawing[x][y] = d1[x][y]
 		}
 	}
 	// Copy d2 with offset
 	for x := 0; x < maxX2; x++ {
 		for y := 0; y < maxY2; y++ {
-			c := (*d2)[x][y]
+			c := d2[x][y]
 			if c != " " {
-				mergedDrawing[x+mergeCoord.x][y+mergeCoord.y] = (*d2)[x][y]
+				mergedDrawing[x+mergeCoord.x][y+mergeCoord.y] = d2[x][y]
 			}
 		}
 	}
-	return &mergedDrawing
+	return mergedDrawing
 }
 
-func drawingToString(d *drawing) string {
+func drawingToString(d drawing) string {
 	maxX, maxY := getDrawingSize(d)
 	s := make([]string, maxY)
 	for y := 0; y < maxY; y++ {
 		lineBuilder := strings.Builder{}
 		for x := 0; x < maxX; x++ {
-			lineBuilder.WriteString((*d)[x][y])
+			lineBuilder.WriteString(d[x][y])
 		}
 		s[y] = lineBuilder.String()
 
@@ -228,8 +330,8 @@ func mkDrawing(x int, y int) drawing {
 	return d
 }
 
-func getDrawingSize(d *drawing) (int, int) {
-	return len(*d), len((*d)[0])
+func getDrawingSize(d drawing) (int, int) {
+	return len(d), len(d[0])
 }
 
 func Min(x, y int) int {
