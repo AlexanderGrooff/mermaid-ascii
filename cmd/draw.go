@@ -8,11 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const boxBorderWidth = 1
-const boxBorderPadding = 1
-const paddingBetweenX = 5
-const paddingBetweenY = 4
-const boxHeight = boxBorderPadding*2 + boxBorderWidth*2 + 1
 
 type drawing [][]string
 
