@@ -169,8 +169,8 @@ func (g *graph) drawEdge(e edge) {
 }
 
 func main() {
-	data := graphData{"Some text": {"B", "C"}, "B": {"D"}, "E": {"F", "G", "H"}, "C": {"D"}}
-	// data := graphData{"A": {"C", "D"}, "D": {"C"}}
+	// data := graphData{"Some text": {"B", "C"}, "B": {"D"}, "E": {"F", "G", "H"}, "C": {"D"}}
+	data := graphData{"A": {"C", "D"}, "B": {"C", "D"}}
 	totalGraph := mkGraph(data)
 	s := drawingToString(totalGraph.drawing)
 	fmt.Println(s)
@@ -338,7 +338,7 @@ func drawArrow(from coord, to coord) drawing {
 		arrowDrawing[to.x-1][to.y] = ">"
 	} else {
 		// Left
-		arrowDrawing[to.x+1][to.y] = "<"
+		arrowDrawing[to.x][to.y] = "<"
 	}
 
 	return arrowDrawing
