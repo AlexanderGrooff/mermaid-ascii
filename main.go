@@ -101,8 +101,11 @@ func (g *graph) getOrCreateRootNode(name string) node {
 }
 
 func (g graph) positionNextRootNode() coord {
+	if len(g.nodes) == 0 {
+		return coord{x: 0, y: 0}
+	}
 	w, _ := g.dimensions()
-	return coord{x: w, y: 0}
+	return coord{x: w + paddingBetweenX, y: 0}
 }
 
 func (g *graph) getOrCreateChildNode(parent node, name string) node {
