@@ -2,6 +2,8 @@ package main
 
 import (
 	"testing"
+
+	"github.com/elliotchance/orderedmap/v2"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -52,7 +54,10 @@ func TestDrawDownRightArrow(t *testing.T) {
 }
 
 func TestNestedChildDrawing(t *testing.T) {
-	g := mkGraph(graphData{"A": {"B"}, "B": {"C"}})
+	data := orderedmap.NewOrderedMap[string, []string]()
+	data.Set("A", []string{"B"})
+	data.Set("B", []string{"C"})
+	g := mkGraph(data)
 	s := drawingToString(g.drawing)
 	expected :=
 		`+---+    +---+    +---+

@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"strings"
+
+	"github.com/elliotchance/orderedmap/v2"
 )
 
 const boxBorderWidth = 1
@@ -16,7 +18,6 @@ type coord struct {
 	y int
 }
 type drawing [][]string
-type graphData map[string][]string
 
 type node struct {
 	name    string
@@ -173,15 +174,22 @@ func (g *graph) drawEdge(e edge) {
 
 func main() {
 	// data := graphData{"Some text": {"B", "C"}, "B": {"D"}, "E": {"F", "G", "H"}, "C": {"D"}}
-	data := graphData{"A": {"C", "D"}, "B": {"C", "D"}, "C": {"D"}}
+	// data := graphData{"A": {"C", "D"}, "B": {"C", "D"}, "C": {"D"}}
+	data := orderedmap.NewOrderedMap[string, []string]()
+	data.Set("A", []string{"C", "D"})
+	data.Set("B", []string{"C", "D"})
+	data.Set("C", []string{"D"})
+
 	totalGraph := mkGraph(data)
 	s := drawingToString(totalGraph.drawing)
 	fmt.Println(s)
 }
 
-func mkGraph(data graphData) graph {
+func mkGraph(data *orderedmap.OrderedMap[string, []string]) graph {
 	g := graph{drawing: mkDrawing(0, 0)}
-	for nodeName, children := range data {
+	for el := data.Front(); el != nil; el = el.Next() {
+		nodeName := el.Key
+		children := el.Value
 		parentNode := g.getOrCreateRootNode(nodeName)
 		for _, childNodeName := range children {
 			childNode := g.getOrCreateChildNode(parentNode, childNodeName)
