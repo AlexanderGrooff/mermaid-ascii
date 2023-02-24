@@ -170,7 +170,7 @@ func (g *graph) drawEdge(e edge) {
 
 func main() {
 	// data := graphData{"Some text": {"B", "C"}, "B": {"D"}, "E": {"F", "G", "H"}, "C": {"D"}}
-	data := graphData{"A": {"C", "D"}, "B": {"C", "D"}}
+	data := graphData{"A": {"C", "D"}, "B": {"C", "D"}, "C": {"D"}}
 	totalGraph := mkGraph(data)
 	s := drawingToString(totalGraph.drawing)
 	fmt.Println(s)
@@ -302,10 +302,12 @@ func drawArrow(from coord, to coord) drawing {
 	rotateCoord := coord{from.x, to.y}
 	// Draw from start to rotate
 	if from.y <= rotateCoord.y {
-		for y := from.y; y <= rotateCoord.y; y++ {
+		// Up
+		for y := from.y; y < rotateCoord.y; y++ {
 			arrowDrawing[rotateCoord.x][y] = "|" // Vertical line
 		}
 	} else {
+		// Down
 		for y := rotateCoord.y; y < from.y; y++ {
 			arrowDrawing[rotateCoord.x][y] = "|" // Vertical line
 		}
@@ -328,7 +330,7 @@ func drawArrow(from coord, to coord) drawing {
 		// Vertical arrow
 		if from.y < to.y {
 			// Down
-			arrowDrawing[to.x][to.y] = "v"
+			arrowDrawing[to.x][to.y-1] = "v"
 		} else {
 			// Up
 			arrowDrawing[to.x][to.y] = "^"
