@@ -22,7 +22,7 @@ var rootCmd = &cobra.Command{
 		}
 		mermaidMap, err := mermaidFileToMap(cmd.Flag("file").Value.String())
 		if err != nil {
-			log.Fatal("Failed to parse mermaid file", err)
+			log.Fatal("Failed to parse mermaid file: ", err)
 		}
 		drawMap(mermaidMap)
 	},

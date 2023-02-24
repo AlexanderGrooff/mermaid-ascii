@@ -90,12 +90,12 @@ func (g *graph) getOrCreateRootNode(name string) node {
 	// Check if the node already exists.
 	for _, existingRootNode := range g.nodes {
 		if existingRootNode.name == name {
-			log.Debug("Found existing root node", existingRootNode.name, "at", existingRootNode.coord)
+			log.Debug("Found existing root node ", existingRootNode.name, " at ", existingRootNode.coord)
 			return existingRootNode
 		}
 	}
 	parentCoord := g.positionNextRootNode()
-	log.Debug("Creating new root node", name, "at", parentCoord)
+	log.Debug("Creating new root node ", name, " at ", parentCoord)
 	parentNode := node{name: name, drawing: drawBox(name), coord: parentCoord}
 	g.drawNode(parentNode)
 	g.appendNode(parentNode)
@@ -114,7 +114,7 @@ func (g *graph) getOrCreateChildNode(parent node, name string) node {
 	// Check if the node already exists.
 	for _, existingChildNode := range g.nodes {
 		if existingChildNode.name == name {
-			log.Debug("Found existing child node", existingChildNode.name, "at", existingChildNode.coord)
+			log.Debug("Found existing child node ", existingChildNode.name, " at ", existingChildNode.coord)
 			return existingChildNode
 		}
 	}
@@ -136,7 +136,7 @@ func (g graph) findPositionChildNode(parent node, child node) coord {
 	// Check if the child node can be placed next to the parent node.
 	coordNextToParent := coord{parent.coord.x + parentWidth + paddingBetweenX, parent.coord.y}
 	if !doDrawingsCollide(g.drawing, child.drawing, coordNextToParent) {
-		log.Debug("Placing child node", child.name, "next to parent node", parent.name)
+		log.Debug("Placing child node ", child.name, " next to parent node ", parent.name)
 		return coordNextToParent
 	} else {
 		// The child node can't be placed next to the parent node.
@@ -144,12 +144,12 @@ func (g graph) findPositionChildNode(parent node, child node) coord {
 		// If there are no child nodes, place it under the parent node.
 		children := g.getChildren(parent)
 		if len(children) == 0 {
-			log.Debug("Couldn't find position for child node", child.name, "for parent node", parent.name)
+			log.Debug("Couldn't find position for child node ", child.name, " for parent node ", parent.name)
 			return coord{x: 15, y: 15}
 		}
 		lastChildNode := children[len(children)-1]
 		_, lastChildNodeHeight := getDrawingSize(lastChildNode.drawing)
-		log.Debug("Placing child node", child.name, "under last child node", lastChildNode.name, "for parent node", parent.name)
+		log.Debug("Placing child node ", child.name, " under last child node ", lastChildNode.name, " for parent node ", parent.name)
 		return coord{x: lastChildNode.coord.x, y: lastChildNode.coord.y + lastChildNodeHeight + paddingBetweenY}
 	}
 }
@@ -302,7 +302,7 @@ func drawBox(text string) drawing {
 func drawArrow(from coord, to coord) drawing {
 	// Stop arrow one character before the end coord to stop just before the target
 	arrowDrawing := mkDrawing(Max(from.x, to.x), Max(from.y, to.y))
-	log.Debug("Drawing arrow from", from, "to", to)
+	log.Debug("Drawing arrow from ", from, " to ", to)
 	// Find the coord where the arrow should rotate
 	rotateCoord := coord{from.x, to.y}
 	// Draw from start to rotate
