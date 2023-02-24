@@ -101,8 +101,8 @@ func (g *graph) getOrCreateRootNode(name string) node {
 }
 
 func (g graph) positionNextRootNode() coord {
-	previousRootNodes := g.getRootNodes()
-	return coord{len(previousRootNodes) * 10, 0}
+	w, _ := g.dimensions()
+	return coord{x: w, y: 0}
 }
 
 func (g *graph) getOrCreateChildNode(parent node, name string) node {
@@ -352,14 +352,14 @@ func mergeDrawings(d1 drawing, d2 drawing, mergeCoord coord) drawing {
 	maxY := Max(maxY1, maxY2+mergeCoord.y)
 	mergedDrawing := mkDrawing(maxX, maxY)
 	// Copy d1
-	for x := 0; x < maxX1; x++ {
-		for y := 0; y < maxY1; y++ {
+	for x := 0; x <= maxX1; x++ {
+		for y := 0; y <= maxY1; y++ {
 			mergedDrawing[x][y] = d1[x][y]
 		}
 	}
 	// Copy d2 with offset
-	for x := 0; x < maxX2; x++ {
-		for y := 0; y < maxY2; y++ {
+	for x := 0; x <= maxX2; x++ {
+		for y := 0; y <= maxY2; y++ {
 			c := d2[x][y]
 			if c != " " {
 				mergedDrawing[x+mergeCoord.x][y+mergeCoord.y] = d2[x][y]
@@ -371,16 +371,16 @@ func mergeDrawings(d1 drawing, d2 drawing, mergeCoord coord) drawing {
 
 func drawingToString(d drawing) string {
 	maxX, maxY := getDrawingSize(d)
-	s := make([]string, maxY)
-	for y := 0; y < maxY; y++ {
-		lineBuilder := strings.Builder{}
-		for x := 0; x < maxX; x++ {
-			lineBuilder.WriteString(d[x][y])
+	dBuilder := strings.Builder{}
+	for y := 0; y <= maxY; y++ {
+		for x := 0; x <= maxX; x++ {
+			dBuilder.WriteString(d[x][y])
 		}
-		s[y] = lineBuilder.String()
-
+		if y != maxY {
+			dBuilder.WriteString("\n")
+		}
 	}
-	return strings.Join(s, "\n")
+	return dBuilder.String()
 }
 
 func mkDrawing(x int, y int) drawing {
@@ -395,7 +395,7 @@ func mkDrawing(x int, y int) drawing {
 }
 
 func getDrawingSize(d drawing) (int, int) {
-	return len(d), len(d[0])
+	return len(d) - 1, len(d[0]) - 1
 }
 
 func Min(x, y int) int {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestBoxDimensions(t *testing.T) {
@@ -33,7 +34,7 @@ func TestDrawRightArrow(t *testing.T) {
 	boxString := drawingToString(arrowDrawing)
 	expected := `-->`
 	if boxString != expected {
-		t.Error("Expected boxString to be ", expected, " got ", boxString)
+		t.Error("Expected boxString to be", expected, "got", boxString)
 	}
 }
 
@@ -46,7 +47,7 @@ func TestDrawDownRightArrow(t *testing.T) {
 |  
 +->`
 	if boxString != expected {
-		t.Error("Expected boxString to be ", expected, " got ", boxString)
+		t.Error("Expected boxString to be", expected, "got", boxString)
 	}
 }
 
@@ -62,5 +63,35 @@ func TestNestedChildDrawing(t *testing.T) {
 +---+     +---+     +---+`
 	if s != expected {
 		t.Error("Expected s to be ", expected, " got ", s)
+	}
+}
+
+func TestMerge(t *testing.T) {
+	a := drawing{{"0", "1", "2"}}
+	b := drawing{{"3", "4", "5"}}
+	c := mergeDrawings(a, b, coord{0, 0})
+	expected := drawing{{"3", "4", "5"}}
+	if !cmp.Equal(c, expected) {
+		t.Error("Expected c to be ", expected, " got ", c)
+	}
+}
+
+func TestMergeWithXOffset(t *testing.T) {
+	a := drawing{{"0", "1", "2"}}
+	b := drawing{{"3", "4", "5"}}
+	c := mergeDrawings(a, b, coord{1, 0})
+	expected := drawing{{"0", "1", "2"}, {"3", "4", "5"}}
+	if !cmp.Equal(c, expected) {
+		t.Error("Expected c to be ", expected, " got ", c)
+	}
+}
+
+func TestMergeWithYOffset(t *testing.T) {
+	a := drawing{{"0", "1", "2"}}
+	b := drawing{{"3", "4", "5"}}
+	c := mergeDrawings(a, b, coord{0, 1})
+	expected := drawing{{"0", "3", "4", "5"}}
+	if !cmp.Equal(c, expected) {
+		t.Error("Expected c to be ", expected, " got ", c)
 	}
 }
