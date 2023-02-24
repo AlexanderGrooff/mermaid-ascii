@@ -173,12 +173,7 @@ func (g *graph) drawEdge(e edge) {
 	g.drawing = m
 }
 
-func main(args []string) {
-	data := orderedmap.NewOrderedMap[string, []string]()
-	data.Set("A", []string{"C", "D"})
-	data.Set("B", []string{"C", "D"})
-	data.Set("C", []string{"D"})
-
+func drawMap(data *orderedmap.OrderedMap[string, []string]) {
 	totalGraph := mkGraph(data)
 	s := drawingToString(totalGraph.drawing)
 	fmt.Println(s)

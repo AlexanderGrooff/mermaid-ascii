@@ -3,8 +3,8 @@ package cmd
 import (
 	"os"
 
-	"github.com/spf13/cobra"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 // Global flags
@@ -20,7 +20,11 @@ var rootCmd = &cobra.Command{
 		} else {
 			log.SetLevel(log.InfoLevel)
 		}
-		main(args)
+		mermaidMap, err := mermaidFileToMap(cmd.Flag("file").Value.String())
+		if err != nil {
+			log.Fatal("Failed to parse mermaid file", err)
+		}
+		drawMap(mermaidMap)
 	},
 }
 
@@ -38,10 +42,9 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mermaid-ascii.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "verbose output")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	// rootCmd.Flags().BoolP("verbose", "v", false, "Toggle verbose output")
+	rootCmd.Flags().StringP("file", "f", "/tmp/dummy.mermaid", "Mermaid file to parse")
 }
