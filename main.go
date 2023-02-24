@@ -105,6 +105,23 @@ func (g graph) positionNextRootNode() coord {
 	return coord{len(previousRootNodes) * 10, 0}
 }
 
+func (g *graph) getOrCreateChildNode(parent node, name string) node {
+	// Check if the node already exists.
+	for _, existingChildNode := range g.nodes {
+		if existingChildNode.name == name {
+			fmt.Println("Found existing child node", existingChildNode.name, "at", existingChildNode.coord)
+			return existingChildNode
+		}
+	}
+	childNode := node{name: name, drawing: drawBox(name)}
+	childCoord := g.findPositionChildNode(parent, childNode)
+	childNode.setCoord(childCoord)
+	g.drawNode(childNode)
+	g.appendNode(childNode)
+	fmt.Println("Placed child node: ", childNode.coord)
+	return childNode
+}
+
 func (g graph) findPositionChildNode(parent node, child node) coord {
 	// Find a place to put the node, so it doesn't collide with any other nodes.
 	// Place the node next to its parent node, if possible. Otherwise, place it
@@ -152,7 +169,8 @@ func (g *graph) drawEdge(e edge) {
 }
 
 func main() {
-	data := graphData{"Some text": {"B", "C"}, "B": {"D"}, "E": {"F", "G", "H"}}
+	data := graphData{"Some text": {"B", "C"}, "B": {"D"}, "E": {"F", "G", "H"}, "C": {"D"}}
+	// data := graphData{"A": {"C", "D"}, "D": {"C"}}
 	totalGraph := mkGraph(data)
 	s := drawingToString(totalGraph.drawing)
 	fmt.Println(s)
@@ -163,12 +181,7 @@ func mkGraph(data graphData) graph {
 	for nodeName, children := range data {
 		parentNode := g.getOrCreateRootNode(nodeName)
 		for _, childNodeName := range children {
-			childNode := node{name: childNodeName, drawing: drawBox(childNodeName)}
-			childCoord := g.findPositionChildNode(parentNode, childNode)
-			childNode.setCoord(childCoord)
-			g.drawNode(childNode)
-			g.appendNode(childNode)
-			fmt.Println("Placed child node: ", childNode.coord)
+			childNode := g.getOrCreateChildNode(parentNode, childNodeName)
 			e := edge{from: parentNode, to: childNode, text: ""}
 			g.drawEdge(e)
 			g.edges = append(g.edges, e)
@@ -283,22 +296,51 @@ func drawBox(text string) drawing {
 
 func drawArrow(from coord, to coord) drawing {
 	// Stop arrow one character before the end coord to stop just before the target
-	arrowDrawing := mkDrawing(Max(from.x, to.x)-1, Max(from.y, to.y))
-	fmt.Println("Drawing arrow from ", from, " to ", to)
+	arrowDrawing := mkDrawing(Max(from.x, to.x), Max(from.y, to.y))
+	fmt.Println("Drawing arrow from", from, "to", to)
 	// Find the coord where the arrow should rotate
 	rotateCoord := coord{from.x, to.y}
 	// Draw from start to rotate
-	for y := from.y; y <= rotateCoord.y; y++ {
-		arrowDrawing[rotateCoord.x][y] = "|" // Vertical line
+	if from.y <= rotateCoord.y {
+		for y := from.y; y <= rotateCoord.y; y++ {
+			arrowDrawing[rotateCoord.x][y] = "|" // Vertical line
+		}
+	} else {
+		for y := rotateCoord.y; y < from.y; y++ {
+			arrowDrawing[rotateCoord.x][y] = "|" // Vertical line
+		}
 	}
 	// Draw from rotate to end
-	for x := rotateCoord.x; x < to.x; x++ {
-		arrowDrawing[x][rotateCoord.y] = "-" // Horizontal line
+	if to.x >= rotateCoord.x {
+		for x := rotateCoord.x; x < to.x; x++ {
+			arrowDrawing[x][rotateCoord.y] = "-" // Horizontal line
+		}
+	} else {
+		for x := to.x; x < rotateCoord.x; x++ {
+			arrowDrawing[x][rotateCoord.y] = "-" // Horizontal line
+		}
 	}
 	if from.x != to.x && from.y != to.y {
 		arrowDrawing[rotateCoord.x][rotateCoord.y] = "+" // Corner
 	}
-	arrowDrawing[to.x-1][to.y] = ">" // Arrow head
+	// Draw arrow head depending on direction
+	if from.x == to.x {
+		// Vertical arrow
+		if from.y < to.y {
+			// Down
+			arrowDrawing[to.x][to.y] = "v"
+		} else {
+			// Up
+			arrowDrawing[to.x][to.y] = "^"
+		}
+	} else if from.x < to.x {
+		// Right
+		arrowDrawing[to.x-1][to.y] = ">"
+	} else {
+		// Left
+		arrowDrawing[to.x+1][to.y] = "<"
+	}
+
 	return arrowDrawing
 }
 func mergeDrawings(d1 drawing, d2 drawing, mergeCoord coord) drawing {

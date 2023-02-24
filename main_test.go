@@ -49,3 +49,18 @@ func TestDrawDownRightArrow(t *testing.T) {
 		t.Error("Expected boxString to be ", expected, " got ", boxString)
 	}
 }
+
+func TestNestedChildDrawing(t *testing.T) {
+	t.Skip("Has whitespace issues")
+	g := mkGraph(graphData{"A": {"B"}, "B": {"C"}})
+	s := drawingToString(g.drawing)
+	expected :=
+		`+---+     +---+     +---+
+|   |     |   |     |   |
+| A |---->| B |---->| C |
+|   |     |   |     |   |
++---+     +---+     +---+`
+	if s != expected {
+		t.Error("Expected s to be ", expected, " got ", s)
+	}
+}
