@@ -8,7 +8,7 @@ import (
 const boxBorderWidth = 1
 const boxBorderPadding = 1
 const paddingBetweenX = 5
-const paddingBetweenY = 2
+const paddingBetweenY = 4
 const boxHeight = boxBorderPadding*2 + boxBorderWidth*2 + 1
 
 type coord struct {
@@ -306,7 +306,7 @@ func drawArrow(from coord, to coord) drawing {
 	// Draw from start to rotate
 	if from.y <= rotateCoord.y {
 		// Up
-		for y := from.y; y < rotateCoord.y; y++ {
+		for y := from.y + 1; y < rotateCoord.y; y++ {
 			arrowDrawing[rotateCoord.x][y] = "|" // Vertical line
 		}
 	} else {
@@ -317,11 +317,13 @@ func drawArrow(from coord, to coord) drawing {
 	}
 	// Draw from rotate to end
 	if to.x >= rotateCoord.x {
-		for x := rotateCoord.x; x < to.x; x++ {
+		// Right
+		for x := rotateCoord.x + 1; x < to.x; x++ {
 			arrowDrawing[x][rotateCoord.y] = "-" // Horizontal line
 		}
 	} else {
-		for x := to.x; x < rotateCoord.x; x++ {
+		// Left
+		for x := to.x + 1; x < rotateCoord.x; x++ {
 			arrowDrawing[x][rotateCoord.y] = "-" // Horizontal line
 		}
 	}
@@ -343,7 +345,7 @@ func drawArrow(from coord, to coord) drawing {
 		arrowDrawing[to.x-1][to.y] = ">"
 	} else {
 		// Left
-		arrowDrawing[to.x][to.y] = "<"
+		arrowDrawing[to.x+1][to.y] = "<"
 	}
 
 	return arrowDrawing
