@@ -33,6 +33,7 @@
             go_1_19 # Go 1.19
             gotools # Go tools like goimports, godoc, and others
             delve   # Go debugger
+            cobra-cli   # Go CLI tool generator
           ];
         };
       });
