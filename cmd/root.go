@@ -13,7 +13,6 @@ var boxBorderWidth = 1
 var boxBorderPadding = 1
 var paddingBetweenX = 5
 var paddingBetweenY = 4
-var boxHeight = boxBorderPadding*2 + boxBorderWidth*2 + 1
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{

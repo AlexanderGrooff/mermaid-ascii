@@ -8,7 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-
 type drawing [][]string
 
 func (g *graph) drawNode(n node) {

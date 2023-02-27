@@ -1,7 +1,8 @@
 package cmd
+
 import (
-	log "github.com/sirupsen/logrus"
 	"github.com/elliotchance/orderedmap/v2"
+	log "github.com/sirupsen/logrus"
 )
 
 type coord struct {
@@ -45,16 +46,6 @@ func (g graph) getEdgesFromNode(node node) []edge {
 	return edges
 }
 
-func (g graph) getEdgesToNode(node node) []edge {
-	edges := []edge{}
-	for _, edge := range g.edges {
-		if (&edge.to) == (&node) {
-			edges = append(edges, edge)
-		}
-	}
-	return edges
-}
-
 func (g graph) getChildren(n node) []node {
 	edges := g.getEdgesFromNode(n)
 	children := []node{}
@@ -62,17 +53,6 @@ func (g graph) getChildren(n node) []node {
 		children = append(children, edge.to)
 	}
 	return children
-}
-
-func (g graph) getRootNodes() []node {
-	nodes := []node{}
-	for _, node := range g.nodes {
-		edges := g.getEdgesToNode(node)
-		if len(edges) == 0 {
-			nodes = append(nodes, node)
-		}
-	}
-	return nodes
 }
 
 func (g *graph) getOrCreateRootNode(name string) node {
