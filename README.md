@@ -53,3 +53,24 @@ Flags:
   -y, --paddingY int   Vertical space between nodes (default 4)
   -v, --verbose        verbose output
 ```
+
+## TODOs
+
+The baseline components for Mermaid work, but there are a lot of things that are not supported yet. Here's a list of things that are not yet supported:
+
+### Syntax support
+
+- [ ] Graph directions like `graph LR` and `graph TB`
+- [ ] `classDef` and `class`
+- [ ] `subgraph`
+- [ ] Shapes other than rectangles
+- [ ] `A & B`
+- [ ] Multiple arrows on one line
+- [ ] Whitespacing and comments
+
+### Rendering
+
+- [ ] Prevent arrows overlapping nodes
+- [ ] Support for multiline nodes
+- [ ] Place nodes in a more compact way
+- [ ] Prevent rendering more than X characters wide (like 80 for terminal width)
