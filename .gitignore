@@ -5,3 +5,6 @@
 # Build artifacts
 build
 dist/
+mermaid-ascii
+*.tar.gz
+*.tar.zst
