@@ -49,6 +49,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "verbose output")
 	rootCmd.PersistentFlags().IntVarP(&paddingBetweenX, "paddingX", "x", 5, "Horizontal space between nodes")
 	rootCmd.PersistentFlags().IntVarP(&paddingBetweenY, "paddingY", "y", 4, "Vertical space between nodes")
+	rootCmd.PersistentFlags().IntVarP(&boxBorderPadding, "borderPadding", "p", 1, "Padding between text and border")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.

@@ -40,6 +40,28 @@ $ mermaid-ascii --file test.mermaid -x 8 -y 8
   +-------->| D |<--------+
             |   |
             +---+
+$ mermaid-ascii -f ./test.mermaid -p 3
++-------+    +-------+    +-------+
+|       |    |       |    |       |
+|       |    |       |    |       |
+|       |    |       |    |       |
+|   A   |--->|   C   |<---|   B   |
+|       |    |       |    |       |
+|       |    |       |    |       |
+|       |    |       |    |       |
++-------+    +-------+    +-------+
+    |            |            |
+    |            |            |
+    |            v            |
+    |        +-------+        |
+    |        |       |        |
+    |        |       |        |
+    |        |       |        |
+    +------->|   D   |<-------+
+             |       |
+             |       |
+             |       |
+             +-------+
 $ mermaid-ascii --help
 Generate ASCII diagrams from mermaid code.
 
