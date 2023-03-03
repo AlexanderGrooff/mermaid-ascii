@@ -36,6 +36,7 @@
             cobra-cli   # Go CLI tool generator
             golangci-lint
             pre-commit
+            goreleaser
           ];
         };
       });

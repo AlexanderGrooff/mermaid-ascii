@@ -1,2 +1,7 @@
+# Dev artifacts
 .direnv
+*.mermaid
+
+# Build artifacts
 build
+dist/
