@@ -1,6 +1,29 @@
 # Mermaid ASCII
 
 Render mermaid diagrams in your terminal:
+
+## Installation
+
+You can download the binary from Github releases:
+
+```bash
+# Get the latest release
+$ curl -s https://api.github.com/repos/AlexanderGrooff/mermaid-ascii/releases/latest | grep "browser_download_url.*mermaid-ascii" | grep "$(uname)_$(uname -m)" | cut -d: -f2,3 | tr -d \" | wget -qi -
+# Unzip it
+$ tar xvzf mermaid-ascii_*.tar.gz
+$ ./mermaid-ascii --help
+```
+
+You can also build it yourself:
+
+```bash
+$ git clone
+$ cd mermaid-ascii
+$ go build
+$ mermaid-ascii --help
+```
+
+## Usage
 ```bash
 $ cat test.mermaid
 A --> C
