@@ -68,59 +68,6 @@ func drawBox(text string) drawing {
 	return boxDrawing
 }
 
-func drawArrow(from coord, to coord) drawing {
-	// Stop arrow one character before the end coord to stop just before the target
-	arrowDrawing := mkDrawing(Max(from.x, to.x), Max(from.y, to.y))
-	log.Debug("Drawing arrow from ", from, " to ", to)
-	// Find the coord where the arrow should rotate
-	rotateCoord := coord{from.x, to.y}
-	// Draw from start to rotate
-	if from.y <= rotateCoord.y {
-		// Down
-		for y := from.y + 1; y < rotateCoord.y; y++ {
-			arrowDrawing[rotateCoord.x][y] = "|" // Vertical line
-		}
-	} else {
-		// Up
-		for y := rotateCoord.y + 1; y < from.y; y++ {
-			arrowDrawing[rotateCoord.x][y] = "|" // Vertical line
-		}
-	}
-	// Draw from rotate to end
-	if to.x >= rotateCoord.x {
-		// Right
-		for x := rotateCoord.x + 1; x < to.x; x++ {
-			arrowDrawing[x][rotateCoord.y] = "-" // Horizontal line
-		}
-	} else {
-		// Left
-		for x := to.x + 1; x < rotateCoord.x; x++ {
-			arrowDrawing[x][rotateCoord.y] = "-" // Horizontal line
-		}
-	}
-	if from.x != to.x && from.y != to.y {
-		arrowDrawing[rotateCoord.x][rotateCoord.y] = "+" // Corner
-	}
-	// Draw arrow head depending on direction
-	if from.x == to.x {
-		// Vertical arrow
-		if from.y < to.y {
-			// Down
-			arrowDrawing[to.x][to.y-1] = "v"
-		} else {
-			// Up
-			arrowDrawing[to.x][to.y+1] = "^"
-		}
-	} else if from.x < to.x {
-		// Right
-		arrowDrawing[to.x-1][to.y] = ">"
-	} else {
-		// Left
-		arrowDrawing[to.x+1][to.y] = "<"
-	}
-
-	return arrowDrawing
-}
 func mergeDrawings(d1 drawing, d2 drawing, mergeCoord coord) drawing {
 	maxX1, maxY1 := getDrawingSize(d1)
 	maxX2, maxY2 := getDrawingSize(d2)
@@ -172,18 +119,4 @@ func mkDrawing(x int, y int) drawing {
 
 func getDrawingSize(d drawing) (int, int) {
 	return len(d) - 1, len(d[0]) - 1
-}
-
-func Min(x, y int) int {
-	if x < y {
-		return x
-	}
-	return y
-}
-
-func Max(x, y int) int {
-	if x > y {
-		return x
-	}
-	return y
 }
