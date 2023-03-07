@@ -76,13 +76,13 @@ func drawArrow(from coord, to coord) drawing {
 	rotateCoord := coord{from.x, to.y}
 	// Draw from start to rotate
 	if from.y <= rotateCoord.y {
-		// Up
+		// Down
 		for y := from.y + 1; y < rotateCoord.y; y++ {
 			arrowDrawing[rotateCoord.x][y] = "|" // Vertical line
 		}
 	} else {
-		// Down
-		for y := rotateCoord.y; y < from.y; y++ {
+		// Up
+		for y := rotateCoord.y + 1; y < from.y; y++ {
 			arrowDrawing[rotateCoord.x][y] = "|" // Vertical line
 		}
 	}
@@ -109,7 +109,7 @@ func drawArrow(from coord, to coord) drawing {
 			arrowDrawing[to.x][to.y-1] = "v"
 		} else {
 			// Up
-			arrowDrawing[to.x][to.y] = "^"
+			arrowDrawing[to.x][to.y+1] = "^"
 		}
 	} else if from.x < to.x {
 		// Right

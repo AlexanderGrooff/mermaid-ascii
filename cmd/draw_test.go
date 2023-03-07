@@ -70,6 +70,80 @@ func TestNestedChildDrawing(t *testing.T) {
 	}
 }
 
+func TestVerticalChildren(t *testing.T) {
+	data := orderedmap.NewOrderedMap[string, []string]()
+	data.Set("A", []string{"B", "C"})
+	g := mkGraph(data)
+	s := drawingToString(g.drawing)
+	expected :=
+		`+---+    +---+
+|   |    |   |
+| A |--->| B |
+|   |    |   |
++---+    +---+
+  |           
+  |           
+  |           
+  |      +---+
+  |      |   |
+  +----->| C |
+         |   |
+         +---+`
+	if s != expected {
+		t.Error("Expected s to be ", expected, " got ", s)
+	}
+}
+
+func TestTopChildPointsDown(t *testing.T) {
+	data := orderedmap.NewOrderedMap[string, []string]()
+	data.Set("A", []string{"B", "C"})
+	data.Set("B", []string{"C"})
+	g := mkGraph(data)
+	s := drawingToString(g.drawing)
+	expected :=
+		`+---+    +---+
+|   |    |   |
+| A |--->| B |
+|   |    |   |
++---+    +---+
+  |        |  
+  |        |  
+  |        v  
+  |      +---+
+  |      |   |
+  +----->| C |
+         |   |
+         +---+`
+	if s != expected {
+		t.Error("Expected s to be ", expected, " got ", s)
+	}
+}
+
+func TestBottomChildPointsUp(t *testing.T) {
+	data := orderedmap.NewOrderedMap[string, []string]()
+	data.Set("A", []string{"B", "C"})
+	data.Set("C", []string{"B"})
+	g := mkGraph(data)
+	s := drawingToString(g.drawing)
+	expected :=
+		`+---+    +---+
+|   |    |   |
+| A |--->| B |
+|   |    |   |
++---+    +---+
+  |        ^  
+  |        |  
+  |        |  
+  |      +---+
+  |      |   |
+  +----->| C |
+         |   |
+         +---+`
+	if s != expected {
+		t.Error("Expected s to be ", expected, " got ", s)
+	}
+}
+
 func TestMerge(t *testing.T) {
 	a := drawing{{"0", "1", "2"}}
 	b := drawing{{"3", "4", "5"}}
