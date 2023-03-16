@@ -17,40 +17,12 @@ const (
 	LowerLeft  = "LowerLeft"
 )
 
-func determineDirection(from coord, to coord) direction {
-	if from.x == to.x {
-		if from.y < to.y {
-			return Down
-		} else {
-			return Up
-		}
-	} else if from.y == to.y {
-		if from.x < to.x {
-			return Right
-		} else {
-			return Left
-		}
-	} else if from.x < to.x {
-		if from.y < to.y {
-			return LowerRight
-		} else {
-			return UpperRight
-		}
-	} else {
-		if from.y < to.y {
-			return LowerLeft
-		} else {
-			return UpperLeft
-		}
-	}
-}
-
 func drawArrow(from coord, to coord) drawing {
-	// Stop arrow one character before the end coord to stop just before the target
 	arrowDrawing := mkDrawing(Max(from.x, to.x), Max(from.y, to.y))
 	log.Debug("Drawing arrow from ", from, " to ", to)
 
-	// Draw arrow body
+	// Draw arrow body. This lines up between the coords, so the actual from/to
+	// coords are offset by 1.
 	switch determineDirection(from, to) {
 	case Up:
 		for y := from.y - 1; y > to.y; y-- {
@@ -65,40 +37,27 @@ func drawArrow(from coord, to coord) drawing {
 			arrowDrawing[x][from.y] = "-"
 		}
 	case Right:
-		for x := from.x + 1; x < to.x; x++ {
-			arrowDrawing[x][from.y] = "-"
-		}
+		arrowDrawing.drawLine(coord{from.x + 1, from.y}, coord{to.x - 1, to.y})
 	// Draw diagonal if the arrow is going from one corner to another.
 	// If there can't be a straight diagonal, first draw a vertical or
 	// horizontal line to the corner, then draw the diagonal.
 	case LowerRight:
 		diff := Abs(to.y-from.y) - Abs(to.x-from.x)
-		log.Debug("Drawing diagonal with diff ", diff)
 		if diff == 0 {
-			for x, y := from.x, from.y+1; x < to.x && y < to.y; x, y = x+1, y+1 {
-				arrowDrawing[x][y] = "\\"
-			}
+			arrowDrawing.drawLine(coord{from.x, from.y + 1}, coord{to.x - 1, to.y})
 		} else {
 			// Draw straight line until we can make a straight diagonal
 			// If diff is positive, we need to draw a vertical line first
 			if diff > 0 {
 				// Draw vertical line until diff is 0
-				for y := from.y + 1; y < from.y+1+diff; y++ {
-					arrowDrawing[from.x][y] = "|"
-				}
+				arrowDrawing.drawLine(coord{from.x, from.y + 1}, coord{from.x, from.y + diff})
 				// Draw diagonal
-				for x, y := from.x, from.y+1+diff; x < to.x && y < to.y; x, y = x+1, y+1 {
-					arrowDrawing[x][y] = "\\"
-				}
+				arrowDrawing.drawLine(coord{from.x, from.y + diff + 1}, coord{to.x - 1, to.y})
 			} else {
 				// Draw diagonal until we can draw a horizontal line
-				for x, y := from.x, from.y+1; x < to.x && y < to.y; x, y = x+1, y+1 {
-					arrowDrawing[x][y] = "\\"
-				}
+				arrowDrawing.drawLine(coord{from.x, from.y + 1}, coord{to.x + diff, to.y})
 				// Draw horizontal line
-				for x := to.x + diff - 1; x < to.x; x++ {
-					arrowDrawing[x][to.y] = "-"
-				}
+				arrowDrawing.drawLine(coord{to.x + diff, to.y}, coord{to.x - 1, to.y})
 			}
 		}
 	}

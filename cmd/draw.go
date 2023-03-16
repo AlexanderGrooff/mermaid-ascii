@@ -25,6 +25,44 @@ func (g *graph) drawEdge(e edge) {
 	g.drawing = m
 }
 
+func (d *drawing) drawLine(from coord, to coord) {
+	direction := determineDirection(from, to)
+	switch direction {
+	case Up:
+		for y := from.y; y >= to.y; y-- {
+			(*d)[from.x][y] = "|"
+		}
+	case Down:
+		for y := from.y; y <= to.y; y++ {
+			(*d)[from.x][y] = "|"
+		}
+	case Left:
+		for x := from.x; x >= to.x; x-- {
+			(*d)[x][from.y] = "-"
+		}
+	case Right:
+		for x := from.x; x <= to.x; x++ {
+			(*d)[x][from.y] = "-"
+		}
+	case UpperLeft:
+		for x, y := from.x, from.y; x >= to.x && y >= to.y; x, y = x-1, y-1 {
+			(*d)[x][y] = "\\"
+		}
+	case UpperRight:
+		for x, y := from.x, from.y; x <= to.x && y >= to.y; x, y = x+1, y-1 {
+			(*d)[x][y] = "/"
+		}
+	case LowerLeft:
+		for x, y := from.x, from.y; x >= to.x && y <= to.y; x, y = x-1, y+1 {
+			(*d)[x][y] = "/"
+		}
+	case LowerRight:
+		for x, y := from.x, from.y; x <= to.x && y <= to.y; x, y = x+1, y+1 {
+			(*d)[x][y] = "\\"
+		}
+	}
+}
+
 func drawMap(data *orderedmap.OrderedMap[string, []string]) {
 	totalGraph := mkGraph(data)
 	s := drawingToString(totalGraph.drawing)
@@ -119,4 +157,32 @@ func mkDrawing(x int, y int) drawing {
 
 func getDrawingSize(d drawing) (int, int) {
 	return len(d) - 1, len(d[0]) - 1
+}
+
+func determineDirection(from coord, to coord) direction {
+	if from.x == to.x {
+		if from.y < to.y {
+			return Down
+		} else {
+			return Up
+		}
+	} else if from.y == to.y {
+		if from.x < to.x {
+			return Right
+		} else {
+			return Left
+		}
+	} else if from.x < to.x {
+		if from.y < to.y {
+			return LowerRight
+		} else {
+			return UpperRight
+		}
+	} else {
+		if from.y < to.y {
+			return LowerLeft
+		} else {
+			return UpperLeft
+		}
+	}
 }
