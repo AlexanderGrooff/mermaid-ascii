@@ -23,42 +23,75 @@ func drawArrow(from coord, to coord) drawing {
 
 	// Draw arrow body. This lines up between the coords, so the actual from/to
 	// coords are offset by 1.
+	diffY := Abs(to.y - from.y)
+	diffX := Abs(to.x - from.x)
+	diff := diffY - diffX
+	log.Debug("diffY: ", diffY, " diffX: ", diffX, " diff: ", diff)
 	switch determineDirection(from, to) {
 	case Up:
-		for y := from.y - 1; y > to.y; y-- {
-			arrowDrawing[from.x][y] = "|"
-		}
+		arrowDrawing.drawLine(from, to, 1, -1)
 	case Down:
-		for y := from.y + 1; y < to.y; y++ {
-			arrowDrawing[from.x][y] = "|"
-		}
+		arrowDrawing.drawLine(from, to, 1, -1)
 	case Left:
-		for x := from.x - 1; x > to.x; x-- {
-			arrowDrawing[x][from.y] = "-"
-		}
+		arrowDrawing.drawLine(from, to, 1, -1)
 	case Right:
-		arrowDrawing.drawLine(coord{from.x + 1, from.y}, coord{to.x - 1, to.y})
+		arrowDrawing.drawLine(from, to, 1, -1)
 	// Draw diagonal if the arrow is going from one corner to another.
 	// If there can't be a straight diagonal, first draw a vertical or
 	// horizontal line to the corner, then draw the diagonal.
+	// Draw straight line until we can make a straight diagonal
+	// If diff is positive, we need to draw a vertical line first
 	case LowerRight:
-		diff := Abs(to.y-from.y) - Abs(to.x-from.x)
 		if diff == 0 {
-			arrowDrawing.drawLine(coord{from.x, from.y + 1}, coord{to.x - 1, to.y})
+			arrowDrawing.drawLine(from, to, 1, -1)
 		} else {
-			// Draw straight line until we can make a straight diagonal
-			// If diff is positive, we need to draw a vertical line first
+			var corner coord
 			if diff > 0 {
-				// Draw vertical line until diff is 0
-				arrowDrawing.drawLine(coord{from.x, from.y + 1}, coord{from.x, from.y + diff})
-				// Draw diagonal
-				arrowDrawing.drawLine(coord{from.x, from.y + diff + 1}, coord{to.x - 1, to.y})
+				corner = coord{from.x, from.y + diff + 1}
 			} else {
-				// Draw diagonal until we can draw a horizontal line
-				arrowDrawing.drawLine(coord{from.x, from.y + 1}, coord{to.x + diff, to.y})
-				// Draw horizontal line
-				arrowDrawing.drawLine(coord{to.x + diff, to.y}, coord{to.x - 1, to.y})
+				corner = coord{from.x + (diffX + diff), to.y}
 			}
+			arrowDrawing.drawLine(from, corner, 1, 0)
+			arrowDrawing.drawLine(corner, to, -1, -1)
+		}
+	case LowerLeft:
+		if diff == 0 {
+			arrowDrawing.drawLine(from, to, 1, -1)
+		} else {
+			var corner coord
+			if diff > 0 {
+				corner = coord{from.x, from.y + diff}
+			} else {
+				corner = coord{to.x - diff, to.y}
+			}
+			arrowDrawing.drawLine(from, corner, 1, 0)
+			arrowDrawing.drawLine(corner, to, -1, -1)
+		}
+	case UpperRight:
+		if diff == 0 {
+			arrowDrawing.drawLine(from, to, 1, -1)
+		} else {
+			var corner coord
+			if diff > 0 {
+				corner = coord{from.x, from.y - diff}
+			} else {
+				corner = coord{to.x + diff, to.y}
+			}
+			arrowDrawing.drawLine(from, corner, 1, 0)
+			arrowDrawing.drawLine(corner, to, 0, -1)
+		}
+	case UpperLeft:
+		if diff == 0 {
+			arrowDrawing.drawLine(from, to, 1, -1)
+		} else {
+			var corner coord
+			if diff > 0 {
+				corner = coord{from.x, from.y - diff}
+			} else {
+				corner = coord{to.x + diff, to.y}
+			}
+			arrowDrawing.drawLine(from, corner, 1, 0)
+			arrowDrawing.drawLine(corner, to, 0, -1)
 		}
 	}
 

@@ -25,39 +25,41 @@ func (g *graph) drawEdge(e edge) {
 	g.drawing = m
 }
 
-func (d *drawing) drawLine(from coord, to coord) {
+func (d *drawing) drawLine(from coord, to coord, offsetFrom int, offsetTo int) {
+	// Offset determines how far from the actual coord the line should start/stop.
 	direction := determineDirection(from, to)
+	log.Debug("Drawing line from ", from, " to ", to, " direction: ", direction, " offsetFrom: ", offsetFrom, " offsetTo: ", offsetTo)
 	switch direction {
 	case Up:
-		for y := from.y; y >= to.y; y-- {
+		for y := from.y - offsetFrom; y >= to.y-offsetTo; y-- {
 			(*d)[from.x][y] = "|"
 		}
 	case Down:
-		for y := from.y; y <= to.y; y++ {
+		for y := from.y + offsetFrom; y <= to.y+offsetTo; y++ {
 			(*d)[from.x][y] = "|"
 		}
 	case Left:
-		for x := from.x; x >= to.x; x-- {
+		for x := from.x - offsetFrom; x >= to.x-offsetTo; x-- {
 			(*d)[x][from.y] = "-"
 		}
 	case Right:
-		for x := from.x; x <= to.x; x++ {
+		for x := from.x + offsetFrom; x <= to.x+offsetTo; x++ {
 			(*d)[x][from.y] = "-"
 		}
 	case UpperLeft:
-		for x, y := from.x, from.y; x >= to.x && y >= to.y; x, y = x-1, y-1 {
+		for x, y := from.x, from.y-offsetFrom; x >= to.x-offsetTo && y >= to.y-offsetTo; x, y = x-1, y-1 {
 			(*d)[x][y] = "\\"
 		}
 	case UpperRight:
-		for x, y := from.x, from.y; x <= to.x && y >= to.y; x, y = x+1, y-1 {
+		for x, y := from.x, from.y-offsetFrom; x <= to.x+offsetTo && y >= to.y-offsetTo; x, y = x+1, y-1 {
 			(*d)[x][y] = "/"
 		}
 	case LowerLeft:
-		for x, y := from.x, from.y; x >= to.x && y <= to.y; x, y = x-1, y+1 {
+		for x, y := from.x, from.y+offsetFrom; x >= to.x-offsetTo && y <= to.y+offsetTo; x, y = x-1, y+1 {
 			(*d)[x][y] = "/"
 		}
 	case LowerRight:
-		for x, y := from.x, from.y; x <= to.x && y <= to.y; x, y = x+1, y+1 {
+		for x, y := from.x, from.y+offsetFrom; x <= to.x+offsetTo && y <= to.y+offsetTo; x, y = x+1, y+1 {
 			(*d)[x][y] = "\\"
 		}
 	}
