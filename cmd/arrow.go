@@ -47,11 +47,11 @@ func drawArrow(from coord, to coord) drawing {
 		} else {
 			var corner coord
 			if diff > 0 {
-				corner = coord{from.x, from.y + diff + 1}
+				corner = coord{from.x, from.y + diff + 2}
 			} else {
 				corner = coord{from.x + (diffX + diff), to.y}
 			}
-			arrowDrawing.drawLine(from, corner, 1, 0)
+			arrowDrawing.drawLine(from, corner, 1, -1)
 			arrowDrawing.drawLine(corner, to, -1, -1)
 		}
 	case LowerLeft:
@@ -60,11 +60,11 @@ func drawArrow(from coord, to coord) drawing {
 		} else {
 			var corner coord
 			if diff > 0 {
-				corner = coord{from.x, from.y + diff}
+				corner = coord{from.x, from.y + diff + 2}
 			} else {
 				corner = coord{to.x - diff, to.y}
 			}
-			arrowDrawing.drawLine(from, corner, 1, 0)
+			arrowDrawing.drawLine(from, corner, 1, -1)
 			arrowDrawing.drawLine(corner, to, -1, -1)
 		}
 	case UpperRight:
@@ -75,7 +75,7 @@ func drawArrow(from coord, to coord) drawing {
 			if diff > 0 {
 				corner = coord{from.x, from.y - diff}
 			} else {
-				corner = coord{to.x + diff, to.y}
+				corner = coord{to.x + diff - 1, to.y}
 			}
 			arrowDrawing.drawLine(from, corner, 1, 0)
 			arrowDrawing.drawLine(corner, to, 0, -1)
@@ -88,7 +88,7 @@ func drawArrow(from coord, to coord) drawing {
 			if diff > 0 {
 				corner = coord{from.x, from.y - diff}
 			} else {
-				corner = coord{to.x + diff, to.y}
+				corner = coord{to.x - diff + 1, to.y}
 			}
 			arrowDrawing.drawLine(from, corner, 1, 0)
 			arrowDrawing.drawLine(corner, to, 0, -1)

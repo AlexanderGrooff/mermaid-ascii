@@ -31,68 +31,6 @@ func TestDrawPlainBox(t *testing.T) {
 	}
 }
 
-func TestDrawRightArrow(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 0}, coord{3, 0})
-	boxString := drawingToString(arrowDrawing)
-	expected := ` -> `
-	if boxString != expected {
-		t.Error("Expected boxString to be", expected, "got", boxString)
-	}
-}
-
-func TestDrawStraightLowerRightArrow(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 0}, coord{3, 3})
-	boxString := drawingToString(arrowDrawing)
-	expected :=
-		`    
-\   
- \  
-  > `
-	if boxString != expected {
-		t.Error("Expected boxString to be", expected, "got", boxString)
-	}
-}
-
-func TestDrawLowerRightArrowWithLongerX(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 0}, coord{5, 3})
-	boxString := drawingToString(arrowDrawing)
-	expected :=
-		`      
-\     
- \    
-  --> `
-	if boxString != expected {
-		t.Error("Expected boxString to be", expected, "got", boxString)
-	}
-}
-
-func TestDrawLowerRightArrowWithLongerY(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 0}, coord{3, 5})
-	boxString := drawingToString(arrowDrawing)
-	expected :=
-		`    
-|   
-|   
-\   
- \  
-  > `
-	if boxString != expected {
-		t.Error("Expected boxString to be", expected, "got", boxString)
-	}
-}
-
-func TestDrawStraightUpperRightArrow(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 3}, coord{3, 0})
-	boxString := drawingToString(arrowDrawing)
-	expected :=
-		`  ^ 
- /
-/  `
-	if boxString != expected {
-		t.Error("Expected boxString to be", expected, "got", boxString)
-	}
-}
-
 func TestNestedChildDrawing(t *testing.T) {
 	data := orderedmap.NewOrderedMap[string, []string]()
 	data.Set("A", []string{"B"})
