@@ -34,33 +34,29 @@ B --> D
 $ mermaid-ascii --file test.mermaid
 +---+    +---+    +---+
 |   |    |   |    |   |
-| A |--->| C |<---| B |
+| A |--->| B |<---| D |
 |   |    |   |    |   |
 +---+    +---+    +---+
-  |        |        |
-  |        |        |
-  |        v        |
-  |      +---+      |
-  |      |   |      |
-  +----->| D |<-----+
+  \        |        /
+   \       |       /
+    \      v      /
+     \   +---+   /
+      \  |   |  /
+       ->| C |<-
          |   |
          +---+
-$ mermaid-ascii --file test.mermaid -x 8 -y 8
+$ mermaid-ascii --file test.mermaid -x 8
 +---+       +---+       +---+
 |   |       |   |       |   |
-| A |------>| C |<------| B |
+| A |------>| B |<------| D |
 |   |       |   |       |   |
 +---+       +---+       +---+
-  |           |           |
-  |           |           |
-  |           |           |
-  |           |           |
-  |           |           |
-  |           |           |
-  |           v           |
-  |         +---+         |
-  |         |   |         |
-  +-------->| D |<--------+
+  \           |           /
+   \          |          /
+    \         v         /
+     \      +---+      /
+      \     |   |     /
+       ---->| C |<----
             |   |
             +---+
 $ mermaid-ascii -f ./test.mermaid -p 3
@@ -68,19 +64,19 @@ $ mermaid-ascii -f ./test.mermaid -p 3
 |       |    |       |    |       |
 |       |    |       |    |       |
 |       |    |       |    |       |
-|   A   |--->|   C   |<---|   B   |
+|   A   |--->|   B   |<---|   D   |
 |       |    |       |    |       |
 |       |    |       |    |       |
 |       |    |       |    |       |
 +-------+    +-------+    +-------+
-    |            |            |
-    |            |            |
-    |            v            |
-    |        +-------+        |
-    |        |       |        |
-    |        |       |        |
-    |        |       |        |
-    +------->|   D   |<-------+
+    \            |            /
+     \           |           /
+      \          v          /
+       \     +-------+     /
+        \    |       |    /
+         \   |       |   /
+          \  |       |  /
+           ->|   C   |<-
              |       |
              |       |
              |       |
@@ -115,7 +111,7 @@ The baseline components for Mermaid work, but there are a lot of things that are
 
 ### Rendering
 
+- [x] Diagonal arrows
 - [ ] Prevent arrows overlapping nodes
-- [ ] Support for multiline nodes
 - [ ] Place nodes in a more compact way
-- [ ] Prevent rendering more than X characters wide (like 80 for terminal width)
+- [ ] Prevent rendering more than X characters wide (like default 80 for terminal width)
