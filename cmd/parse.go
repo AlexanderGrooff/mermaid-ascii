@@ -10,50 +10,46 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func setArrowWithLabel(matchedLine []string, data *orderedmap.OrderedMap[string, []string]) {
+type labeledChild struct {
+	child string
+	label string
+}
+
+func setArrowWithLabel(matchedLine []string, data *orderedmap.OrderedMap[string, []labeledChild]) {
 	parent := matchedLine[0]
 	label := matchedLine[1]
 	child := matchedLine[2]
 	log.Debug("Setting arrow from ", parent, " to ", child, " with label ", label)
-	// Check if the parent is in the map
-	if children, ok := data.Get(parent); ok {
-		// If it is, append the child to the list of children
-		data.Set(parent, append(children, child))
-	} else {
-		// If it isn't, add it to the map
-		data.Set(parent, []string{child})
-	}
-	// Check if the child is in the map
-	if _, ok := data.Get(child); ok {
-		// If it is, do nothing
-	} else {
-		// If it isn't, add it to the map
-		data.Set(child, []string{})
-	}
+	setData(parent, labeledChild{child, label}, data)
 }
 
-func setArrow(matchedLine []string, data *orderedmap.OrderedMap[string, []string]) {
+func setArrow(matchedLine []string, data *orderedmap.OrderedMap[string, []labeledChild]) {
 	parent := matchedLine[0]
 	child := matchedLine[1]
+	label := "" // Or should this be nil?
 	log.Debug("Setting arrow from ", parent, " to ", child)
+	setData(parent, labeledChild{child, label}, data)
+}
+
+func setData(parent string, child labeledChild, data *orderedmap.OrderedMap[string, []labeledChild]) {
 	// Check if the parent is in the map
 	if children, ok := data.Get(parent); ok {
 		// If it is, append the child to the list of children
 		data.Set(parent, append(children, child))
 	} else {
 		// If it isn't, add it to the map
-		data.Set(parent, []string{child})
+		data.Set(parent, []labeledChild{child})
 	}
 	// Check if the child is in the map
-	if _, ok := data.Get(child); ok {
+	if _, ok := data.Get(child.child); ok {
 		// If it is, do nothing
 	} else {
 		// If it isn't, add it to the map
-		data.Set(child, []string{})
+		data.Set(child.child, []labeledChild{})
 	}
 }
 
-func mermaidFileToMap(mermaidFile string) (*orderedmap.OrderedMap[string, []string], error) {
+func mermaidFileToMap(mermaidFile string) (*orderedmap.OrderedMap[string, []labeledChild], error) {
 	// Parse the mermaid code into a map
 	// The map is a tree of the form:
 	// {
@@ -68,7 +64,7 @@ func mermaidFileToMap(mermaidFile string) (*orderedmap.OrderedMap[string, []stri
 	// This is an ordered map so that the output is deterministic
 	// and the order of the keys is the order in which the nodes
 	// are drawn
-	data := orderedmap.NewOrderedMap[string, []string]()
+	data := orderedmap.NewOrderedMap[string, []labeledChild]()
 	// Split the mermaid code into lines
 	lines := strings.Split(string(mermaid), "\n")
 

@@ -127,15 +127,15 @@ func (g graph) dimensions() (int, int) {
 	return getDrawingSize(g.drawing)
 }
 
-func mkGraph(data *orderedmap.OrderedMap[string, []string]) graph {
+func mkGraph(data *orderedmap.OrderedMap[string, []labeledChild]) graph {
 	g := graph{drawing: mkDrawing(0, 0)}
 	for el := data.Front(); el != nil; el = el.Next() {
 		nodeName := el.Key
 		children := el.Value
 		parentNode := g.getOrCreateRootNode(nodeName)
-		for _, childNodeName := range children {
-			childNode := g.getOrCreateChildNode(parentNode, childNodeName)
-			e := edge{from: parentNode, to: childNode, text: ""}
+		for _, child := range children {
+			childNode := g.getOrCreateChildNode(parentNode, child.child)
+			e := edge{from: parentNode, to: childNode, text: child.label}
 			g.drawEdge(e)
 			g.edges = append(g.edges, e)
 		}

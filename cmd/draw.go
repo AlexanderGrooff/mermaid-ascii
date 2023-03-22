@@ -65,7 +65,7 @@ func (d *drawing) drawLine(from coord, to coord, offsetFrom int, offsetTo int) {
 	}
 }
 
-func drawMap(data *orderedmap.OrderedMap[string, []string]) {
+func drawMap(data *orderedmap.OrderedMap[string, []labeledChild]) {
 	totalGraph := mkGraph(data)
 	s := drawingToString(totalGraph.drawing)
 	fmt.Println(s)

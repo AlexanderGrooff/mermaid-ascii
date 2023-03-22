@@ -32,9 +32,9 @@ func TestDrawPlainBox(t *testing.T) {
 }
 
 func TestNestedChildDrawing(t *testing.T) {
-	data := orderedmap.NewOrderedMap[string, []string]()
-	data.Set("A", []string{"B"})
-	data.Set("B", []string{"C"})
+	data := orderedmap.NewOrderedMap[string, []labeledChild]()
+	data.Set("A", []labeledChild{{"B", ""}})
+	data.Set("B", []labeledChild{{"C", ""}})
 	g := mkGraph(data)
 	s := drawingToString(g.drawing)
 	expected :=
@@ -49,8 +49,8 @@ func TestNestedChildDrawing(t *testing.T) {
 }
 
 func TestVerticalChildren(t *testing.T) {
-	data := orderedmap.NewOrderedMap[string, []string]()
-	data.Set("A", []string{"B", "C"})
+	data := orderedmap.NewOrderedMap[string, []labeledChild]()
+	data.Set("A", []labeledChild{{"B", ""}, {"C", ""}})
 	g := mkGraph(data)
 	s := drawingToString(g.drawing)
 	expected :=
@@ -73,9 +73,9 @@ func TestVerticalChildren(t *testing.T) {
 }
 
 func TestTopChildPointsDown(t *testing.T) {
-	data := orderedmap.NewOrderedMap[string, []string]()
-	data.Set("A", []string{"B", "C"})
-	data.Set("B", []string{"C"})
+	data := orderedmap.NewOrderedMap[string, []labeledChild]()
+	data.Set("A", []labeledChild{{"B", ""}, {"C", ""}})
+	data.Set("B", []labeledChild{{"C", ""}})
 	g := mkGraph(data)
 	s := drawingToString(g.drawing)
 	expected :=
@@ -98,9 +98,9 @@ func TestTopChildPointsDown(t *testing.T) {
 }
 
 func TestBottomChildPointsUp(t *testing.T) {
-	data := orderedmap.NewOrderedMap[string, []string]()
-	data.Set("A", []string{"B", "C"})
-	data.Set("C", []string{"B"})
+	data := orderedmap.NewOrderedMap[string, []labeledChild]()
+	data.Set("A", []labeledChild{{"B", ""}, {"C", ""}})
+	data.Set("C", []labeledChild{{"B", ""}})
 	g := mkGraph(data)
 	s := drawingToString(g.drawing)
 	expected :=
