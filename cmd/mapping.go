@@ -122,25 +122,16 @@ func (g graph) findPositionChildNode(parent node, child node, arrowLabel string)
 		coordX = parent.coord.x + parentWidth + len(arrowLabel) + 4
 	}
 
-	// Check if the child node can be placed next to the parent node.
-	coordNextToParent := coord{coordX, parent.coord.y}
-	if !doDrawingsCollide(g.drawing, child.drawing, coordNextToParent) {
+	children := g.getChildren(parent)
+	if len(children) == 0 {
+		coordNextToParent := coord{coordX, parent.coord.y}
 		log.Debug("Placing child node ", child.name, " next to parent node ", parent.name)
 		return coordNextToParent
-	} else {
-		// The child node can't be placed next to the parent node.
-		// Find the last child node, and place the node under that one.
-		// If there are no child nodes, place it under the parent node.
-		children := g.getChildren(parent)
-		if len(children) == 0 {
-			log.Debug("Couldn't find position for child node ", child.name, " for parent node ", parent.name)
-			return coord{x: 15, y: 15}
-		}
-		lastChildNode := children[len(children)-1]
-		_, lastChildNodeHeight := getDrawingSize(lastChildNode.drawing)
-		log.Debug("Placing child node ", child.name, " under last child node ", lastChildNode.name, " for parent node ", parent.name)
-		return coord{x: lastChildNode.coord.x, y: lastChildNode.coord.y + lastChildNodeHeight + paddingBetweenY}
 	}
+	lastChildNode := children[len(children)-1]
+	_, lastChildNodeHeight := getDrawingSize(lastChildNode.drawing)
+	log.Debug("Placing child node ", child.name, " under last child node ", lastChildNode.name, " for parent node ", parent.name)
+	return coord{x: lastChildNode.coord.x, y: lastChildNode.coord.y + lastChildNodeHeight + paddingBetweenY}
 }
 
 func (g graph) dimensions() (int, int) {
@@ -161,25 +152,6 @@ func mkGraph(data *orderedmap.OrderedMap[string, []labeledChild]) graph {
 		}
 	}
 	return g
-}
-
-func doDrawingsCollide(drawing1 drawing, drawing2 drawing, offset coord) bool {
-	// Check if any of the drawing2 characters overlap with drawing1 characters.
-	// The offset is the coord of drawing2 relative to drawing1.
-	drawing1Width, drawing1Height := getDrawingSize(drawing1)
-	drawing2Width, drawing2Height := getDrawingSize(drawing2)
-	for x := 0; x < drawing2Width; x++ {
-		for y := 0; y < drawing2Height; y++ {
-			// Check if drawing2[x][y] overlaps with drawing1[x+offset.x][y+offset.y]
-			if x+offset.x >= 0 && x+offset.x < drawing1Width &&
-				y+offset.y >= 0 && y+offset.y < drawing1Height &&
-				drawing2[x][y] != " " &&
-				drawing1[x+offset.x][y+offset.y] != " " {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func getArrowStartEndOffset(from node, to node) (coord, coord) {
