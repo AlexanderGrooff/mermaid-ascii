@@ -55,7 +55,7 @@ func (g graph) getChildren(n node) []node {
 	return children
 }
 
-func (g *graph) getOrCreateRootNode(name string) node {
+func (g *graph) getOrCreateRootNode(name string, children []labeledChild) node {
 	// Check if the node already exists.
 	for _, existingRootNode := range g.nodes {
 		if existingRootNode.name == name {
@@ -63,7 +63,7 @@ func (g *graph) getOrCreateRootNode(name string) node {
 			return existingRootNode
 		}
 	}
-	parentCoord := g.positionNextRootNode()
+	parentCoord := g.positionNextRootNode(children)
 	log.Debug("Creating new root node ", name, " at ", parentCoord)
 	parentNode := node{name: name, drawing: drawBox(name), coord: parentCoord}
 	g.drawNode(parentNode)
@@ -71,24 +71,37 @@ func (g *graph) getOrCreateRootNode(name string) node {
 	return parentNode
 }
 
-func (g graph) positionNextRootNode() coord {
+func (g graph) positionNextRootNode(children []labeledChild) coord {
 	if len(g.nodes) == 0 {
 		return coord{x: 0, y: 0}
 	}
+
+	// Find existing child nodes to position the next root node next to.
+	// This way we can take label width into account.
+	var labelWidth int = 0
+	for _, node := range g.nodes {
+		for _, child := range children {
+			if child.child == node.name {
+				labelWidth = Max(len(child.label), labelWidth)
+			}
+		}
+	}
+	padding := Max(paddingBetweenX, labelWidth+4)
+
 	w, _ := g.dimensions()
-	return coord{x: w + paddingBetweenX, y: 0}
+	return coord{x: w + padding, y: 0}
 }
 
-func (g *graph) getOrCreateChildNode(parent node, name string) node {
+func (g *graph) getOrCreateChildNode(parent node, target labeledChild) node {
 	// Check if the node already exists.
 	for _, existingChildNode := range g.nodes {
-		if existingChildNode.name == name {
+		if existingChildNode.name == target.child {
 			log.Debug("Found existing child node ", existingChildNode.name, " at ", existingChildNode.coord)
 			return existingChildNode
 		}
 	}
-	childNode := node{name: name, drawing: drawBox(name)}
-	childCoord := g.findPositionChildNode(parent, childNode)
+	childNode := node{name: target.child, drawing: drawBox(target.child)}
+	childCoord := g.findPositionChildNode(parent, childNode, target.label)
 	childNode.setCoord(childCoord)
 	g.drawNode(childNode)
 	g.appendNode(childNode)
@@ -96,14 +109,21 @@ func (g *graph) getOrCreateChildNode(parent node, name string) node {
 	return childNode
 }
 
-func (g graph) findPositionChildNode(parent node, child node) coord {
+func (g graph) findPositionChildNode(parent node, child node, arrowLabel string) coord {
 	// Find a place to put the node, so it doesn't collide with any other nodes.
 	// Place the node next to its parent node, if possible. Otherwise, place it
 	// under the previous child node.
 	parentWidth, _ := getDrawingSize(parent.drawing)
 
+	// Add additional marging to the right of the parent node, so the arrow label
+	// can be placed on the arrow to the child node.
+	coordX := parent.coord.x + parentWidth + paddingBetweenX
+	if arrowLabel != "" && paddingBetweenX < len(arrowLabel)+4 {
+		coordX = parent.coord.x + parentWidth + len(arrowLabel) + 4
+	}
+
 	// Check if the child node can be placed next to the parent node.
-	coordNextToParent := coord{parent.coord.x + parentWidth + paddingBetweenX, parent.coord.y}
+	coordNextToParent := coord{coordX, parent.coord.y}
 	if !doDrawingsCollide(g.drawing, child.drawing, coordNextToParent) {
 		log.Debug("Placing child node ", child.name, " next to parent node ", parent.name)
 		return coordNextToParent
@@ -132,10 +152,10 @@ func mkGraph(data *orderedmap.OrderedMap[string, []labeledChild]) graph {
 	for el := data.Front(); el != nil; el = el.Next() {
 		nodeName := el.Key
 		children := el.Value
-		parentNode := g.getOrCreateRootNode(nodeName)
-		for _, child := range children {
-			childNode := g.getOrCreateChildNode(parentNode, child.child)
-			e := edge{from: parentNode, to: childNode, text: child.label}
+		parentNode := g.getOrCreateRootNode(nodeName, children)
+		for _, target := range children {
+			childNode := g.getOrCreateChildNode(parentNode, target)
+			e := edge{from: parentNode, to: childNode, text: target.label}
 			g.drawEdge(e)
 			g.edges = append(g.edges, e)
 		}
