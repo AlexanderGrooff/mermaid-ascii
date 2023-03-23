@@ -17,12 +17,22 @@ func (g *graph) drawNode(n node) {
 
 func (g *graph) drawEdge(e edge) {
 	arrowStart, arrowEnd := getArrowStartEndOffset(e.from, e.to)
-	arrow := drawArrow(
-		coord{x: e.from.coord.x + arrowStart.x, y: e.from.coord.y + arrowStart.y},
-		coord{x: e.to.coord.x + arrowEnd.x, y: e.to.coord.y + arrowEnd.y},
+	arrowFrom := coord{x: e.from.coord.x + arrowStart.x, y: e.from.coord.y + arrowStart.y}
+	arrowTo := coord{x: e.to.coord.x + arrowEnd.x, y: e.to.coord.y + arrowEnd.y}
+	g.drawing.drawArrow(
+		arrowFrom,
+		arrowTo,
+		e.text,
 	)
-	m := mergeDrawings(g.drawing, arrow, coord{x: 0, y: 0})
-	g.drawing = m
+}
+
+func (d *drawing) drawText(start coord, text string) {
+	// Increase dimensions if necessary.
+	d.increaseSize(start.x+len(text), start.y)
+	log.Debug("Drawing '", text, "' from ", start, " to ", coord{x: start.x + len(text), y: start.y})
+	for x := 0; x < len(text); x++ {
+		(*d)[x+start.x][start.y] = string(text[x])
+	}
 }
 
 func (d *drawing) drawLine(from coord, to coord, offsetFrom int, offsetTo int) {
@@ -106,6 +116,11 @@ func drawBox(text string) drawing {
 	boxDrawing[to.x][to.y] = "+"     // Bottom right corner
 
 	return boxDrawing
+}
+
+func (d *drawing) increaseSize(x int, y int) {
+	drawingWithNewSize := mkDrawing(x, y)
+	*d = mergeDrawings(drawingWithNewSize, *d, coord{0, 0})
 }
 
 func mergeDrawings(d1 drawing, d2 drawing, mergeCoord coord) drawing {

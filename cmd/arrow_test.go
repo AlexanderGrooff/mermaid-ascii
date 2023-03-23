@@ -5,7 +5,8 @@ import (
 )
 
 func TestDrawUpArrow(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 3}, coord{0, 0})
+	arrowDrawing := mkDrawing(0, 3)
+	arrowDrawing.drawArrow(coord{0, 3}, coord{0, 0}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected := ` 
 ^
@@ -17,7 +18,8 @@ func TestDrawUpArrow(t *testing.T) {
 }
 
 func TestDrawDownArrow(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 0}, coord{0, 3})
+	arrowDrawing := mkDrawing(0, 3)
+	arrowDrawing.drawArrow(coord{0, 0}, coord{0, 3}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected := ` 
 |
@@ -29,7 +31,8 @@ v
 }
 
 func TestDrawRightArrow(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 0}, coord{3, 0})
+	arrowDrawing := mkDrawing(3, 0)
+	arrowDrawing.drawArrow(coord{0, 0}, coord{3, 0}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected := ` -> `
 	if boxString != expected {
@@ -38,7 +41,8 @@ func TestDrawRightArrow(t *testing.T) {
 }
 
 func TestDrawLeftArrow(t *testing.T) {
-	arrowDrawing := drawArrow(coord{3, 0}, coord{0, 0})
+	arrowDrawing := mkDrawing(3, 0)
+	arrowDrawing.drawArrow(coord{3, 0}, coord{0, 0}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected := ` <- `
 	if boxString != expected {
@@ -47,7 +51,8 @@ func TestDrawLeftArrow(t *testing.T) {
 }
 
 func TestDrawStraightLowerRightArrow(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 0}, coord{3, 3})
+	arrowDrawing := mkDrawing(3, 3)
+	arrowDrawing.drawArrow(coord{0, 0}, coord{3, 3}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected :=
 		`    
@@ -60,7 +65,8 @@ func TestDrawStraightLowerRightArrow(t *testing.T) {
 }
 
 func TestDrawLowerRightArrowWithLongerX(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 0}, coord{5, 3})
+	arrowDrawing := mkDrawing(5, 3)
+	arrowDrawing.drawArrow(coord{0, 0}, coord{5, 3}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected :=
 		`      
@@ -73,7 +79,8 @@ func TestDrawLowerRightArrowWithLongerX(t *testing.T) {
 }
 
 func TestDrawLowerRightArrowWithLongerY(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 0}, coord{3, 5})
+	arrowDrawing := mkDrawing(3, 5)
+	arrowDrawing.drawArrow(coord{0, 0}, coord{3, 5}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected :=
 		`    
@@ -88,7 +95,8 @@ func TestDrawLowerRightArrowWithLongerY(t *testing.T) {
 }
 
 func TestDrawStraightLowerLeftArrow(t *testing.T) {
-	arrowDrawing := drawArrow(coord{3, 0}, coord{0, 3})
+	arrowDrawing := mkDrawing(3, 3)
+	arrowDrawing.drawArrow(coord{3, 0}, coord{0, 3}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected :=
 		`    
@@ -101,7 +109,8 @@ func TestDrawStraightLowerLeftArrow(t *testing.T) {
 }
 
 func TestDrawLowerLeftArrowWithLongerX(t *testing.T) {
-	arrowDrawing := drawArrow(coord{5, 0}, coord{0, 3})
+	arrowDrawing := mkDrawing(5, 3)
+	arrowDrawing.drawArrow(coord{5, 0}, coord{0, 3}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected :=
 		`      
@@ -114,7 +123,8 @@ func TestDrawLowerLeftArrowWithLongerX(t *testing.T) {
 }
 
 func TestDrawLowerLeftArrowWithLongerY(t *testing.T) {
-	arrowDrawing := drawArrow(coord{3, 0}, coord{0, 5})
+	arrowDrawing := mkDrawing(3, 5)
+	arrowDrawing.drawArrow(coord{3, 0}, coord{0, 5}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected :=
 		`    
@@ -129,7 +139,8 @@ func TestDrawLowerLeftArrowWithLongerY(t *testing.T) {
 }
 
 func TestDrawStraightUpperRightArrow(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 3}, coord{3, 0})
+	arrowDrawing := mkDrawing(3, 3)
+	arrowDrawing.drawArrow(coord{0, 3}, coord{3, 0}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected :=
 		`  > 
@@ -142,7 +153,8 @@ func TestDrawStraightUpperRightArrow(t *testing.T) {
 }
 
 func TestDrawUpperRightArrowWithLongerX(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 3}, coord{5, 0})
+	arrowDrawing := mkDrawing(5, 3)
+	arrowDrawing.drawArrow(coord{0, 3}, coord{5, 0}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected :=
 		`  --> 
@@ -155,7 +167,8 @@ func TestDrawUpperRightArrowWithLongerX(t *testing.T) {
 }
 
 func TestDrawUpperRightArrowWithLongerY(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 5}, coord{3, 0})
+	arrowDrawing := mkDrawing(3, 5)
+	arrowDrawing.drawArrow(coord{0, 5}, coord{3, 0}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected :=
 		`  > 
@@ -170,7 +183,8 @@ func TestDrawUpperRightArrowWithLongerY(t *testing.T) {
 }
 
 func TestDrawStraightUpperLeftArrow(t *testing.T) {
-	arrowDrawing := drawArrow(coord{3, 3}, coord{0, 0})
+	arrowDrawing := mkDrawing(3, 3)
+	arrowDrawing.drawArrow(coord{3, 3}, coord{0, 0}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected :=
 		` <  
@@ -183,7 +197,8 @@ func TestDrawStraightUpperLeftArrow(t *testing.T) {
 }
 
 func TestDrawUpperLeftArrowWithLongerX(t *testing.T) {
-	arrowDrawing := drawArrow(coord{5, 3}, coord{0, 0})
+	arrowDrawing := mkDrawing(5, 3)
+	arrowDrawing.drawArrow(coord{5, 3}, coord{0, 0}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected :=
 		` <--  
@@ -196,7 +211,8 @@ func TestDrawUpperLeftArrowWithLongerX(t *testing.T) {
 }
 
 func TestDrawUpperLeftArrowWithVeryLongX(t *testing.T) {
-	arrowDrawing := drawArrow(coord{15, 3}, coord{0, 0})
+	arrowDrawing := mkDrawing(15, 3)
+	arrowDrawing.drawArrow(coord{15, 3}, coord{0, 0}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected :=
 		` <------------  
@@ -209,7 +225,8 @@ func TestDrawUpperLeftArrowWithVeryLongX(t *testing.T) {
 }
 
 func TestDrawUpperLeftArrowWithLongerY(t *testing.T) {
-	arrowDrawing := drawArrow(coord{3, 5}, coord{0, 0})
+	arrowDrawing := mkDrawing(3, 5)
+	arrowDrawing.drawArrow(coord{3, 5}, coord{0, 0}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected :=
 		` <  

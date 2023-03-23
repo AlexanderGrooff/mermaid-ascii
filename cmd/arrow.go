@@ -17,8 +17,7 @@ const (
 	LowerLeft  = "LowerLeft"
 )
 
-func drawArrow(from coord, to coord) drawing {
-	arrowDrawing := mkDrawing(Max(from.x, to.x), Max(from.y, to.y))
+func (d *drawing) drawArrow(from coord, to coord, label string) {
 	log.Debug("Drawing arrow from ", from, " to ", to)
 
 	// Draw arrow body. This lines up between the coords, so the actual from/to
@@ -26,16 +25,21 @@ func drawArrow(from coord, to coord) drawing {
 	diffY := Abs(to.y - from.y)
 	diffX := Abs(to.x - from.x)
 	diff := diffY - diffX
+	var textCoord coord
 	log.Debug("diffY: ", diffY, " diffX: ", diffX, " diff: ", diff)
 	switch determineDirection(from, to) {
 	case Up:
-		arrowDrawing.drawLine(from, to, 1, -1)
+		(*d).drawLine(from, to, 1, -1)
+		textCoord = coord{to.x - (len(label) / 2), from.y - (diffY / 2)}
 	case Down:
-		arrowDrawing.drawLine(from, to, 1, -1)
+		(*d).drawLine(from, to, 1, -1)
+		textCoord = coord{to.x - (len(label) / 2), from.y + (diffY / 2)}
 	case Left:
-		arrowDrawing.drawLine(from, to, 1, -1)
+		(*d).drawLine(from, to, 1, -1)
+		textCoord = coord{to.x + (diffX / 2) - (len(label) / 2) + 1, to.y}
 	case Right:
-		arrowDrawing.drawLine(from, to, 1, -1)
+		(*d).drawLine(from, to, 1, -1)
+		textCoord = coord{from.x + (diffX / 2) - (len(label) / 2), to.y}
 	// Draw diagonal if the arrow is going from one corner to another.
 	// If there can't be a straight diagonal, first draw a vertical or
 	// horizontal line to the corner, then draw the diagonal.
@@ -43,7 +47,7 @@ func drawArrow(from coord, to coord) drawing {
 	// If diff is positive, we need to draw a vertical line first
 	case LowerRight:
 		if diff == 0 {
-			arrowDrawing.drawLine(from, to, 1, -1)
+			(*d).drawLine(from, to, 1, -1)
 		} else {
 			var corner coord
 			if diff > 0 {
@@ -51,12 +55,12 @@ func drawArrow(from coord, to coord) drawing {
 			} else {
 				corner = coord{from.x + (diffX + diff), to.y}
 			}
-			arrowDrawing.drawLine(from, corner, 1, -1)
-			arrowDrawing.drawLine(corner, to, -1, -1)
+			(*d).drawLine(from, corner, 1, -1)
+			(*d).drawLine(corner, to, -1, -1)
 		}
 	case LowerLeft:
 		if diff == 0 {
-			arrowDrawing.drawLine(from, to, 1, -1)
+			(*d).drawLine(from, to, 1, -1)
 		} else {
 			var corner coord
 			if diff > 0 {
@@ -64,12 +68,12 @@ func drawArrow(from coord, to coord) drawing {
 			} else {
 				corner = coord{to.x - diff, to.y}
 			}
-			arrowDrawing.drawLine(from, corner, 1, -1)
-			arrowDrawing.drawLine(corner, to, -1, -1)
+			(*d).drawLine(from, corner, 1, -1)
+			(*d).drawLine(corner, to, -1, -1)
 		}
 	case UpperRight:
 		if diff == 0 {
-			arrowDrawing.drawLine(from, to, 1, -1)
+			(*d).drawLine(from, to, 1, -1)
 		} else {
 			var corner coord
 			if diff > 0 {
@@ -77,12 +81,12 @@ func drawArrow(from coord, to coord) drawing {
 			} else {
 				corner = coord{to.x + diff - 1, to.y}
 			}
-			arrowDrawing.drawLine(from, corner, 1, 0)
-			arrowDrawing.drawLine(corner, to, 0, -1)
+			(*d).drawLine(from, corner, 1, 0)
+			(*d).drawLine(corner, to, 0, -1)
 		}
 	case UpperLeft:
 		if diff == 0 {
-			arrowDrawing.drawLine(from, to, 1, -1)
+			(*d).drawLine(from, to, 1, -1)
 		} else {
 			var corner coord
 			if diff > 0 {
@@ -90,9 +94,12 @@ func drawArrow(from coord, to coord) drawing {
 			} else {
 				corner = coord{to.x - diff + 1, to.y}
 			}
-			arrowDrawing.drawLine(from, corner, 1, 0)
-			arrowDrawing.drawLine(corner, to, 0, -1)
+			(*d).drawLine(from, corner, 1, 0)
+			(*d).drawLine(corner, to, 0, -1)
 		}
+	}
+	if label != "" {
+		(*d).drawText(textCoord, label)
 	}
 
 	// Draw arrow head depending on direction
@@ -100,18 +107,16 @@ func drawArrow(from coord, to coord) drawing {
 		// Vertical arrow
 		if from.y < to.y {
 			// Down
-			arrowDrawing[to.x][to.y-1] = "v"
+			(*d)[to.x][to.y-1] = "v"
 		} else {
 			// Up
-			arrowDrawing[to.x][to.y+1] = "^"
+			(*d)[to.x][to.y+1] = "^"
 		}
 	} else if from.x < to.x {
 		// Right
-		arrowDrawing[to.x-1][to.y] = ">"
+		(*d)[to.x-1][to.y] = ">"
 	} else {
 		// Left
-		arrowDrawing[to.x+1][to.y] = "<"
+		(*d)[to.x+1][to.y] = "<"
 	}
-
-	return arrowDrawing
 }
