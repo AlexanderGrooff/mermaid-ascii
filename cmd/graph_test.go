@@ -18,3 +18,12 @@ func TestEmptyGraphHasNoEdges(t *testing.T) {
 
 	assert.Equal(t, 0, len(g.edges))
 }
+
+func TestRootNodeHasLevelOne(t *testing.T) {
+	data := orderedmap.NewOrderedMap[string, []string]()
+	data.Set("A", []string{})
+
+	g := mkGraph(data)
+
+	assert.Equal(t, 1, g.nodes[0].level)
+}

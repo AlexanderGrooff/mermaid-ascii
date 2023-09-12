@@ -3,14 +3,11 @@ package cmd
 import (
 )
 
-func (g graph) getEdgesFromNode(node node) []edge {
-	edges := []edge{}
-	for _, edge := range g.edges {
-		if (edge.from.name) == (node.name) {
-			edges = append(edges, edge)
-		}
-	}
-	return edges
+type edge struct {
+	from node
+	to   node
+	text string
+	drawn bool
 }
 
 func getArrowStartEndOffset(from node, to node) (coord, coord) {

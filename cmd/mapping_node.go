@@ -4,44 +4,17 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type coord struct {
-	x int
-	y int
-}
-
 type node struct {
 	name    string
 	drawing drawing
-	coord   coord
+	coord   *coord // Coord of the node within the grid
+	drawn   bool
+	level   int // How many layers down is this node from the root node? Root node level is 1. (0 is default value for unset integers)
+	index   int // Index of the node in the graph.nodes slice
 }
 
-func (n *node) setCoord(c coord) {
+func (n *node) setCoord(c *coord) {
 	n.coord = c
-}
-
-type edge struct {
-	from node
-	to   node
-	text string
-}
-
-type graph struct {
-	nodes   []node
-	edges   []edge
-	drawing drawing
-}
-
-func (g *graph) appendNode(n node) {
-	g.nodes = append(g.nodes, n)
-}
-
-func (g graph) getChildren(n node) []node {
-	edges := g.getEdgesFromNode(n)
-	children := []node{}
-	for _, edge := range edges {
-		children = append(children, edge.to)
-	}
-	return children
 }
 
 func (g *graph) getOrCreateRootNode(name string) node {
@@ -54,8 +27,8 @@ func (g *graph) getOrCreateRootNode(name string) node {
 	}
 	parentCoord := g.positionNextRootNode()
 	log.Debug("Creating new root node ", name, " at ", parentCoord)
-	parentNode := node{name: name, drawing: drawBox(name), coord: parentCoord}
-	g.drawNode(parentNode)
+	parentNode := node{name: name, drawing: drawBox(name), coord: &parentCoord}
+	// g.drawNode(parentNode)
 	g.appendNode(parentNode)
 	return parentNode
 }
@@ -85,7 +58,7 @@ func (g *graph) getOrCreateChildNode(parent node, name string) node {
 	return childNode
 }
 
-func (g graph) findPositionChildNode(parent node, child node) coord {
+func (g graph) findPositionChildNode(parent node, child node) *coord {
 	// Find a place to put the node, so it doesn't collide with any other nodes.
 	// Place the node next to its parent node, if possible. Otherwise, place it
 	// under the previous child node.
@@ -95,7 +68,7 @@ func (g graph) findPositionChildNode(parent node, child node) coord {
 	coordNextToParent := coord{parent.coord.x + parentWidth + paddingBetweenX, parent.coord.y}
 	if !doDrawingsCollide(g.drawing, child.drawing, coordNextToParent) {
 		log.Debug("Placing child node ", child.name, " next to parent node ", parent.name)
-		return coordNextToParent
+		return &coordNextToParent
 	} else {
 		// The child node can't be placed next to the parent node.
 		// Find the last child node, and place the node under that one.
@@ -103,11 +76,16 @@ func (g graph) findPositionChildNode(parent node, child node) coord {
 		children := g.getChildren(parent)
 		if len(children) == 0 {
 			log.Debug("Couldn't find position for child node ", child.name, " for parent node ", parent.name)
-			return coord{x: 15, y: 15}
+			return &coord{x: 15, y: 15}
 		}
 		lastChildNode := children[len(children)-1]
 		_, lastChildNodeHeight := getDrawingSize(lastChildNode.drawing)
 		log.Debug("Placing child node ", child.name, " under last child node ", lastChildNode.name, " for parent node ", parent.name)
-		return coord{x: lastChildNode.coord.x, y: lastChildNode.coord.y + lastChildNodeHeight + paddingBetweenY}
+		return &coord{x: lastChildNode.coord.x, y: lastChildNode.coord.y + lastChildNodeHeight + paddingBetweenY}
 	}
+}
+
+func (n node) draw() drawing {
+	// TODO: convert coords to drawing coords and draw the thing
+	return n.drawing
 }

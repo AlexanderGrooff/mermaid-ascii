@@ -30,3 +30,13 @@ func TestCreateNodeBasedOnEdge(t *testing.T) {
 
 	assert.Equal(t, 2, len(g.nodes))
 }
+
+func TestChildNodeHasLevelTwo(t *testing.T) {
+	data := orderedmap.NewOrderedMap[string, []string]()
+	data.Set("A", []string{"B"})
+
+	g := mkGraph(data)
+	g.createMapping()
+
+	assert.Equal(t, 2, g.nodes[1].level)
+}

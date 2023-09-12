@@ -11,7 +11,7 @@ import (
 type drawing [][]string
 
 func (g *graph) drawNode(n node) {
-	m := mergeDrawings(g.drawing, n.drawing, n.coord)
+	m := mergeDrawings(g.drawing, n.draw(), *n.coord)
 	g.drawing = m
 }
 
@@ -66,8 +66,8 @@ func (d *drawing) drawLine(from coord, to coord, offsetFrom int, offsetTo int) {
 }
 
 func drawMap(data *orderedmap.OrderedMap[string, []string]) {
-	totalGraph := mkGraph(data)
-	s := drawingToString(totalGraph.drawing)
+	g := mkGraph(data)
+	s := drawingToString(g.draw())
 	fmt.Println(s)
 }
 
