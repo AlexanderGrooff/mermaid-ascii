@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"github.com/elliotchance/orderedmap/v2"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -34,16 +33,6 @@ type graph struct {
 
 func (g *graph) appendNode(n node) {
 	g.nodes = append(g.nodes, n)
-}
-
-func (g graph) getEdgesFromNode(node node) []edge {
-	edges := []edge{}
-	for _, edge := range g.edges {
-		if (edge.from.name) == (node.name) {
-			edges = append(edges, edge)
-		}
-	}
-	return edges
 }
 
 func (g graph) getChildren(n node) []node {
@@ -120,92 +109,5 @@ func (g graph) findPositionChildNode(parent node, child node) coord {
 		_, lastChildNodeHeight := getDrawingSize(lastChildNode.drawing)
 		log.Debug("Placing child node ", child.name, " under last child node ", lastChildNode.name, " for parent node ", parent.name)
 		return coord{x: lastChildNode.coord.x, y: lastChildNode.coord.y + lastChildNodeHeight + paddingBetweenY}
-	}
-}
-
-func (g graph) dimensions() (int, int) {
-	return getDrawingSize(g.drawing)
-}
-
-func mkGraph(data *orderedmap.OrderedMap[string, []string]) graph {
-	g := graph{drawing: mkDrawing(0, 0)}
-	for el := data.Front(); el != nil; el = el.Next() {
-		nodeName := el.Key
-		children := el.Value
-		parentNode := g.getOrCreateRootNode(nodeName)
-		for _, childNodeName := range children {
-			childNode := g.getOrCreateChildNode(parentNode, childNodeName)
-			e := edge{from: parentNode, to: childNode, text: ""}
-			g.drawEdge(e)
-			g.edges = append(g.edges, e)
-		}
-	}
-	return g
-}
-
-func doDrawingsCollide(drawing1 drawing, drawing2 drawing, offset coord) bool {
-	// Check if any of the drawing2 characters overlap with drawing1 characters.
-	// The offset is the coord of drawing2 relative to drawing1.
-	drawing1Width, drawing1Height := getDrawingSize(drawing1)
-	drawing2Width, drawing2Height := getDrawingSize(drawing2)
-	for x := 0; x < drawing2Width; x++ {
-		for y := 0; y < drawing2Height; y++ {
-			// Check if drawing2[x][y] overlaps with drawing1[x+offset.x][y+offset.y]
-			if x+offset.x >= 0 && x+offset.x < drawing1Width &&
-				y+offset.y >= 0 && y+offset.y < drawing1Height &&
-				drawing2[x][y] != " " &&
-				drawing1[x+offset.x][y+offset.y] != " " {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func getArrowStartEndOffset(from node, to node) (coord, coord) {
-	// Find which sides the arrow should start/end.
-	// This is the middle of one of the sides, depending on the direction of the arrow.
-	// Note that the coord returned is relative to the box.
-	fromBoxWidth, fromBoxHeight := getDrawingSize(from.drawing)
-	toBoxWidth, toBoxHeight := getDrawingSize(to.drawing)
-	if from.coord.x == to.coord.x {
-		// Vertical arrow
-		if from.coord.y < to.coord.y {
-			// Down
-			return coord{fromBoxWidth / 2, fromBoxHeight}, coord{toBoxWidth / 2, 0}
-		} else {
-			// Up
-			return coord{fromBoxWidth / 2, 0}, coord{toBoxWidth / 2, toBoxHeight}
-		}
-	} else if from.coord.y == to.coord.y {
-		// Horizontal arrow
-		if from.coord.x < to.coord.x {
-			// Right
-			return coord{fromBoxWidth, fromBoxHeight / 2}, coord{0, toBoxHeight / 2}
-		} else {
-			// Left
-			return coord{0, fromBoxHeight / 2}, coord{toBoxWidth, toBoxHeight / 2}
-		}
-	} else {
-		// Diagonal arrow
-		if from.coord.x < to.coord.x {
-			// Right
-			if from.coord.y < to.coord.y {
-				// Down
-				return coord{fromBoxWidth / 2, fromBoxHeight}, coord{0, toBoxHeight / 2}
-			} else {
-				// Up
-				return coord{fromBoxWidth / 2, 0}, coord{0, toBoxHeight / 2}
-			}
-		} else {
-			// Left
-			if from.coord.y < to.coord.y {
-				// Down
-				return coord{fromBoxWidth / 2, fromBoxHeight}, coord{toBoxWidth, toBoxHeight / 2}
-			} else {
-				// Up
-				return coord{fromBoxWidth / 2, 0}, coord{toBoxWidth, toBoxHeight / 2}
-			}
-		}
 	}
 }
