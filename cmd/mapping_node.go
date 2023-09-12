@@ -17,3 +17,11 @@ func (n node) draw() drawing {
 	// TODO: convert coords to drawing coords and draw the thing
 	return drawBox(n.name)
 }
+
+func (n node) coordToPixel() bool {
+	// For every node there is:
+	// - 2 lines of border
+	// - 1 line of text
+	// - 2x padding
+	// - 2x margin
+}

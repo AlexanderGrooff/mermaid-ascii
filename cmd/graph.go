@@ -50,9 +50,18 @@ func mkGraph(data *orderedmap.OrderedMap[string, []string]) graph {
 }
 
 func (g *graph) createMapping() {
+	highestPositionPerLevel := []int{}
+	// Init array with 0 values
+	// TODO: I'm sure there's a better way of doing this
+	for i := 0; i < 100; i++ {
+		highestPositionPerLevel = append(highestPositionPerLevel, 0)
+	}
 	for _, n := range g.nodes {
 		for _, child := range g.getChildren(n) {
 			g.nodes[child.index].level = n.level + 1
+			// TODO: Change x/y depending on graph TD/LR. This is LR
+			g.nodes[child.index].setCoord(&coord{x: n.level + 1, y: highestPositionPerLevel[n.level+1]})
+			highestPositionPerLevel[n.level+1] = highestPositionPerLevel[n.level+1] + 1
 		}
 	}
 }

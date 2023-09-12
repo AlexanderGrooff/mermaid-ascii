@@ -11,7 +11,8 @@ import (
 type drawing [][]string
 
 func (g *graph) drawNode(n node) {
-	m := mergeDrawings(g.drawing, n.draw(), *n.coord)
+	n.drawing = n.draw()
+	m := mergeDrawings(g.drawing, n.drawing, *n.coord)
 	g.drawing = m
 }
 
