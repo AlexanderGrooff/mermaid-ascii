@@ -36,7 +36,7 @@ func TestNestedChildDrawing(t *testing.T) {
 	data.Set("A", []string{"B"})
 	data.Set("B", []string{"C"})
 	g := mkGraph(data)
-	s := drawingToString(g.drawing)
+	s := drawingToString(g.draw())
 	expected :=
 		`+---+    +---+    +---+
 |   |    |   |    |   |
@@ -52,7 +52,7 @@ func TestVerticalChildren(t *testing.T) {
 	data := orderedmap.NewOrderedMap[string, []string]()
 	data.Set("A", []string{"B", "C"})
 	g := mkGraph(data)
-	s := drawingToString(g.drawing)
+	s := drawingToString(g.draw())
 	expected :=
 		`+---+    +---+
 |   |    |   |

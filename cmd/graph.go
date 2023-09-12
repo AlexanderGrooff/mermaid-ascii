@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"log"
-
 	"github.com/elliotchance/orderedmap/v2"
 )
 
@@ -30,13 +28,13 @@ func mkGraph(data *orderedmap.OrderedMap[string, []string]) graph {
 		parentNode := &node{name: nodeName, index: index}
 		if !g.isNodeInGraph(*parentNode) {
 			g.appendNode(*parentNode)
+			index += 1
 		}
-		index += 1
 		for _, childNodeName := range children {
 			childNode := &node{name: childNodeName, index: index}
-			index += 1
 			if !g.isNodeInGraph(*childNode) {
 				g.appendNode(*childNode)
+				index += 1
 			}
 			e := edge{from: *parentNode, to: *childNode, text: ""}
 			g.edges = append(g.edges, e)
@@ -55,7 +53,6 @@ func (g *graph) createMapping() {
 	for _, n := range g.nodes {
 		for _, child := range g.getChildren(n) {
 			g.nodes[child.index].level = n.level + 1
-			log.Println("Mapping created")
 		}
 	}
 }

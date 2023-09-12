@@ -40,3 +40,14 @@ func TestChildNodeHasLevelTwo(t *testing.T) {
 
 	assert.Equal(t, 2, g.nodes[1].level)
 }
+
+func TestNestedChildHasLevelThree(t *testing.T) {
+	data := orderedmap.NewOrderedMap[string, []string]()
+	data.Set("A", []string{"B", "C"})
+	data.Set("C", []string{"D"})
+
+	g := mkGraph(data)
+	g.createMapping()
+
+	assert.Equal(t, 3, g.nodes[3].level)
+}
