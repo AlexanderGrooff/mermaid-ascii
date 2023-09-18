@@ -38,8 +38,9 @@ func (g *graph) mappingToDrawingCoord(n *node) *coord {
 
 	x := prevX
 	y := n.mappingCoord.y * 2 * paddingBetweenY
-	logrus.Debugf("Drawing coord for %s is %d,%d", n.name, x, y)
-	return &coord{x: x, y: y}
+	drawingCoord := coord{x: x, y: y}
+	logrus.Debugf("Mapping coord for %s from %v to %v", n.name, *n.mappingCoord, drawingCoord)
+	return &drawingCoord
 }
 
 func (g *graph) reserveSpotInGrid(n *node, requestedCoord *coord) *coord {

@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/elliotchance/orderedmap/v2"
+	"github.com/sirupsen/logrus"
 )
 
 type coord struct {
@@ -68,17 +69,25 @@ func (g *graph) createMapping() {
 		if len(g.getParents(n)) == 0 {
 			// TODO: Change x/y depending on graph TD/LR. This is LR
 			mappingCoord := g.reserveSpotInGrid(g.nodes[n.index], &coord{x: 0, y: highestPositionPerLevel[0]})
+			logrus.Debugf("Setting mapping coord for rootnode %s to %v", n.name, mappingCoord)
 			g.nodes[n.index].mappingCoord = mappingCoord
 			highestPositionPerLevel[0] = highestPositionPerLevel[0] + 1
 		}
 	}
 
 	for _, n := range g.nodes {
+		childLevel := n.mappingCoord.x + 1
+		highestPosition := highestPositionPerLevel[childLevel]
 		for _, child := range g.getChildren(n) {
+			// Skip if the child already has a mapping coord
+			if child.mappingCoord != nil {
+				continue
+			}
+
 			// TODO: Change x/y depending on graph TD/LR. This is LR
-			childLevel := n.mappingCoord.x + 1
-			highestPosition := highestPositionPerLevel[childLevel]
-			g.nodes[child.index].mappingCoord = &coord{x: childLevel, y: highestPosition}
+			mappingCoord := g.reserveSpotInGrid(g.nodes[n.index], &coord{x: childLevel, y: highestPosition})
+			logrus.Debugf("Setting mapping coord for child %s of parent %s to %v", child.name, n.name, mappingCoord)
+			g.nodes[child.index].mappingCoord = mappingCoord
 			highestPositionPerLevel[childLevel] = highestPosition + 1
 		}
 	}
@@ -96,6 +105,9 @@ func (g *graph) draw() *drawing {
 		if !node.drawn {
 			g.drawNode(node)
 		}
+	}
+	for _, edge := range g.edges {
+		g.drawEdge(edge)
 	}
 	return g.drawing
 }
@@ -154,9 +166,8 @@ func (g *graph) getChildren(n *node) []*node {
 }
 
 func (g *graph) getParents(n *node) []*node {
-	edges := g.getEdgesFromNode(n)
 	parents := []*node{}
-	for _, edge := range edges {
+	for _, edge := range g.edges {
 		if edge.to.name == n.name {
 			parents = append(parents, edge.from)
 		}
