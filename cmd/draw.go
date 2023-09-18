@@ -10,16 +10,16 @@ import (
 
 type drawing [][]string
 
-func (g *graph) drawNode(n node) {
-	m := mergeDrawings(g.drawing, n.drawing, n.coord)
+func (g *graph) drawNode(n *node) {
+	m := mergeDrawings(g.drawing, n.drawing, *n.drawingCoord)
 	g.drawing = m
 }
 
-func (g *graph) drawEdge(e edge) {
+func (g *graph) drawEdge(e *edge) {
 	arrowStart, arrowEnd := getArrowStartEndOffset(e.from, e.to)
 	arrow := drawArrow(
-		coord{x: e.from.coord.x + arrowStart.x, y: e.from.coord.y + arrowStart.y},
-		coord{x: e.to.coord.x + arrowEnd.x, y: e.to.coord.y + arrowEnd.y},
+		coord{x: e.from.drawingCoord.x + arrowStart.x, y: e.from.drawingCoord.y + arrowStart.y},
+		coord{x: e.to.drawingCoord.x + arrowEnd.x, y: e.to.drawingCoord.y + arrowEnd.y},
 	)
 	m := mergeDrawings(g.drawing, arrow, coord{x: 0, y: 0})
 	g.drawing = m
@@ -66,16 +66,16 @@ func (d *drawing) drawLine(from coord, to coord, offsetFrom int, offsetTo int) {
 }
 
 func drawMap(data *orderedmap.OrderedMap[string, []string]) {
-	totalGraph := mkGraph(data)
-	s := drawingToString(totalGraph.drawing)
+	g := mkGraph(data)
+	s := drawingToString(g.draw())
 	fmt.Println(s)
 }
 
-func drawBox(text string) drawing {
+func drawBox(text string) *drawing {
 	from := coord{0, 0}
 	// -1 because we start at 0
 	to := coord{len(text) + boxBorderPadding*2 + boxBorderWidth*2 - 1, boxBorderWidth*2 + boxBorderPadding*2}
-	boxDrawing := mkDrawing(Max(from.x, to.x), Max(from.y, to.y))
+	boxDrawing := *(mkDrawing(Max(from.x, to.x), Max(from.y, to.y)))
 	log.Debug("Drawing box from ", from, " to ", to)
 	// Draw top border
 	for x := from.x; x < to.x; x++ {
@@ -105,10 +105,10 @@ func drawBox(text string) drawing {
 	boxDrawing[from.x][to.y] = "+"   // Bottom left corner
 	boxDrawing[to.x][to.y] = "+"     // Bottom right corner
 
-	return boxDrawing
+	return &boxDrawing
 }
 
-func mergeDrawings(d1 drawing, d2 drawing, mergeCoord coord) drawing {
+func mergeDrawings(d1 *drawing, d2 *drawing, mergeCoord coord) *drawing {
 	maxX1, maxY1 := getDrawingSize(d1)
 	maxX2, maxY2 := getDrawingSize(d2)
 	maxX := Max(maxX1, maxX2+mergeCoord.x)
@@ -117,27 +117,27 @@ func mergeDrawings(d1 drawing, d2 drawing, mergeCoord coord) drawing {
 	// Copy d1
 	for x := 0; x <= maxX1; x++ {
 		for y := 0; y <= maxY1; y++ {
-			mergedDrawing[x][y] = d1[x][y]
+			(*mergedDrawing)[x][y] = (*d1)[x][y]
 		}
 	}
 	// Copy d2 with offset
 	for x := 0; x <= maxX2; x++ {
 		for y := 0; y <= maxY2; y++ {
-			c := d2[x][y]
+			c := (*d2)[x][y]
 			if c != " " {
-				mergedDrawing[x+mergeCoord.x][y+mergeCoord.y] = d2[x][y]
+				(*mergedDrawing)[x+mergeCoord.x][y+mergeCoord.y] = (*d2)[x][y]
 			}
 		}
 	}
 	return mergedDrawing
 }
 
-func drawingToString(d drawing) string {
+func drawingToString(d *drawing) string {
 	maxX, maxY := getDrawingSize(d)
 	dBuilder := strings.Builder{}
 	for y := 0; y <= maxY; y++ {
 		for x := 0; x <= maxX; x++ {
-			dBuilder.WriteString(d[x][y])
+			dBuilder.WriteString((*d)[x][y])
 		}
 		if y != maxY {
 			dBuilder.WriteString("\n")
@@ -146,7 +146,7 @@ func drawingToString(d drawing) string {
 	return dBuilder.String()
 }
 
-func mkDrawing(x int, y int) drawing {
+func mkDrawing(x int, y int) *drawing {
 	d := make(drawing, x+1)
 	for i := 0; i <= x; i++ {
 		d[i] = make([]string, y+1)
@@ -154,11 +154,11 @@ func mkDrawing(x int, y int) drawing {
 			d[i][j] = " "
 		}
 	}
-	return d
+	return &d
 }
 
-func getDrawingSize(d drawing) (int, int) {
-	return len(d) - 1, len(d[0]) - 1
+func getDrawingSize(d *drawing) (int, int) {
+	return len(*d) - 1, len((*d)[0]) - 1
 }
 
 func determineDirection(from coord, to coord) direction {

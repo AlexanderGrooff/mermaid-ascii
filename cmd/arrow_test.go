@@ -132,10 +132,10 @@ func TestDrawStraightUpperRightArrow(t *testing.T) {
 	arrowDrawing := drawArrow(coord{0, 3}, coord{3, 0})
 	boxString := drawingToString(arrowDrawing)
 	expected :=
-		`  > 
- /  
-/   
-    `
+		`    
+   ^
+  / 
+-/  `
 	if boxString != expected {
 		t.Error("Expected boxString to be", expected, "got", boxString)
 	}
@@ -145,24 +145,26 @@ func TestDrawUpperRightArrowWithLongerX(t *testing.T) {
 	arrowDrawing := drawArrow(coord{0, 3}, coord{5, 0})
 	boxString := drawingToString(arrowDrawing)
 	expected :=
-		`  --> 
- /    
-/     
-      `
+		`      
+     ^
+    / 
+ --/  `
 	if boxString != expected {
 		t.Error("Expected boxString to be", expected, "got", boxString)
 	}
 }
 
 func TestDrawUpperRightArrowWithLongerY(t *testing.T) {
-	arrowDrawing := drawArrow(coord{0, 5}, coord{3, 0})
+	arrowDrawing := drawArrow(coord{0, 7}, coord{3, 0})
 	boxString := drawingToString(arrowDrawing)
 	expected :=
-		`  > 
+		`    
+   ^
+   |
+   |
   / 
  /  
 /   
-|   
     `
 	if boxString != expected {
 		t.Error("Expected boxString to be", expected, "got", boxString)
