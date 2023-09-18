@@ -59,7 +59,7 @@ func TestConvertMappingToDrawingCoord(t *testing.T) {
 			g := mkGraph(orderedmap.NewOrderedMap[string, []string]())
 			n := node{mappingCoord: &coord{x: 0, y: 0}}
 
-			drawCoord := g.mappingToDrawingCoord(&n)
+			drawCoord := *g.mappingToDrawingCoord(&n)
 
 			assert.Equal(t, 0, drawCoord.x)
 			assert.Equal(t, 0, drawCoord.y)
@@ -71,9 +71,9 @@ func TestConvertMappingToDrawingCoord(t *testing.T) {
 			g := mkGraph(orderedmap.NewOrderedMap[string, []string]())
 			n := node{mappingCoord: &coord{x: 1, y: 0}}
 
-			drawCoord := g.mappingToDrawingCoord(&n)
+			drawCoord := *g.mappingToDrawingCoord(&n)
 
-			assert.Equal(t, 15, drawCoord.x)
+			assert.Equal(t, 10, drawCoord.x)
 			assert.Equal(t, 0, drawCoord.y)
 		},
 	)
@@ -83,10 +83,10 @@ func TestConvertMappingToDrawingCoord(t *testing.T) {
 			g := mkGraph(orderedmap.NewOrderedMap[string, []string]())
 			n := node{mappingCoord: &coord{x: 0, y: 1}}
 
-			drawCoord := g.mappingToDrawingCoord(&n)
+			drawCoord := *g.mappingToDrawingCoord(&n)
 
 			assert.Equal(t, 0, drawCoord.x)
-			assert.Equal(t, 13, drawCoord.y)
+			assert.Equal(t, 8, drawCoord.y)
 		},
 	)
 	t.Run(
@@ -95,10 +95,10 @@ func TestConvertMappingToDrawingCoord(t *testing.T) {
 			g := mkGraph(orderedmap.NewOrderedMap[string, []string]())
 			n := node{mappingCoord: &coord{x: 1, y: 1}}
 
-			drawCoord := g.mappingToDrawingCoord(&n)
+			drawCoord := *g.mappingToDrawingCoord(&n)
 
-			assert.Equal(t, 15, drawCoord.x)
-			assert.Equal(t, 13, drawCoord.y)
+			assert.Equal(t, 10, drawCoord.x)
+			assert.Equal(t, 8, drawCoord.y)
 		},
 	)
 }

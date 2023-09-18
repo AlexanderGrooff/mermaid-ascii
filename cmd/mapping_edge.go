@@ -1,10 +1,9 @@
 package cmd
 
 type edge struct {
-	from  *node
-	to    *node
-	text  string
-	drawn bool
+	from *node
+	to   *node
+	text string
 }
 
 func getArrowStartEndOffset(from *node, to *node) (coord, coord) {
@@ -40,7 +39,7 @@ func getArrowStartEndOffset(from *node, to *node) (coord, coord) {
 				return coord{fromBoxWidth / 2, fromBoxHeight}, coord{0, toBoxHeight / 2}
 			} else {
 				// Up
-				return coord{fromBoxWidth / 2, 0}, coord{0, toBoxHeight / 2}
+				return coord{fromBoxWidth + 1, fromBoxHeight / 2}, coord{toBoxWidth / 2, toBoxHeight}
 			}
 		} else {
 			// Left

@@ -19,15 +19,16 @@ const (
 
 func drawArrow(from coord, to coord) *drawing {
 	arrowDrawing := *(mkDrawing(Max(from.x, to.x), Max(from.y, to.y)))
-	log.Debug("Drawing arrow from ", from, " to ", to)
+	dir := determineDirection(from, to)
+	log.Debugf("Drawing arrow from %v to %v with direction %s", from, to, dir)
 
 	// Draw arrow body. This lines up between the coords, so the actual from/to
 	// coords are offset by 1.
 	diffY := Abs(to.y - from.y)
 	diffX := Abs(to.x - from.x)
-	diff := diffY - diffX
-	log.Debug("diffY: ", diffY, " diffX: ", diffX, " diff: ", diff)
-	switch determineDirection(from, to) {
+	yLongerThanX := diffY - diffX
+	log.Debug("diffY: ", diffY, " diffX: ", diffX, " diff: ", yLongerThanX)
+	switch dir {
 	case Up:
 		arrowDrawing.drawLine(from, to, 1, -1)
 	case Down:
@@ -42,53 +43,57 @@ func drawArrow(from coord, to coord) *drawing {
 	// Draw straight line until we can make a straight diagonal
 	// If diff is positive, we need to draw a vertical line first
 	case LowerRight:
-		if diff == 0 {
+		if yLongerThanX == 0 {
 			arrowDrawing.drawLine(from, to, 1, -1)
 		} else {
 			var corner coord
-			if diff > 0 {
-				corner = coord{from.x, from.y + diff + 2}
+			if yLongerThanX > 0 {
+				corner = coord{from.x, from.y + yLongerThanX + 2}
 			} else {
-				corner = coord{from.x + (diffX + diff), to.y}
+				corner = coord{from.x + (diffX + yLongerThanX), to.y}
 			}
 			arrowDrawing.drawLine(from, corner, 1, -1)
 			arrowDrawing.drawLine(corner, to, -1, -1)
 		}
 	case LowerLeft:
-		if diff == 0 {
+		if yLongerThanX == 0 {
 			arrowDrawing.drawLine(from, to, 1, -1)
 		} else {
 			var corner coord
-			if diff > 0 {
-				corner = coord{from.x, from.y + diff + 2}
+			if yLongerThanX > 0 {
+				corner = coord{from.x, from.y + yLongerThanX + 2}
 			} else {
-				corner = coord{to.x - diff, to.y}
+				corner = coord{to.x - yLongerThanX, to.y}
 			}
 			arrowDrawing.drawLine(from, corner, 1, -1)
 			arrowDrawing.drawLine(corner, to, -1, -1)
 		}
 	case UpperRight:
-		if diff == 0 {
-			arrowDrawing.drawLine(from, to, 1, -1)
+		if yLongerThanX == 0 {
+			corner1 := coord{from.x + 1, from.y}
+			corner2 := coord{to.x, to.y + 1}
+			arrowDrawing.drawLine(from, corner1, 0, 0)
+			arrowDrawing.drawLine(corner1, corner2, 0, 0)
+			arrowDrawing.drawLine(corner2, to, 0, -1)
 		} else {
 			var corner coord
-			if diff > 0 {
-				corner = coord{from.x, from.y - diff}
+			if yLongerThanX > 0 {
+				corner = coord{to.x, to.y + yLongerThanX - 1}
 			} else {
-				corner = coord{to.x + diff - 1, to.y}
+				corner = coord{from.x - yLongerThanX + 1, from.y}
 			}
 			arrowDrawing.drawLine(from, corner, 1, 0)
 			arrowDrawing.drawLine(corner, to, 0, -1)
 		}
 	case UpperLeft:
-		if diff == 0 {
+		if yLongerThanX == 0 {
 			arrowDrawing.drawLine(from, to, 1, -1)
 		} else {
 			var corner coord
-			if diff > 0 {
-				corner = coord{from.x, from.y - diff}
+			if yLongerThanX > 0 {
+				corner = coord{from.x, from.y - yLongerThanX}
 			} else {
-				corner = coord{to.x - diff + 1, to.y}
+				corner = coord{to.x - yLongerThanX + 1, to.y}
 			}
 			arrowDrawing.drawLine(from, corner, 1, 0)
 			arrowDrawing.drawLine(corner, to, 0, -1)
@@ -107,7 +112,11 @@ func drawArrow(from coord, to coord) *drawing {
 		}
 	} else if from.x < to.x {
 		// Right
-		arrowDrawing[to.x-1][to.y] = ">"
+		if dir == UpperRight {
+			arrowDrawing[to.x][to.y+1] = "^"
+		} else {
+			arrowDrawing[to.x-1][to.y] = ">"
+		}
 	} else {
 		// Left
 		arrowDrawing[to.x+1][to.y] = "<"
