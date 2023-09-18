@@ -4,7 +4,7 @@ import "github.com/sirupsen/logrus"
 
 type node struct {
 	name         string
-	drawing      drawing
+	drawing      *drawing
 	drawingCoord *coord
 	mappingCoord *coord
 	drawn        bool
@@ -15,13 +15,13 @@ func (n *node) setCoord(c *coord) {
 	n.drawingCoord = c
 }
 
-func (n *node) setDrawing() drawing {
+func (n *node) setDrawing() *drawing {
 	d := drawBox(n.name)
 	n.drawing = d
 	return d
 }
 
-func (g *graph) mappingToDrawingCoord(n node) *coord {
+func (g *graph) mappingToDrawingCoord(n *node) *coord {
 	// For every node there is:
 	// - 2 lines of border
 	// - 1 line of text

@@ -8,7 +8,7 @@ import (
 )
 
 func TestBoxDimensions(t *testing.T) {
-	boxDrawing := drawBox("text")
+	boxDrawing := *drawBox("text")
 	if len(boxDrawing) != 8 {
 		t.Error("Expected boxDrawing to have 8 columns, got ", len(boxDrawing))
 	}
@@ -123,8 +123,8 @@ func TestBottomChildPointsUp(t *testing.T) {
 }
 
 func TestMerge(t *testing.T) {
-	a := drawing{{"0", "1", "2"}}
-	b := drawing{{"3", "4", "5"}}
+	a := &drawing{{"0", "1", "2"}}
+	b := &drawing{{"3", "4", "5"}}
 	c := mergeDrawings(a, b, coord{0, 0})
 	expected := drawing{{"3", "4", "5"}}
 	if !cmp.Equal(c, expected) {
@@ -133,8 +133,8 @@ func TestMerge(t *testing.T) {
 }
 
 func TestMergeWithXOffset(t *testing.T) {
-	a := drawing{{"0", "1", "2"}}
-	b := drawing{{"3", "4", "5"}}
+	a := &drawing{{"0", "1", "2"}}
+	b := &drawing{{"3", "4", "5"}}
 	c := mergeDrawings(a, b, coord{1, 0})
 	expected := drawing{{"0", "1", "2"}, {"3", "4", "5"}}
 	if !cmp.Equal(c, expected) {
@@ -143,8 +143,8 @@ func TestMergeWithXOffset(t *testing.T) {
 }
 
 func TestMergeWithYOffset(t *testing.T) {
-	a := drawing{{"0", "1", "2"}}
-	b := drawing{{"3", "4", "5"}}
+	a := &drawing{{"0", "1", "2"}}
+	b := &drawing{{"3", "4", "5"}}
 	c := mergeDrawings(a, b, coord{0, 1})
 	expected := drawing{{"0", "3", "4", "5"}}
 	if !cmp.Equal(c, expected) {

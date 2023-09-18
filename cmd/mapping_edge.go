@@ -1,13 +1,13 @@
 package cmd
 
 type edge struct {
-	from  node
-	to    node
+	from  *node
+	to    *node
 	text  string
 	drawn bool
 }
 
-func getArrowStartEndOffset(from node, to node) (coord, coord) {
+func getArrowStartEndOffset(from *node, to *node) (coord, coord) {
 	// Find which sides the arrow should start/end.
 	// This is the middle of one of the sides, depending on the direction of the arrow.
 	// Note that the coord returned is relative to the box.

@@ -12,9 +12,9 @@ type coord struct {
 }
 
 type graph struct {
-	nodes       []node
-	edges       []edge
-	drawing     drawing
+	nodes       []*node
+	edges       []*edge
+	drawing     *drawing
 	grid        map[coord]*node
 	columnWidth map[int]int
 }
@@ -34,19 +34,19 @@ func mkGraph(data *orderedmap.OrderedMap[string, []string]) graph {
 		// Get or create parent node
 		parentNode, err := g.getNode(nodeName)
 		if err != nil {
-			parentNode = node{name: nodeName, index: index}
+			parentNode = &node{name: nodeName, index: index}
 			g.appendNode(parentNode)
 			index += 1
 		}
 		for _, childNodeName := range children {
 			childNode, err := g.getNode(childNodeName)
 			if err != nil {
-				childNode = node{name: childNodeName, index: index}
+				childNode = &node{name: childNodeName, index: index}
 				g.appendNode(childNode)
 				index += 1
 			}
 			e := edge{from: parentNode, to: childNode, text: ""}
-			g.edges = append(g.edges, e)
+			g.edges = append(g.edges, &e)
 		}
 	}
 
@@ -67,7 +67,7 @@ func (g *graph) createMapping() {
 	for _, n := range g.nodes {
 		if len(g.getParents(n)) == 0 {
 			// TODO: Change x/y depending on graph TD/LR. This is LR
-			mappingCoord := g.reserveSpotInGrid(&g.nodes[n.index], &coord{x: 0, y: highestPositionPerLevel[0]})
+			mappingCoord := g.reserveSpotInGrid(g.nodes[n.index], &coord{x: 0, y: highestPositionPerLevel[0]})
 			g.nodes[n.index].mappingCoord = mappingCoord
 			highestPositionPerLevel[0] = highestPositionPerLevel[0] + 1
 		}
@@ -90,7 +90,7 @@ func (g *graph) createMapping() {
 	}
 }
 
-func (g *graph) draw() drawing {
+func (g *graph) draw() *drawing {
 	// Draw all nodes.
 	for _, node := range g.nodes {
 		if !node.drawn {
@@ -100,7 +100,7 @@ func (g *graph) draw() drawing {
 	return g.drawing
 }
 
-func doDrawingsCollide(drawing1 drawing, drawing2 drawing, offset coord) bool {
+func doDrawingsCollide(drawing1 *drawing, drawing2 *drawing, offset coord) bool {
 	// Check if any of the drawing2 characters overlap with drawing1 characters.
 	// The offset is the coord of drawing2 relative to drawing1.
 	drawing1Width, drawing1Height := getDrawingSize(drawing1)
@@ -110,8 +110,8 @@ func doDrawingsCollide(drawing1 drawing, drawing2 drawing, offset coord) bool {
 			// Check if drawing2[x][y] overlaps with drawing1[x+offset.x][y+offset.y]
 			if x+offset.x >= 0 && x+offset.x < drawing1Width &&
 				y+offset.y >= 0 && y+offset.y < drawing1Height &&
-				drawing2[x][y] != " " &&
-				drawing1[x+offset.x][y+offset.y] != " " {
+				(*drawing2)[x][y] != " " &&
+				(*drawing1)[x+offset.x][y+offset.y] != " " {
 				return true
 			}
 		}
@@ -119,32 +119,32 @@ func doDrawingsCollide(drawing1 drawing, drawing2 drawing, offset coord) bool {
 	return false
 }
 
-func (g *graph) getNode(nodeName string) (node, error) {
+func (g *graph) getNode(nodeName string) (*node, error) {
 	for _, n := range g.nodes {
 		if n.name == nodeName {
 			return n, nil
 		}
 	}
-	return node{}, errors.New("node " + nodeName + " not found")
+	return &node{}, errors.New("node " + nodeName + " not found")
 }
 
-func (g *graph) appendNode(n node) {
+func (g *graph) appendNode(n *node) {
 	g.nodes = append(g.nodes, n)
 }
 
-func (g graph) getEdgesFromNode(node node) []edge {
+func (g graph) getEdgesFromNode(n *node) []edge {
 	edges := []edge{}
 	for _, edge := range g.edges {
-		if (edge.from.name) == (node.name) {
-			edges = append(edges, edge)
+		if (edge.from.name) == (n.name) {
+			edges = append(edges, *edge)
 		}
 	}
 	return edges
 }
 
-func (g *graph) getChildren(n node) []node {
+func (g *graph) getChildren(n *node) []*node {
 	edges := g.getEdgesFromNode(n)
-	children := []node{}
+	children := []*node{}
 	for _, edge := range edges {
 		if edge.from.name == n.name {
 			children = append(children, edge.to)
@@ -153,9 +153,9 @@ func (g *graph) getChildren(n node) []node {
 	return children
 }
 
-func (g *graph) getParents(n node) []node {
+func (g *graph) getParents(n *node) []*node {
 	edges := g.getEdgesFromNode(n)
-	parents := []node{}
+	parents := []*node{}
 	for _, edge := range edges {
 		if edge.to.name == n.name {
 			parents = append(parents, edge.from)

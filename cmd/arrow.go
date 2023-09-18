@@ -17,8 +17,8 @@ const (
 	LowerLeft  = "LowerLeft"
 )
 
-func drawArrow(from coord, to coord) drawing {
-	arrowDrawing := mkDrawing(Max(from.x, to.x), Max(from.y, to.y))
+func drawArrow(from coord, to coord) *drawing {
+	arrowDrawing := *(mkDrawing(Max(from.x, to.x), Max(from.y, to.y)))
 	log.Debug("Drawing arrow from ", from, " to ", to)
 
 	// Draw arrow body. This lines up between the coords, so the actual from/to
@@ -113,5 +113,5 @@ func drawArrow(from coord, to coord) drawing {
 		arrowDrawing[to.x+1][to.y] = "<"
 	}
 
-	return arrowDrawing
+	return &arrowDrawing
 }
