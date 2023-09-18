@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"errors"
+
 	"github.com/elliotchance/orderedmap/v2"
 )
 
@@ -10,9 +12,11 @@ type coord struct {
 }
 
 type graph struct {
-	nodes   []node
-	edges   []edge
-	drawing drawing
+	nodes       []node
+	edges       []edge
+	drawing     drawing
+	grid        map[coord]*node
+	columnWidth map[int]int
 }
 
 func (g graph) dimensions() (int, int) {
@@ -21,55 +25,72 @@ func (g graph) dimensions() (int, int) {
 
 func mkGraph(data *orderedmap.OrderedMap[string, []string]) graph {
 	g := graph{drawing: mkDrawing(0, 0)}
+	g.grid = make(map[coord]*node)
+	g.columnWidth = make(map[int]int)
 	index := 0
 	for el := data.Front(); el != nil; el = el.Next() {
 		nodeName := el.Key
 		children := el.Value
-		parentNode := &node{name: nodeName, index: index}
-		if !g.isNodeInGraph(*parentNode) {
-			g.appendNode(*parentNode)
+		// Get or create parent node
+		parentNode, err := g.getNode(nodeName)
+		if err != nil {
+			parentNode = node{name: nodeName, index: index}
+			g.appendNode(parentNode)
 			index += 1
 		}
 		for _, childNodeName := range children {
-			childNode := &node{name: childNodeName, index: index}
-			if !g.isNodeInGraph(*childNode) {
-				g.appendNode(*childNode)
+			childNode, err := g.getNode(childNodeName)
+			if err != nil {
+				childNode = node{name: childNodeName, index: index}
+				g.appendNode(childNode)
 				index += 1
 			}
-			e := edge{from: *parentNode, to: *childNode, text: ""}
+			e := edge{from: parentNode, to: childNode, text: ""}
 			g.edges = append(g.edges, e)
 		}
 	}
 
-	// Set root node
-	rootNode := &g.nodes[0]
-	rootNode.setCoord(&coord{x: 0, y: 0})
-	rootNode.level = 1
-
+	g.createMapping()
 	return g
 }
 
 func (g *graph) createMapping() {
+	// Set mapping coord for every node in the graph
 	highestPositionPerLevel := []int{}
 	// Init array with 0 values
 	// TODO: I'm sure there's a better way of doing this
 	for i := 0; i < 100; i++ {
 		highestPositionPerLevel = append(highestPositionPerLevel, 0)
 	}
+
+	// Set root nodes to level 0
+	for _, n := range g.nodes {
+		if len(g.getParents(n)) == 0 {
+			// TODO: Change x/y depending on graph TD/LR. This is LR
+			mappingCoord := g.reserveSpotInGrid(&g.nodes[n.index], &coord{x: 0, y: highestPositionPerLevel[0]})
+			g.nodes[n.index].mappingCoord = mappingCoord
+			highestPositionPerLevel[0] = highestPositionPerLevel[0] + 1
+		}
+	}
+
 	for _, n := range g.nodes {
 		for _, child := range g.getChildren(n) {
-			g.nodes[child.index].level = n.level + 1
 			// TODO: Change x/y depending on graph TD/LR. This is LR
-			g.nodes[child.index].setCoord(&coord{x: n.level + 1, y: highestPositionPerLevel[n.level+1]})
-			highestPositionPerLevel[n.level+1] = highestPositionPerLevel[n.level+1] + 1
+			childLevel := n.mappingCoord.x + 1
+			highestPosition := highestPositionPerLevel[childLevel]
+			g.nodes[child.index].mappingCoord = &coord{x: childLevel, y: highestPosition}
+			highestPositionPerLevel[childLevel] = highestPosition + 1
 		}
+	}
+
+	// After mapping coords are set, set drawing coords
+	for _, n := range g.nodes {
+		g.nodes[n.index].setCoord(g.mappingToDrawingCoord(n))
+		g.nodes[n.index].setDrawing()
 	}
 }
 
 func (g *graph) draw() drawing {
-	// Ensure all nodes are mapped within the graph
-	g.createMapping()
-
 	// Draw all nodes.
 	for _, node := range g.nodes {
 		if !node.drawn {
@@ -98,13 +119,13 @@ func doDrawingsCollide(drawing1 drawing, drawing2 drawing, offset coord) bool {
 	return false
 }
 
-func (g *graph) isNodeInGraph(node node) bool {
+func (g *graph) getNode(nodeName string) (node, error) {
 	for _, n := range g.nodes {
-		if n.name == node.name {
-			return true
+		if n.name == nodeName {
+			return n, nil
 		}
 	}
-	return false
+	return node{}, errors.New("node " + nodeName + " not found")
 }
 
 func (g *graph) appendNode(n node) {
@@ -130,4 +151,15 @@ func (g *graph) getChildren(n node) []node {
 		}
 	}
 	return children
+}
+
+func (g *graph) getParents(n node) []node {
+	edges := g.getEdgesFromNode(n)
+	parents := []node{}
+	for _, edge := range edges {
+		if edge.to.name == n.name {
+			parents = append(parents, edge.from)
+		}
+	}
+	return parents
 }

@@ -1,12 +1,9 @@
 package cmd
 
-import (
-)
-
 type edge struct {
-	from node
-	to   node
-	text string
+	from  node
+	to    node
+	text  string
 	drawn bool
 }
 
@@ -16,18 +13,18 @@ func getArrowStartEndOffset(from node, to node) (coord, coord) {
 	// Note that the coord returned is relative to the box.
 	fromBoxWidth, fromBoxHeight := getDrawingSize(from.drawing)
 	toBoxWidth, toBoxHeight := getDrawingSize(to.drawing)
-	if from.coord.x == to.coord.x {
+	if from.drawingCoord.x == to.drawingCoord.x {
 		// Vertical arrow
-		if from.coord.y < to.coord.y {
+		if from.drawingCoord.y < to.drawingCoord.y {
 			// Down
 			return coord{fromBoxWidth / 2, fromBoxHeight}, coord{toBoxWidth / 2, 0}
 		} else {
 			// Up
 			return coord{fromBoxWidth / 2, 0}, coord{toBoxWidth / 2, toBoxHeight}
 		}
-	} else if from.coord.y == to.coord.y {
+	} else if from.drawingCoord.y == to.drawingCoord.y {
 		// Horizontal arrow
-		if from.coord.x < to.coord.x {
+		if from.drawingCoord.x < to.drawingCoord.x {
 			// Right
 			return coord{fromBoxWidth, fromBoxHeight / 2}, coord{0, toBoxHeight / 2}
 		} else {
@@ -36,9 +33,9 @@ func getArrowStartEndOffset(from node, to node) (coord, coord) {
 		}
 	} else {
 		// Diagonal arrow
-		if from.coord.x < to.coord.x {
+		if from.drawingCoord.x < to.drawingCoord.x {
 			// Right
-			if from.coord.y < to.coord.y {
+			if from.drawingCoord.y < to.drawingCoord.y {
 				// Down
 				return coord{fromBoxWidth / 2, fromBoxHeight}, coord{0, toBoxHeight / 2}
 			} else {
@@ -47,7 +44,7 @@ func getArrowStartEndOffset(from node, to node) (coord, coord) {
 			}
 		} else {
 			// Left
-			if from.coord.y < to.coord.y {
+			if from.drawingCoord.y < to.drawingCoord.y {
 				// Down
 				return coord{fromBoxWidth / 2, fromBoxHeight}, coord{toBoxWidth, toBoxHeight / 2}
 			} else {

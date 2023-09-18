@@ -11,16 +11,15 @@ import (
 type drawing [][]string
 
 func (g *graph) drawNode(n node) {
-	n.drawing = n.draw()
-	m := mergeDrawings(g.drawing, n.drawing, *n.coord)
+	m := mergeDrawings(g.drawing, n.drawing, *n.drawingCoord)
 	g.drawing = m
 }
 
 func (g *graph) drawEdge(e edge) {
 	arrowStart, arrowEnd := getArrowStartEndOffset(e.from, e.to)
 	arrow := drawArrow(
-		coord{x: e.from.coord.x + arrowStart.x, y: e.from.coord.y + arrowStart.y},
-		coord{x: e.to.coord.x + arrowEnd.x, y: e.to.coord.y + arrowEnd.y},
+		coord{x: e.from.drawingCoord.x + arrowStart.x, y: e.from.drawingCoord.y + arrowStart.y},
+		coord{x: e.to.drawingCoord.x + arrowEnd.x, y: e.to.drawingCoord.y + arrowEnd.y},
 	)
 	m := mergeDrawings(g.drawing, arrow, coord{x: 0, y: 0})
 	g.drawing = m

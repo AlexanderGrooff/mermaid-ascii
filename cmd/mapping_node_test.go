@@ -31,23 +31,70 @@ func TestCreateNodeBasedOnEdge(t *testing.T) {
 	assert.Equal(t, 2, len(g.nodes))
 }
 
-func TestChildNodeHasLevelTwo(t *testing.T) {
+func TestChildNodeMappingCoord(t *testing.T) {
 	data := orderedmap.NewOrderedMap[string, []string]()
 	data.Set("A", []string{"B"})
 
 	g := mkGraph(data)
-	g.createMapping()
 
-	assert.Equal(t, 2, g.nodes[1].level)
+	assert.Equal(t, 1, g.nodes[1].mappingCoord.x)
+	assert.Equal(t, 0, g.nodes[1].mappingCoord.y)
 }
 
-func TestNestedChildHasLevelThree(t *testing.T) {
+func TestNestedChildMappingCoord(t *testing.T) {
 	data := orderedmap.NewOrderedMap[string, []string]()
 	data.Set("A", []string{"B", "C"})
 	data.Set("C", []string{"D"})
 
 	g := mkGraph(data)
-	g.createMapping()
 
-	assert.Equal(t, 3, g.nodes[3].level)
+	assert.Equal(t, 2, g.nodes[3].mappingCoord.x)
+	assert.Equal(t, 0, g.nodes[3].mappingCoord.y)
+}
+
+func TestConvertMappingToDrawingCoord(t *testing.T) {
+	t.Run(
+		"0,0",
+		func(t *testing.T) {
+			n := node{mappingCoord: &coord{x: 0, y: 0}}
+
+			drawCoord := n.mappingToDrawingCoord()
+
+			assert.Equal(t, 0, drawCoord.x)
+			assert.Equal(t, 0, drawCoord.y)
+		},
+	)
+	t.Run(
+		"1,0",
+		func(t *testing.T) {
+			n := node{mappingCoord: &coord{x: 1, y: 0}}
+
+			drawCoord := n.mappingToDrawingCoord()
+
+			assert.Equal(t, 15, drawCoord.x)
+			assert.Equal(t, 0, drawCoord.y)
+		},
+	)
+	t.Run(
+		"0,1",
+		func(t *testing.T) {
+			n := node{mappingCoord: &coord{x: 0, y: 1}}
+
+			drawCoord := n.mappingToDrawingCoord()
+
+			assert.Equal(t, 0, drawCoord.x)
+			assert.Equal(t, 13, drawCoord.y)
+		},
+	)
+	t.Run(
+		"1,1",
+		func(t *testing.T) {
+			n := node{mappingCoord: &coord{x: 1, y: 1}}
+
+			drawCoord := n.mappingToDrawingCoord()
+
+			assert.Equal(t, 15, drawCoord.x)
+			assert.Equal(t, 13, drawCoord.y)
+		},
+	)
 }
