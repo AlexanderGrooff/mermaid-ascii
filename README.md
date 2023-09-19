@@ -26,6 +26,7 @@ $ mermaid-ascii --help
 ## Usage
 ```bash
 $ cat test.mermaid
+graph LR
 A --> B
 A --> C
 B --> C
@@ -82,6 +83,7 @@ $ mermaid-ascii -f ./test.mermaid -p 3
 
 # Labeled edges
 $ cat test.mermaid
+graph LR
 A --> B
 A --> C
 B --> C
@@ -101,6 +103,42 @@ $ mermaid-ascii -f ./test.mermaid -x 2 -y 4
        ->| C | -------/
          |   |
          +---+
+
+# Top-down layout
+$ cat test.mermaid
+graph TD
+A --> B
+B --> C
+B --> D
+C --> D
+X --> C
+$ mermaid-ascii -f ./test.mermaid -y 5
++---+          +---+
+|   |          |   |
+| A |          | X |
+|   |          |   |
++---+          +---+
+  |              |
+  |              |
+  |              |
+  |              |
+  v              |
++---+            /
+|   |           /
+| B |          /
+|   |         /
++---+        /
+  \         /
+  |\       /
+  | \     /
+  |  \   /
+  v   \ /
++---+  /       +---+
+|   | / \      |   |
+| C |<-------->| D |
+|   |          |   |
++---+          +---+
+
 $ mermaid-ascii --help
 Generate ASCII diagrams from mermaid code.
 
@@ -122,7 +160,7 @@ The baseline components for Mermaid work, but there are a lot of things that are
 ### Syntax support
 
 - [x] Labelled edges (like `A -->|label| B`)
-- [ ] Graph directions like `graph LR` and `graph TB`
+- [x] Graph directions like `graph LR` and `graph TB`
 - [ ] `classDef` and `class`
 - [ ] `subgraph`
 - [ ] Shapes other than rectangles
