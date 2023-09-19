@@ -153,6 +153,21 @@ Flags:
   -v, --verbose        verbose output
 ```
 
+Colored output is also supported (given that your terminal supports it) using the `classDef` syntax:
+
+```bash
+graph LR
+classDef example1 color:#ff0000
+classDef example2 color:#00ff00
+classDef example3 color:#0000ff
+test1:::example1 --> test2
+test2:::example2 --> test3:::example3
+```
+
+This results in the following graph:
+
+![](docs/colored_graph.png)
+
 ## TODOs
 
 The baseline components for Mermaid work, but there are a lot of things that are not supported yet. Here's a list of things that are not yet supported:
@@ -161,7 +176,7 @@ The baseline components for Mermaid work, but there are a lot of things that are
 
 - [x] Labelled edges (like `A -->|label| B`)
 - [x] Graph directions like `graph LR` and `graph TB`
-- [ ] `classDef` and `class`
+- [x] `classDef` and `class`
 - [ ] `subgraph`
 - [ ] Shapes other than rectangles
 - [ ] `A & B`

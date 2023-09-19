@@ -5,10 +5,16 @@ import (
 	"strings"
 
 	"github.com/elliotchance/orderedmap/v2"
+	"github.com/gookit/color"
 	log "github.com/sirupsen/logrus"
 )
 
 type drawing [][]string
+
+type styleClass struct {
+	name   string
+	styles map[string]string
+}
 
 func (g *graph) drawNode(n *node) {
 	m := mergeDrawings(g.drawing, n.drawing, *n.drawingCoord)
@@ -75,16 +81,18 @@ func (d *drawing) drawLine(from coord, to coord, offsetFrom int, offsetTo int) {
 	}
 }
 
-func drawMap(data *orderedmap.OrderedMap[string, []labeledChild]) {
+func drawMap(data *orderedmap.OrderedMap[string, []textEdge], styleClasses map[string]styleClass) {
 	g := mkGraph(data)
+	g.setStyleClasses(styleClasses)
+	g.createMapping()
 	s := drawingToString(g.draw())
 	fmt.Println(s)
 }
 
-func drawBox(text string) *drawing {
+func drawBox(n *node) *drawing {
 	from := coord{0, 0}
 	// -1 because we start at 0
-	to := coord{len(text) + boxBorderPadding*2 + boxBorderWidth*2 - 1, boxBorderWidth*2 + boxBorderPadding*2}
+	to := coord{len(n.name) + boxBorderPadding*2 + boxBorderWidth*2 - 1, boxBorderWidth*2 + boxBorderPadding*2}
 	boxDrawing := *(mkDrawing(Max(from.x, to.x), Max(from.y, to.y)))
 	log.Debug("Drawing box from ", from, " to ", to)
 	// Draw top border
@@ -103,11 +111,22 @@ func drawBox(text string) *drawing {
 	for y := from.y; y < to.y; y++ {
 		boxDrawing[to.x][y] = "|" // Vertical line
 	}
+	// Set up text color
+	var c color.RGBColor
+	log.Debugf("Color for node %s is %s", n.name, n.styleClass)
+	if n.styleClass.styles["color"] != "" {
+		c = color.HEX(n.styleClass.styles["color"])
+	}
 	// Draw text
 	textY := from.y + boxBorderPadding + boxBorderWidth
 	textXOffset := from.x + boxBorderPadding + boxBorderWidth
-	for x := from.x + boxBorderPadding + boxBorderWidth; x < textXOffset+len(text); x++ {
-		boxDrawing[x][textY] = string(text[x-textXOffset]) // Text
+	for x := from.x + boxBorderPadding + boxBorderWidth; x < textXOffset+len(n.name); x++ {
+		if n.styleClass.styles["color"] != "" {
+			log.Debugf("Setting color for node %s to %s", n.name, n.styleClass.styles["color"])
+			boxDrawing[x][textY] = c.Sprint(string(n.name[x-textXOffset])) // Text
+		} else {
+			boxDrawing[x][textY] = string(n.name[x-textXOffset]) // Text
+		}
 	}
 	// Draw corners
 	boxDrawing[from.x][from.y] = "+" // Top left corner

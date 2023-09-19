@@ -7,14 +7,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func CreateChildren(parent string, children []string) []textEdge {
+	edges := make([]textEdge, len(children))
+	for i, child := range children {
+		edges[i] = textEdge{textNode{parent, ""}, textNode{child, ""}, ""}
+	}
+	return edges
+}
+
 func TestSingleNodeGraphHasNoEdges(t *testing.T) {
-	data := orderedmap.NewOrderedMap[string, []labeledChild]()
-	data.Set("A", []labeledChild{{"B", ""}, {"C", ""}})
-	data.Set("B", []labeledChild{{"D", ""}})
-	data.Set("C", []labeledChild{{"E", ""}, {"F", ""}})
-	data.Set("D", []labeledChild{})
-	data.Set("E", []labeledChild{})
-	data.Set("F", []labeledChild{})
+	data := orderedmap.NewOrderedMap[string, []textEdge]()
+	data.Set("A", CreateChildren("A", []string{"B", "C"}))
+	data.Set("B", CreateChildren("B", []string{"D"}))
+	data.Set("C", CreateChildren("C", []string{"E", "F"}))
+	data.Set("D", []textEdge{})
+	data.Set("E", []textEdge{})
+	data.Set("F", []textEdge{})
 
 	g := mkGraph(data)
 
@@ -23,8 +31,8 @@ func TestSingleNodeGraphHasNoEdges(t *testing.T) {
 }
 
 func TestCreateNodeBasedOnEdge(t *testing.T) {
-	data := orderedmap.NewOrderedMap[string, []labeledChild]()
-	data.Set("A", []labeledChild{{"B", ""}})
+	data := orderedmap.NewOrderedMap[string, []textEdge]()
+	data.Set("A", CreateChildren("A", []string{"B"}))
 
 	g := mkGraph(data)
 
@@ -32,21 +40,23 @@ func TestCreateNodeBasedOnEdge(t *testing.T) {
 }
 
 func TestChildNodeMappingCoord(t *testing.T) {
-	data := orderedmap.NewOrderedMap[string, []labeledChild]()
-	data.Set("A", []labeledChild{{"B", ""}})
+	data := orderedmap.NewOrderedMap[string, []textEdge]()
+	data.Set("A", CreateChildren("A", []string{"B"}))
 
 	g := mkGraph(data)
+	g.createMapping()
 
 	assert.Equal(t, 1, g.nodes[1].mappingCoord.x)
 	assert.Equal(t, 0, g.nodes[1].mappingCoord.y)
 }
 
 func TestNestedChildMappingCoord(t *testing.T) {
-	data := orderedmap.NewOrderedMap[string, []labeledChild]()
-	data.Set("A", []labeledChild{{"B", ""}, {"C", ""}})
-	data.Set("C", []labeledChild{{"D", ""}})
+	data := orderedmap.NewOrderedMap[string, []textEdge]()
+	data.Set("A", CreateChildren("A", []string{"B", "C"}))
+	data.Set("C", CreateChildren("C", []string{"D"}))
 
 	g := mkGraph(data)
+	g.createMapping()
 
 	assert.Equal(t, 2, g.nodes[3].mappingCoord.x)
 	assert.Equal(t, 0, g.nodes[3].mappingCoord.y)
@@ -56,7 +66,7 @@ func TestConvertMappingToDrawingCoord(t *testing.T) {
 	t.Run(
 		"0,0",
 		func(t *testing.T) {
-			g := mkGraph(orderedmap.NewOrderedMap[string, []labeledChild]())
+			g := mkGraph(orderedmap.NewOrderedMap[string, []textEdge]())
 			n := node{mappingCoord: &coord{x: 0, y: 0}}
 
 			drawCoord := *g.mappingToDrawingCoord(&n)
@@ -68,7 +78,7 @@ func TestConvertMappingToDrawingCoord(t *testing.T) {
 	t.Run(
 		"1,0",
 		func(t *testing.T) {
-			g := mkGraph(orderedmap.NewOrderedMap[string, []labeledChild]())
+			g := mkGraph(orderedmap.NewOrderedMap[string, []textEdge]())
 			n := node{mappingCoord: &coord{x: 1, y: 0}}
 
 			drawCoord := *g.mappingToDrawingCoord(&n)
@@ -80,7 +90,7 @@ func TestConvertMappingToDrawingCoord(t *testing.T) {
 	t.Run(
 		"0,1",
 		func(t *testing.T) {
-			g := mkGraph(orderedmap.NewOrderedMap[string, []labeledChild]())
+			g := mkGraph(orderedmap.NewOrderedMap[string, []textEdge]())
 			n := node{mappingCoord: &coord{x: 0, y: 1}}
 
 			drawCoord := *g.mappingToDrawingCoord(&n)
@@ -92,7 +102,7 @@ func TestConvertMappingToDrawingCoord(t *testing.T) {
 	t.Run(
 		"1,1",
 		func(t *testing.T) {
-			g := mkGraph(orderedmap.NewOrderedMap[string, []labeledChild]())
+			g := mkGraph(orderedmap.NewOrderedMap[string, []textEdge]())
 			n := node{mappingCoord: &coord{x: 1, y: 1}}
 
 			drawCoord := *g.mappingToDrawingCoord(&n)
