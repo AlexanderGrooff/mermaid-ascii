@@ -26,61 +26,81 @@ $ mermaid-ascii --help
 ## Usage
 ```bash
 $ cat test.mermaid
+A --> B
 A --> C
-A --> D
 B --> C
-C --> D
 B --> D
+C --> D
 $ mermaid-ascii --file test.mermaid
-+---+    +---+    +---+
-|   |    |   |    |   |
-| A |--->| B |<---| D |
-|   |    |   |    |   |
-+---+    +---+    +---+
-  \        |        /
-   \       |       /
-    \      v      /
-     \   +---+   /
-      \  |   |  /
-       ->| C |<-
++---+          +---+          +---+
+|   |          |   |          |   |
+| A |--------->| B |--------->| D |
+|   |          |   |          |   |
++---+          +---+          +---+
+  \              |              ^
+   \             |             /
+    \            v            /
+     \         +---+         /
+      \        |   |        /
+       ------->| C | ------/
+               |   |
+               +---+
+
+# Increase horizontal spacing
+$ mermaid-ascii --file test.mermaid -x 8
++---+                +---+                +---+
+|   |                |   |                |   |
+| A |--------------->| B |--------------->| D |
+|   |                |   |                |   |
++---+                +---+                +---+
+  \                    |                    ^
+   \                   |                   /
+    \                  v                  /
+     \               +---+               /
+      \              |   |              /
+       ------------->| C | ------------/
+                     |   |
+                     +---+
+
+# Increase box padding
+$ mermaid-ascii -f ./test.mermaid -p 3
++-----+          +-----+          +-----+
+|     |          |     |          |     |
+|     |          |     |          |     |
+|  A  |--------->|  B  |--------->|  D  |
+|     |          |     |          |     |
+|     |          |     |          |     |
++-----+          +-----+          +-----+
+   \                v                ^
+    \            +-----+            /
+     \           |     |           /
+      \          |     |          /
+       --------->|  C  | --------/
+                 |     |
+                 |     |
+                 +-----+
+
+# Labeled edges
+$ cat test.mermaid
+A --> B
+A --> C
+B --> C
+B -->|example| D
+C --> D
+$ mermaid-ascii -f ./test.mermaid -x 2 -y 4
++---+    +---+           +---+
+|   |    |   |           |   |
+| A |--->| B |--example->| D |
+|   |    |   |           |   |
++---+    +---+           +---+
+  \        |               ^
+   \       |              /
+    \      v             /
+     \   +---+          /
+      \  |   |         /
+       ->| C | -------/
          |   |
          +---+
-$ mermaid-ascii --file test.mermaid -x 8
-+---+       +---+       +---+
-|   |       |   |       |   |
-| A |------>| B |<------| D |
-|   |       |   |       |   |
-+---+       +---+       +---+
-  \           |           /
-   \          |          /
-    \         v         /
-     \      +---+      /
-      \     |   |     /
-       ---->| C |<----
-            |   |
-            +---+
-$ mermaid-ascii -f ./test.mermaid -p 3
-+-------+    +-------+    +-------+
-|       |    |       |    |       |
-|       |    |       |    |       |
-|       |    |       |    |       |
-|   A   |--->|   B   |<---|   D   |
-|       |    |       |    |       |
-|       |    |       |    |       |
-|       |    |       |    |       |
-+-------+    +-------+    +-------+
-    \            |            /
-     \           |           /
-      \          v          /
-       \     +-------+     /
-        \    |       |    /
-         \   |       |   /
-          \  |       |  /
-           ->|   C   |<-
-             |       |
-             |       |
-             |       |
-             +-------+
 $ mermaid-ascii --help
 Generate ASCII diagrams from mermaid code.
 
@@ -101,12 +121,13 @@ The baseline components for Mermaid work, but there are a lot of things that are
 
 ### Syntax support
 
+- [x] Labelled edges (like `A -->|label| B`)
 - [ ] Graph directions like `graph LR` and `graph TB`
 - [ ] `classDef` and `class`
 - [ ] `subgraph`
 - [ ] Shapes other than rectangles
 - [ ] `A & B`
-- [ ] Multiple arrows on one line
+- [ ] Multiple arrows on one line (like `A --> B --> C`)
 - [ ] Whitespacing and comments
 
 ### Rendering
