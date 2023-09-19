@@ -63,8 +63,12 @@ func (g *graph) createMapping() {
 	// Set root nodes to level 0
 	for _, n := range g.nodes {
 		if len(g.getParents(n)) == 0 {
-			// TODO: Change x/y depending on graph TD/LR. This is LR
-			mappingCoord := g.reserveSpotInGrid(g.nodes[n.index], &coord{x: 0, y: highestPositionPerLevel[0]})
+			var mappingCoord *coord
+			if graphDirection == "LR" {
+				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &coord{x: 0, y: highestPositionPerLevel[0]})
+			} else {
+				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &coord{x: highestPositionPerLevel[0], y: 0})
+			}
 			logrus.Debugf("Setting mapping coord for rootnode %s to %v", n.name, mappingCoord)
 			g.nodes[n.index].mappingCoord = mappingCoord
 			highestPositionPerLevel[0] = highestPositionPerLevel[0] + 1
@@ -72,7 +76,12 @@ func (g *graph) createMapping() {
 	}
 
 	for _, n := range g.nodes {
-		childLevel := n.mappingCoord.x + 1
+		var childLevel int
+		if graphDirection == "LR" {
+			childLevel = n.mappingCoord.x + 1
+		} else {
+			childLevel = n.mappingCoord.y + 1
+		}
 		highestPosition := highestPositionPerLevel[childLevel]
 		for _, child := range g.getChildren(n) {
 			// Skip if the child already has a mapping coord
@@ -80,8 +89,12 @@ func (g *graph) createMapping() {
 				continue
 			}
 
-			// TODO: Change x/y depending on graph TD/LR. This is LR
-			mappingCoord := g.reserveSpotInGrid(g.nodes[n.index], &coord{x: childLevel, y: highestPosition})
+			var mappingCoord *coord
+			if graphDirection == "LR" {
+				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &coord{x: childLevel, y: highestPosition})
+			} else {
+				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &coord{x: highestPosition, y: childLevel})
+			}
 			logrus.Debugf("Setting mapping coord for child %s of parent %s to %v", child.name, n.name, mappingCoord)
 			g.nodes[child.index].mappingCoord = mappingCoord
 			highestPositionPerLevel[childLevel] = highestPosition + 1
