@@ -18,7 +18,6 @@ const (
 )
 
 func (d *drawing) drawArrow(from coord, to coord, label string) {
-	arrowDrawing := *(mkDrawing(Max(from.x, to.x), Max(from.y, to.y)))
 	dir := determineDirection(from, to)
 	log.Debugf("Drawing arrow from %v to %v with direction %s", from, to, dir)
 
@@ -92,8 +91,8 @@ func (d *drawing) drawArrow(from coord, to coord, label string) {
 			corner1 := coord{from.x + 1, from.y}
 			corner2 := coord{to.x, to.y + 1}
 			(*d).drawLine(from, corner1, 0, 0)
-			arrowDrawing.drawLine(corner1, corner2, 0, 0)
-			arrowDrawing.drawLine(corner2, to, 0, -1)
+			(*d).drawLine(corner1, corner2, 0, 0)
+			(*d).drawLine(corner2, to, 0, -2)
 			textCoord = coord{from.x + (diffX / 2) - (len(label) / 2), from.y - (diffY / 2)}
 		} else {
 			var corner coord

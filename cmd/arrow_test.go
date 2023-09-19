@@ -167,7 +167,7 @@ func TestDrawUpperRightArrowWithLongerX(t *testing.T) {
 }
 
 func TestDrawUpperRightArrowWithLongerY(t *testing.T) {
-	arrowDrawing := mkDrawing(3, 5)
+	arrowDrawing := mkDrawing(3, 7)
 	arrowDrawing.drawArrow(coord{0, 7}, coord{3, 0}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected :=

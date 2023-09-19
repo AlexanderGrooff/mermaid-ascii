@@ -121,7 +121,7 @@ func drawBox(text string) *drawing {
 func (d *drawing) increaseSize(x int, y int) {
 	currSizeX, currSizeY := getDrawingSize(d)
 	drawingWithNewSize := mkDrawing(Max(x, currSizeX), Max(y, currSizeY))
-	d = mergeDrawings(drawingWithNewSize, d, coord{0, 0})
+	*d = *mergeDrawings(drawingWithNewSize, d, coord{0, 0})
 }
 
 func mergeDrawings(d1 *drawing, d2 *drawing, mergeCoord coord) *drawing {
