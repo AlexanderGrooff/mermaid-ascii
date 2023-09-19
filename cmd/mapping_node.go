@@ -29,12 +29,20 @@ func (g *graph) mappingToDrawingCoord(n *node) *coord {
 	// - 2x margin
 	w := 2*boxBorderWidth + 2*boxBorderPadding + len(n.name)
 
+	labelLength := 0
+	for _, e := range g.getEdgesFromNode(n) {
+		// Does the edge go to the next column?
+		if e.to.mappingCoord.x == n.mappingCoord.x+1 {
+			labelLength = Max(labelLength, len(e.text))
+		}
+	}
+
 	// Next to that you have previous columns, which have a max width based on the longest name
 	prevX := 0
 	for i := 0; i < n.mappingCoord.x; i++ {
 		prevX += g.columnWidth[i] + 2*paddingBetweenX
 	}
-	g.columnWidth[n.mappingCoord.x] = Max(g.columnWidth[n.mappingCoord.x], w)
+	g.columnWidth[n.mappingCoord.x] = Max(g.columnWidth[n.mappingCoord.x], w+labelLength)
 
 	x := prevX
 	y := n.mappingCoord.y * 2 * paddingBetweenY

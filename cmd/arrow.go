@@ -93,19 +93,15 @@ func (d *drawing) drawArrow(from coord, to coord, label string) {
 			(*d).drawLine(from, corner1, 0, 0)
 			(*d).drawLine(corner1, corner2, 0, 0)
 			(*d).drawLine(corner2, to, 0, -2)
-			textCoord = coord{from.x + (diffX / 2) - (len(label) / 2), from.y - (diffY / 2)}
+			textCoord = coord{Max(from.x+(diffX/2)-(len(label)/2), 0), from.y - (diffY / 2)}
 		} else {
 			var corner coord
 			if yLongerThanX > 0 {
 				corner = coord{to.x, to.y + yLongerThanX - 1}
-				textCoord = coord{Max(to.x/2-(len(label)/2), 0), from.y - yLongerThanX}
+				textCoord = coord{corner.x - len(label) - 1, corner.y + 1 + len(label)/2}
 			} else {
 				corner = coord{from.x - yLongerThanX + 1, from.y}
-				if Abs(yLongerThanX) > len(label)+4 {
-					textCoord = coord{from.x + (diffY) + Abs(yLongerThanX/2) - (len(label) / 2) - 2, to.y}
-				} else {
-					textCoord = coord{Max(from.x+diffY-(len(label)/2)-2, 0), Max(corner.y+2, from.y-1)}
-				}
+				textCoord = coord{Min(corner.x-len(label)-1, from.x), corner.y}
 			}
 			(*d).drawLine(from, corner, 1, 0)
 			(*d).drawLine(corner, to, 0, -1)

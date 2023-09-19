@@ -152,6 +152,20 @@ func TestDrawStraightUpperRightArrow(t *testing.T) {
 	}
 }
 
+func TestDrawStraightUpperRightArrowWithLabel(t *testing.T) {
+	arrowDrawing := mkDrawing(3, 3)
+	arrowDrawing.drawArrow(coord{0, 3}, coord{3, 0}, "test")
+	boxString := drawingToString(arrowDrawing)
+	expected :=
+		`     
+   ^ 
+test 
+-/   `
+	if boxString != expected {
+		t.Error("Expected boxString to be", expected, "got", boxString)
+	}
+}
+
 func TestDrawUpperRightArrowWithLongerX(t *testing.T) {
 	arrowDrawing := mkDrawing(5, 3)
 	arrowDrawing.drawArrow(coord{0, 3}, coord{5, 0}, "")

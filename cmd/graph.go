@@ -42,7 +42,7 @@ func mkGraph(data *orderedmap.OrderedMap[string, []labeledChild]) graph {
 				g.appendNode(childNode)
 				index += 1
 			}
-			e := edge{from: parentNode, to: childNode, text: ""}
+			e := edge{from: parentNode, to: childNode, text: labeledC.label}
 			g.edges = append(g.edges, &e)
 		}
 	}
