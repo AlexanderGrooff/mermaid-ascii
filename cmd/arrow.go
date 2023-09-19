@@ -18,16 +18,18 @@ const (
 )
 
 func (d *drawing) drawArrow(from coord, to coord, label string) {
-	log.Debug("Drawing arrow from ", from, " to ", to)
+	arrowDrawing := *(mkDrawing(Max(from.x, to.x), Max(from.y, to.y)))
+	dir := determineDirection(from, to)
+	log.Debugf("Drawing arrow from %v to %v with direction %s", from, to, dir)
 
 	// Draw arrow body. This lines up between the coords, so the actual from/to
 	// coords are offset by 1.
 	diffY := Abs(to.y - from.y)
 	diffX := Abs(to.x - from.x)
-	diff := diffY - diffX
+	yLongerThanX := diffY - diffX
 	var textCoord coord
-	log.Debug("diffY: ", diffY, " diffX: ", diffX, " diff: ", diff)
-	switch determineDirection(from, to) {
+	log.Debug("yLongerThanXY: ", diffY, " yLongerThanXX: ", diffX, " yLongerThanX: ", yLongerThanX)
+	switch dir {
 	case Up:
 		(*d).drawLine(from, to, 1, -1)
 		textCoord = coord{to.x - (len(label) / 2), from.y - (diffY / 2)}
@@ -44,20 +46,20 @@ func (d *drawing) drawArrow(from coord, to coord, label string) {
 	// If there can't be a straight diagonal, first draw a vertical or
 	// horizontal line to the corner, then draw the diagonal.
 	// Draw straight line until we can make a straight diagonal
-	// If diff is positive, we need to draw a vertical line first
+	// If yLongerThanX is positive, we need to draw a vertical line first
 	case LowerRight:
-		if diff == 0 {
+		if yLongerThanX == 0 {
 			(*d).drawLine(from, to, 1, -1)
 			textCoord = coord{from.x + (diffX / 2) - (len(label) / 2), from.y + (diffY / 2)}
 		} else {
 			var corner coord
-			if diff > 0 {
-				corner = coord{from.x, from.y + diff + 2}
-				textCoord = coord{Max(from.x-(len(label)/2), 0), from.y + diff}
+			if yLongerThanX > 0 {
+				corner = coord{from.x, from.y + yLongerThanX + 2}
+				textCoord = coord{Max(from.x-(len(label)/2), 0), from.y + yLongerThanX}
 			} else {
-				corner = coord{from.x + (diffX + diff), to.y}
-				if Abs(diff) > len(label)+4 {
-					textCoord = coord{from.x + (diffY) + Abs(diff/2) - (len(label) / 2) - 2, to.y}
+				corner = coord{from.x + (diffX + yLongerThanX), to.y}
+				if Abs(yLongerThanX) > len(label)+4 {
+					textCoord = coord{from.x + (diffY) + Abs(yLongerThanX/2) - (len(label) / 2) - 2, to.y}
 				} else {
 					textCoord = coord{Max(from.x+diffY-(len(label)/2)-2, 0), Max(corner.y-2, from.y+1)}
 				}
@@ -66,18 +68,18 @@ func (d *drawing) drawArrow(from coord, to coord, label string) {
 			(*d).drawLine(corner, to, -1, -1)
 		}
 	case LowerLeft:
-		if diff == 0 {
+		if yLongerThanX == 0 {
 			(*d).drawLine(from, to, 1, -1)
 			textCoord = coord{from.x - (diffX / 2) - (len(label) / 2), from.y + (diffY / 2)}
 		} else {
 			var corner coord
-			if diff > 0 {
-				corner = coord{from.x, from.y + diff + 2}
-				textCoord = coord{from.x - (len(label) / 2), from.y + diff}
+			if yLongerThanX > 0 {
+				corner = coord{from.x, from.y + yLongerThanX + 2}
+				textCoord = coord{from.x - (len(label) / 2), from.y + yLongerThanX}
 			} else {
-				corner = coord{to.x - diff, to.y}
-				if Abs(diff) > len(label)+4 {
-					textCoord = coord{from.x - (diffY) - Abs(diff/2) - (len(label) / 4), to.y}
+				corner = coord{to.x - yLongerThanX, to.y}
+				if Abs(yLongerThanX) > len(label)+4 {
+					textCoord = coord{from.x - (diffY) - Abs(yLongerThanX/2) - (len(label) / 4), to.y}
 				} else {
 					textCoord = coord{from.x - diffY + (len(label) / 2) - 4, Max(corner.y-2, from.y+1)}
 				}
@@ -86,18 +88,22 @@ func (d *drawing) drawArrow(from coord, to coord, label string) {
 			(*d).drawLine(corner, to, -1, -1)
 		}
 	case UpperRight:
-		if diff == 0 {
-			(*d).drawLine(from, to, 1, -1)
+		if yLongerThanX == 0 {
+			corner1 := coord{from.x + 1, from.y}
+			corner2 := coord{to.x, to.y + 1}
+			(*d).drawLine(from, corner1, 0, 0)
+			arrowDrawing.drawLine(corner1, corner2, 0, 0)
+			arrowDrawing.drawLine(corner2, to, 0, -1)
 			textCoord = coord{from.x + (diffX / 2) - (len(label) / 2), from.y - (diffY / 2)}
 		} else {
 			var corner coord
-			if diff > 0 {
-				corner = coord{from.x, from.y - diff}
-				textCoord = coord{Max(from.x-(len(label)/2), 0), from.y - diff}
+			if yLongerThanX > 0 {
+				corner = coord{to.x, to.y + yLongerThanX - 1}
+				textCoord = coord{Max(to.x/2-(len(label)/2), 0), from.y - yLongerThanX}
 			} else {
-				corner = coord{to.x + diff - 1, to.y}
-				if Abs(diff) > len(label)+4 {
-					textCoord = coord{from.x + (diffY) + Abs(diff/2) - (len(label) / 2) - 2, to.y}
+				corner = coord{from.x - yLongerThanX + 1, from.y}
+				if Abs(yLongerThanX) > len(label)+4 {
+					textCoord = coord{from.x + (diffY) + Abs(yLongerThanX/2) - (len(label) / 2) - 2, to.y}
 				} else {
 					textCoord = coord{Max(from.x+diffY-(len(label)/2)-2, 0), Max(corner.y+2, from.y-1)}
 				}
@@ -106,18 +112,18 @@ func (d *drawing) drawArrow(from coord, to coord, label string) {
 			(*d).drawLine(corner, to, 0, -1)
 		}
 	case UpperLeft:
-		if diff == 0 {
+		if yLongerThanX == 0 {
 			(*d).drawLine(from, to, 1, -1)
 			textCoord = coord{from.x - (diffX / 2) - (len(label) / 2), from.y - (diffY / 2)}
 		} else {
 			var corner coord
-			if diff > 0 {
-				corner = coord{from.x, from.y - diff}
-				textCoord = coord{from.x - (len(label) / 2), from.y - diff}
+			if yLongerThanX > 0 {
+				corner = coord{from.x, from.y - yLongerThanX}
+				textCoord = coord{from.x - (len(label) / 2), from.y - yLongerThanX}
 			} else {
-				corner = coord{to.x - diff + 1, to.y}
-				if Abs(diff) > len(label)+4 {
-					textCoord = coord{from.x - (diffY) - Abs(diff/2) - (len(label) / 4), to.y}
+				corner = coord{to.x - yLongerThanX + 1, to.y}
+				if Abs(yLongerThanX) > len(label)+4 {
+					textCoord = coord{from.x - (diffY) - Abs(yLongerThanX/2) - (len(label) / 4), to.y}
 				} else {
 					textCoord = coord{from.x - diffY + (len(label) / 2) - 4, Max(corner.y+2, from.y-1)}
 				}
@@ -142,7 +148,11 @@ func (d *drawing) drawArrow(from coord, to coord, label string) {
 		}
 	} else if from.x < to.x {
 		// Right
-		(*d)[to.x-1][to.y] = ">"
+		if dir == UpperRight {
+			(*d)[to.x][to.y+1] = "^"
+		} else {
+			(*d)[to.x-1][to.y] = ">"
+		}
 	} else {
 		// Left
 		(*d)[to.x+1][to.y] = "<"
