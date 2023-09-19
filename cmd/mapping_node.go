@@ -3,12 +3,14 @@ package cmd
 import "github.com/sirupsen/logrus"
 
 type node struct {
-	name         string
-	drawing      *drawing
-	drawingCoord *coord
-	mappingCoord *coord
-	drawn        bool
-	index        int // Index of the node in the graph.nodes slice
+	name           string
+	drawing        *drawing
+	drawingCoord   *coord
+	mappingCoord   *coord
+	drawn          bool
+	index          int // Index of the node in the graph.nodes slice
+	styleClassName string
+	styleClass     styleClass
 }
 
 func (n *node) setCoord(c *coord) {
@@ -16,7 +18,7 @@ func (n *node) setCoord(c *coord) {
 }
 
 func (n *node) setDrawing() *drawing {
-	d := drawBox(n.name)
+	d := drawBox(n)
 	n.drawing = d
 	return d
 }

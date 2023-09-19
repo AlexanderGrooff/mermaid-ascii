@@ -13,17 +13,20 @@ type coord struct {
 }
 
 type graph struct {
-	nodes       []*node
-	edges       []*edge
-	drawing     *drawing
-	grid        map[coord]*node
-	columnWidth map[int]int
+	nodes        []*node
+	edges        []*edge
+	drawing      *drawing
+	grid         map[coord]*node
+	columnWidth  map[int]int
+	styleClasses map[string]styleClass
 }
 
-func mkGraph(data *orderedmap.OrderedMap[string, []labeledChild]) graph {
+func mkGraph(data *orderedmap.OrderedMap[string, []textEdge]) graph {
 	g := graph{drawing: mkDrawing(0, 0)}
 	g.grid = make(map[coord]*node)
 	g.columnWidth = make(map[int]int)
+	g.styleClasses = make(map[string]styleClass)
+
 	index := 0
 	for el := data.Front(); el != nil; el = el.Next() {
 		nodeName := el.Key
@@ -31,24 +34,34 @@ func mkGraph(data *orderedmap.OrderedMap[string, []labeledChild]) graph {
 		// Get or create parent node
 		parentNode, err := g.getNode(nodeName)
 		if err != nil {
-			parentNode = &node{name: nodeName, index: index}
+			parentNode = &node{name: nodeName, index: index, styleClassName: ""}
 			g.appendNode(parentNode)
 			index += 1
 		}
-		for _, labeledC := range children {
-			childNode, err := g.getNode(labeledC.child)
+		for _, textEdge := range children {
+			childNode, err := g.getNode(textEdge.child.name)
 			if err != nil {
-				childNode = &node{name: labeledC.child, index: index}
+				childNode = &node{name: textEdge.child.name, index: index, styleClassName: textEdge.child.styleClass}
+				parentNode.styleClassName = textEdge.parent.styleClass
 				g.appendNode(childNode)
 				index += 1
 			}
-			e := edge{from: parentNode, to: childNode, text: labeledC.label}
+			e := edge{from: parentNode, to: childNode, text: textEdge.label}
 			g.edges = append(g.edges, &e)
 		}
 	}
-
-	g.createMapping()
 	return g
+}
+
+func (g *graph) setStyleClasses(styleClasses map[string]styleClass) {
+	logrus.Debugf("Setting style classes to %v", styleClasses)
+	g.styleClasses = styleClasses
+	for _, n := range g.nodes {
+		if n.styleClassName != "" {
+			logrus.Debugf("Setting style class for node %s to %s", n.name, n.styleClassName)
+			(*n).styleClass = g.styleClasses[n.styleClassName]
+		}
+	}
 }
 
 func (g *graph) createMapping() {

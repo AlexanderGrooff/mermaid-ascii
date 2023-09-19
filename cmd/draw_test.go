@@ -7,7 +7,7 @@ import (
 )
 
 func TestBoxDimensions(t *testing.T) {
-	boxDrawing := *drawBox("text")
+	boxDrawing := *drawBox(&node{name: "text"})
 	if len(boxDrawing) != 8 {
 		t.Error("Expected boxDrawing to have 8 columns, got ", len(boxDrawing))
 	}
@@ -17,7 +17,7 @@ func TestBoxDimensions(t *testing.T) {
 }
 
 func TestDrawPlainBox(t *testing.T) {
-	boxDrawing := drawBox("text")
+	boxDrawing := drawBox(&node{name: "text"})
 	boxString := drawingToString(boxDrawing)
 	expected :=
 		`+------+
