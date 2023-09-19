@@ -20,7 +20,7 @@ type graph struct {
 	columnWidth map[int]int
 }
 
-func mkGraph(data *orderedmap.OrderedMap[string, []string]) graph {
+func mkGraph(data *orderedmap.OrderedMap[string, []labeledChild]) graph {
 	g := graph{drawing: mkDrawing(0, 0)}
 	g.grid = make(map[coord]*node)
 	g.columnWidth = make(map[int]int)
@@ -35,14 +35,14 @@ func mkGraph(data *orderedmap.OrderedMap[string, []string]) graph {
 			g.appendNode(parentNode)
 			index += 1
 		}
-		for _, childNodeName := range children {
-			childNode, err := g.getNode(childNodeName)
+		for _, labeledC := range children {
+			childNode, err := g.getNode(labeledC.child)
 			if err != nil {
-				childNode = &node{name: childNodeName, index: index}
+				childNode = &node{name: labeledC.child, index: index}
 				g.appendNode(childNode)
 				index += 1
 			}
-			e := edge{from: parentNode, to: childNode, text: ""}
+			e := edge{from: parentNode, to: childNode, text: labeledC.label}
 			g.edges = append(g.edges, &e)
 		}
 	}

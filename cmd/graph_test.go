@@ -8,21 +8,21 @@ import (
 )
 
 func TestEmptyGraphHasNoNodes(t *testing.T) {
-	g := mkGraph(orderedmap.NewOrderedMap[string, []string]())
+	g := mkGraph(orderedmap.NewOrderedMap[string, []labeledChild]())
 
 	assert.Equal(t, 0, len(g.nodes))
 }
 
 func TestEmptyGraphHasNoEdges(t *testing.T) {
-	g := mkGraph(orderedmap.NewOrderedMap[string, []string]())
+	g := mkGraph(orderedmap.NewOrderedMap[string, []labeledChild]())
 
 	assert.Equal(t, 0, len(g.edges))
 }
 
 func TestRootNodeMappingCoords(t *testing.T) {
-	data := orderedmap.NewOrderedMap[string, []string]()
-	data.Set("A", []string{})
-	data.Set("B", []string{})
+	data := orderedmap.NewOrderedMap[string, []labeledChild]()
+	data.Set("A", []labeledChild{})
+	data.Set("B", []labeledChild{})
 
 	g := mkGraph(data)
 
