@@ -77,6 +77,22 @@ func mermaidFileToMap(mermaidFile string) (*orderedmap.OrderedMap[string, []labe
 		return nil, err
 	}
 
+	// First line should either say "graph TD" or "graph LR"
+	switch lines[0] {
+	case "graph LR":
+		graphDirection = "LR"
+	case "graph TD":
+		graphDirection = "TD"
+	case "flowchart LR":
+		graphDirection = "LR"
+	case "flowchart TD":
+		graphDirection = "TD"
+	default:
+		return nil, errors.New("first line should define the graph")
+	}
+	// Pop first line
+	lines = lines[1:]
+
 	// Iterate over the lines
 	log.Debug("Parsing mermaid code from ", mermaidFile)
 	for _, line := range lines {

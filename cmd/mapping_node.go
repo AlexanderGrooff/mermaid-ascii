@@ -54,8 +54,11 @@ func (g *graph) mappingToDrawingCoord(n *node) *coord {
 func (g *graph) reserveSpotInGrid(n *node, requestedCoord *coord) *coord {
 	if g.grid[*requestedCoord] != nil {
 		logrus.Debugf("Coord %d,%d is already taken", requestedCoord.x, requestedCoord.y)
-		// TODO: Change this based on TD/LR
-		return g.reserveSpotInGrid(n, &coord{x: requestedCoord.x, y: requestedCoord.y + 1})
+		if graphDirection == "LR" {
+			return g.reserveSpotInGrid(n, &coord{x: requestedCoord.x, y: requestedCoord.y + 1})
+		} else {
+			return g.reserveSpotInGrid(n, &coord{x: requestedCoord.x + 1, y: requestedCoord.y})
+		}
 	}
 	g.grid[*requestedCoord] = n
 	return requestedCoord

@@ -13,6 +13,7 @@ var boxBorderWidth = 1
 var boxBorderPadding = 1
 var paddingBetweenX = 5
 var paddingBetweenY = 4
+var graphDirection = "LR"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
