@@ -1,30 +1,84 @@
+project_name: mermaid-ascii
+
 before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod tidy
     # you may remove this if you don't need go generate
     - go generate ./...
-builds:
-  - env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - windows
-      - darwin
-archives:
-  - replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      386: i386
-      amd64: x86_64
-checksum:
-  name_template: 'checksums.txt'
-snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+
+release:
+  github:
+    owner: AlexanderGrooff
+    name: mermaid-ascii
+  name_template: 'Release {{.Tag}}'
+  draft: true
+
 changelog:
-  sort: asc
-  filters:
-    exclude:
-      - '^docs:'
-      - '^test:'
+  skip: true
+
+builds:
+- main: .
+  binary: mermaid-ascii
+  flags:
+  - -trimpath
+  env:
+    - GO111MODULE=on
+    - CGO_ENABLED=0
+  goos:
+  - darwin
+  - linux
+  - windows
+  - freebsd
+  goarch:
+  - amd64
+  - arm
+  - arm64
+  - 386
+  - mips64le
+  - s390x
+  goarm:
+  - 6
+  - 7
+  ignore:
+    - goos: darwin
+      goarch: 386
+    - goos: freebsd
+      goarch: arm
+    - goos: freebsd
+      goarch: arm64
+    - goos: freebsd
+      goarch: 386
+
+nfpms:
+  - file_name_template: '{{.ProjectName}}-{{.Tag}}-{{.Arch}}{{if .Arm}}{{.Arm}}{{end}}'
+    description: Render mermaid diagrams in your terminal
+    maintainer: Alexander Grooff <alexandergrooff@gmail.com>
+    license: MIT
+    formats:
+    - deb
+    - rpm
+    - archlinux
+    contents:
+    - src: /usr/bin/mermaid-ascii
+      dst: /usr/local/bin/mermaid-ascii
+      type: "symlink"
+
+archives:
+  - name_template: '{{.ProjectName}}-{{.Tag}}-{{.Os}}-{{.Arch}}{{if .Arm}}{{.Arm}}{{end}}'
+    wrap_in_directory: true
+    format: zip
+    files:
+      - README.md
+      - LICENSE
+  - name_template: '{{.ProjectName}}-{{.Tag}}-{{.Os}}-{{.Arch}}{{if .Arm}}{{.Arm}}{{end}}'
+    id: targz-archives
+    wrap_in_directory: true
+    format: tar.gz
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: 'SHA256SUMS'
+  algorithm: sha256
