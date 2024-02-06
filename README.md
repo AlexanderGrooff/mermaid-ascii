@@ -23,6 +23,14 @@ $ go build
 $ mermaid-ascii --help
 ```
 
+Or using Nix:
+```bash
+$ git clone
+$ cd mermaid-ascii
+$ nix build
+$ ./result/bin/mermaid-ascii --help
+```
+
 ## Usage
 ```bash
 $ cat test.mermaid

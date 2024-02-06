@@ -8,3 +8,4 @@ dist/
 mermaid-ascii
 *.tar.gz
 *.tar.zst
+result
