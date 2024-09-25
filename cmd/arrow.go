@@ -17,6 +17,22 @@ const (
 	LowerLeft  = "LowerLeft"
 )
 
+type arrow struct {
+	edge *edge
+	startDirection direction // Side of the box where the arrow starts from
+	endDirection direction // Side of the box where the arrow should end
+	coords []coord
+}
+
+func (g *graph) getArrowPath(arrow *arrow) []coord {
+	// Figure out what path the arrow should take. This takes into account the start node, end node, starting direction and ending direction.
+	// Next to this, it should not collide with any nodes in the mapping.
+
+	// If we're in LR, we first go horizontal then vertical.
+	// If we're in TD, we first go vertical then horizontal.
+}
+
+
 func (d *drawing) drawArrow(from coord, to coord, label string) {
 	dir := determineDirection(from, to)
 	log.Debugf("Drawing arrow from %v to %v with direction %s", from, to, dir)

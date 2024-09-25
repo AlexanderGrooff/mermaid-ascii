@@ -32,3 +32,56 @@ func TestRootNodeMappingCoords(t *testing.T) {
 	assert.Equal(t, 0, g.nodes[1].mappingCoord.x)
 	assert.Equal(t, 1, g.nodes[1].mappingCoord.y)
 }
+
+func TestTopdownBoxes(t *testing.T) {
+	mermaidMap, _, err := mermaidFileToMap(`graph TD
+test --> test2`)
+	if err != nil {
+		t.Error(err)
+	}
+	drawing := drawMap(mermaidMap, nil)
+	expected :=
+		`+------+ 
+|      | 
+| test | 
+|      | 
++------+ 
+   |     
+   |     
+   v     
++-------+
+|       |
+| test2 |
+|       |
++-------+`
+	if drawing != expected {
+		t.Error("Expected boxString to be ", expected, " got ", drawing)
+	}
+}
+
+func TestTopdownIdenticalSizeBoxes(t *testing.T) {
+	mermaidMap, _, err := mermaidFileToMap(`graph TD
+test1 --> test2`)
+	if err != nil {
+		t.Error(err)
+	}
+
+	drawing := drawMap(mermaidMap, nil)
+	expected :=
+		`+-------+
+|       |
+| test1 |
+|       |
++-------+
+    |    
+    |    
+    v    
++-------+
+|       |
+| test2 |
+|       |
++-------+`
+	if drawing != expected {
+		t.Error("Expected boxString to be ", expected, " got ", drawing)
+	}
+}
