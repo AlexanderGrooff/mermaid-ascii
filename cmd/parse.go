@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"os"
 	"regexp"
 	"strings"
 
@@ -78,7 +77,7 @@ func setData(parent textNode, edge textEdge, data *orderedmap.OrderedMap[string,
 	}
 }
 
-func mermaidFileToMap(mermaidFile string) (*orderedmap.OrderedMap[string, []textEdge], *map[string]styleClass, error) {
+func mermaidFileToMap(mermaid string) (*orderedmap.OrderedMap[string, []textEdge], *map[string]styleClass, error) {
 	// Parse the mermaid code into a map
 	// The map is a tree of the form:
 	// {
@@ -86,10 +85,7 @@ func mermaidFileToMap(mermaidFile string) (*orderedmap.OrderedMap[string, []text
 	//   "B": ["C"],
 	//   "C": []
 	// }
-	mermaid, err := os.ReadFile(mermaidFile)
-	if err != nil {
-		return nil, nil, err
-	}
+
 	// This is an ordered map so that the output is deterministic
 	// and the order of the keys is the order in which the nodes
 	// are drawn
@@ -128,7 +124,7 @@ func mermaidFileToMap(mermaidFile string) (*orderedmap.OrderedMap[string, []text
 	lines = lines[1:]
 
 	// Iterate over the lines
-	log.Debug("Parsing mermaid code from ", mermaidFile)
+	log.Debug("Parsing mermaid code")
 	for _, line := range lines {
 		if line == "" {
 			// Skip empty lines

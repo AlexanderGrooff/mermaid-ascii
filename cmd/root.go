@@ -25,7 +25,12 @@ var rootCmd = &cobra.Command{
 		} else {
 			log.SetLevel(log.InfoLevel)
 		}
-		mermaidMap, styleClasses, err := mermaidFileToMap(cmd.Flag("file").Value.String())
+		mermaid, err := os.ReadFile(cmd.Flag("file").Value.String())
+		if err != nil {
+			log.Fatal("Failed to parse mermaid file: ", err)
+			return
+		}
+		mermaidMap, styleClasses, err := mermaidFileToMap(string(mermaid))
 		if err != nil {
 			log.Fatal("Failed to parse mermaid file: ", err)
 		}
