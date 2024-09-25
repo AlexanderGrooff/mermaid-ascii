@@ -81,12 +81,13 @@ func (d *drawing) drawLine(from coord, to coord, offsetFrom int, offsetTo int) {
 	}
 }
 
-func drawMap(data *orderedmap.OrderedMap[string, []textEdge], styleClasses map[string]styleClass) {
+func drawMap(data *orderedmap.OrderedMap[string, []textEdge], styleClasses map[string]styleClass) string {
 	g := mkGraph(data)
 	g.setStyleClasses(styleClasses)
 	g.createMapping()
 	s := drawingToString(g.draw())
 	fmt.Println(s)
+	return s
 }
 
 func drawBox(n *node) *drawing {
