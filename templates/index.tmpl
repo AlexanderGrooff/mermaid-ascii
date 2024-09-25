@@ -16,11 +16,12 @@
     <script src="https://unpkg.com/htmx.org@1.7.0"></script>
 </head>
 <body>
-    <h1>{{ .title }}</h1>
+    <h1>Mermaid ASCII</h1>
     <div class="container">
         <div class="column">
+            <p>Note: styleclasses are not yet supported</p>
             <form hx-post="/generate" hx-target=".result">
-                <textarea name="inputText"></textarea>
+                <textarea name="inputText" placeholder="graph LR"></textarea>
                 <button type="submit">Generate</button>
             </form>
         </div>

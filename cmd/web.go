@@ -24,8 +24,6 @@ var webCmd = &cobra.Command{
 	},
 }
 
-var db = make(map[string]string)
-
 func setupRouter() *gin.Engine {
 	r := gin.Default()
 
@@ -33,7 +31,6 @@ func setupRouter() *gin.Engine {
 	//router.LoadHTMLFiles("templates/template1.html", "templates/template2.html")
 	r.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.tmpl", gin.H{
-			"title": "Main website",
 		})
 	})
 
@@ -47,12 +44,12 @@ func setupRouter() *gin.Engine {
 }
 
 func generate_map(input string) string {
-	mermaidMap, styleClasses, err := mermaidFileToMap(input)
+	mermaidMap, _, err := mermaidFileToMap(input)
 	if err != nil {
 		return "Failed to parse mermaid file"
 	}
 	
-	ascii_art := drawMap(mermaidMap, *styleClasses)
+	ascii_art := drawMap(mermaidMap, nil)
 	escaped_ascii_art := template.HTMLEscapeString(ascii_art)
 	html_ascii_art := fmt.Sprintf("<pre>%s</pre>", escaped_ascii_art)
 	return html_ascii_art
