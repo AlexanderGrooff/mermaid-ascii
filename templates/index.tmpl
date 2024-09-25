@@ -20,12 +20,17 @@
     <div class="container">
         <div class="column">
             <p>Note: styleclasses are not yet supported</p>
-            <form hx-post="/generate" hx-target=".result">
-                <textarea name="inputText" placeholder="graph LR"></textarea>
+            <form hx-post="/generate" hx-target="#result">
+                <textarea
+                    name="inputText" placeholder="graph LR"
+                    hx-post="/generate"
+                    hx-trigger="keyup changed delay:200ms"
+                    hx-target="#result"
+                ></textarea>
                 <button type="submit">Generate</button>
             </form>
         </div>
-        <div class="column result">
+        <div id="result" class="column result">
             <!-- Result content goes here -->
         </div>
     </div>
