@@ -207,6 +207,7 @@ func (g *graph) gridToDrawingCoord(c gridCoord, dir *direction) drawingCoord {
 	} else if *dir == Down {
 		dc = drawingCoord{x: x + g.columnWidth[c.x]/2, y: y + boxHeight}
 	}
+	// TODO: corner directions
 
 	if dir == nil {
 		log.Debugf("Mapping grid coord %v to drawing coord %v", c, dc)

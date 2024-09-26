@@ -124,7 +124,9 @@ func (g *graph) getPath(from gridCoord, to gridCoord, prevSteps []gridCoord) []g
 		}
 	}
 
-	return append(g.getPath(nextPos, to, append(prevSteps, nextPos)), nextPos)
+	item := nextPos
+	slice := g.getPath(nextPos, to, append(prevSteps, nextPos))
+	return append([]gridCoord{item}, slice...)
 }
 
 func (g *graph) isFreeInGrid(c gridCoord) bool {
@@ -141,14 +143,15 @@ func hasStepBeenTaken(step gridCoord, steps []gridCoord) bool {
 }
 
 func (g *graph) drawArrow(from gridCoord, to gridCoord, label string) {
-	dir := determineDirection(genericCoord(from), genericCoord(to))
-	log.Debugf("Drawing arrow from %v to %v with direction %s", from, to, dir)
-
 	path := g.getPath(from, to, []gridCoord{})
+	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, path)
+
 	d := g.drawing
 	previousCoord := from
 	var previousDrawingCoord drawingCoord
+	var dir direction
 	for _, nextCoord := range path {
+		// TODO: intermediate steps should be drawn to the middle of the gridCoord instead of stop at direction.
 		dir = determineDirection(genericCoord(previousCoord), genericCoord(nextCoord))
 		oppositeDir := dir.getOpposite()
 		previousDrawingCoord = g.gridToDrawingCoord(previousCoord, &dir)
