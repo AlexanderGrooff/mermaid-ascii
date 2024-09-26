@@ -22,28 +22,21 @@ func (g *graph) drawNode(n *node) {
 }
 
 func (g *graph) drawEdge(e *edge) {
-	arrowStart, arrowEnd := getArrowStartEndOffset(e.from, e.to)
-	arrowFrom := coord{x: e.from.drawingCoord.x + arrowStart.x, y: e.from.drawingCoord.y + arrowStart.y}
-	arrowTo := coord{x: e.to.drawingCoord.x + arrowEnd.x, y: e.to.drawingCoord.y + arrowEnd.y}
-	g.drawing.drawArrow(
-		arrowFrom,
-		arrowTo,
-		e.text,
-	)
+	g.drawArrow(*e.from.gridCoord, *e.to.gridCoord, e.text)
 }
 
-func (d *drawing) drawText(start coord, text string) {
+func (d *drawing) drawText(start drawingCoord, text string) {
 	// Increase dimensions if necessary.
 	d.increaseSize(start.x+len(text), start.y)
-	log.Debug("Drawing '", text, "' from ", start, " to ", coord{x: start.x + len(text), y: start.y})
+	log.Debug("Drawing '", text, "' from ", start, " to ", drawingCoord{x: start.x + len(text), y: start.y})
 	for x := 0; x < len(text); x++ {
 		(*d)[x+start.x][start.y] = string(text[x])
 	}
 }
 
-func (d *drawing) drawLine(from coord, to coord, offsetFrom int, offsetTo int) {
+func (d *drawing) drawLine(from drawingCoord, to drawingCoord, offsetFrom int, offsetTo int) {
 	// Offset determines how far from the actual coord the line should start/stop.
-	direction := determineDirection(from, to)
+	direction := determineDirection(genericCoord(from), genericCoord(to))
 	log.Debug("Drawing line from ", from, " to ", to, " direction: ", direction, " offsetFrom: ", offsetFrom, " offsetTo: ", offsetTo)
 	switch direction {
 	case Up:
@@ -85,15 +78,19 @@ func drawMap(data *orderedmap.OrderedMap[string, []textEdge], styleClasses map[s
 	g := mkGraph(data)
 	g.setStyleClasses(styleClasses)
 	g.createMapping()
-	s := drawingToString(g.draw())
+	d := g.draw()
+	if Verbose {
+		d = d.debugWrapper()
+	}
+	s := drawingToString(d)
 	fmt.Println(s)
 	return s
 }
 
 func drawBox(n *node) *drawing {
-	from := coord{0, 0}
+	from := drawingCoord{0, 0}
 	// -1 because we start at 0
-	to := coord{len(n.name) + boxBorderPadding*2 + boxBorderWidth*2 - 1, boxBorderWidth*2 + boxBorderPadding*2}
+	to := drawingCoord{len(n.name) + boxBorderPadding*2 + boxBorderWidth*2 - 1, boxBorderWidth*2 + boxBorderPadding*2}
 	boxDrawing := *(mkDrawing(Max(from.x, to.x), Max(from.y, to.y)))
 	log.Debug("Drawing box from ", from, " to ", to)
 	// Draw top border
@@ -141,10 +138,10 @@ func drawBox(n *node) *drawing {
 func (d *drawing) increaseSize(x int, y int) {
 	currSizeX, currSizeY := getDrawingSize(d)
 	drawingWithNewSize := mkDrawing(Max(x, currSizeX), Max(y, currSizeY))
-	*d = *mergeDrawings(drawingWithNewSize, d, coord{0, 0})
+	*d = *mergeDrawings(drawingWithNewSize, d, drawingCoord{0, 0})
 }
 
-func mergeDrawings(d1 *drawing, d2 *drawing, mergeCoord coord) *drawing {
+func mergeDrawings(d1 *drawing, d2 *drawing, mergeCoord drawingCoord) *drawing {
 	maxX1, maxY1 := getDrawingSize(d1)
 	maxX2, maxY2 := getDrawingSize(d2)
 	maxX := Max(maxX1, maxX2+mergeCoord.x)
@@ -197,7 +194,7 @@ func getDrawingSize(d *drawing) (int, int) {
 	return len(*d) - 1, len((*d)[0]) - 1
 }
 
-func determineDirection(from coord, to coord) direction {
+func determineDirection(from genericCoord, to genericCoord) direction {
 	if from.x == to.x {
 		if from.y < to.y {
 			return Down
@@ -223,4 +220,17 @@ func determineDirection(from coord, to coord) direction {
 			return UpperLeft
 		}
 	}
+}
+
+func (d drawing) debugWrapper() *drawing {
+	maxX, maxY := getDrawingSize(&d)
+	debugDrawing := *mkDrawing(maxX+2, maxY+1)
+	for x := 0; x <= maxX; x++ {
+		debugDrawing[x+2][0] = fmt.Sprintf("%d", x%10)
+	}
+	for y := 0; y <= maxY; y++ {
+		debugDrawing[0][y+1] = fmt.Sprintf("%2d", y)
+	}
+
+	return mergeDrawings(&debugDrawing, &d, drawingCoord{1, 1})
 }

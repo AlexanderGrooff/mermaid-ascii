@@ -46,8 +46,8 @@ func TestChildNodeMappingCoord(t *testing.T) {
 	g := mkGraph(data)
 	g.createMapping()
 
-	assert.Equal(t, 1, g.nodes[1].mappingCoord.x)
-	assert.Equal(t, 0, g.nodes[1].mappingCoord.y)
+	assert.Equal(t, 1, g.nodes[1].gridCoord.x)
+	assert.Equal(t, 0, g.nodes[1].gridCoord.y)
 }
 
 func TestNestedChildMappingCoord(t *testing.T) {
@@ -58,8 +58,8 @@ func TestNestedChildMappingCoord(t *testing.T) {
 	g := mkGraph(data)
 	g.createMapping()
 
-	assert.Equal(t, 2, g.nodes[3].mappingCoord.x)
-	assert.Equal(t, 0, g.nodes[3].mappingCoord.y)
+	assert.Equal(t, 2, g.nodes[3].gridCoord.x)
+	assert.Equal(t, 0, g.nodes[3].gridCoord.y)
 }
 
 func TestConvertMappingToDrawingCoord(t *testing.T) {
@@ -67,7 +67,7 @@ func TestConvertMappingToDrawingCoord(t *testing.T) {
 		"0,0",
 		func(t *testing.T) {
 			g := mkGraph(orderedmap.NewOrderedMap[string, []textEdge]())
-			n := node{mappingCoord: &coord{x: 0, y: 0}}
+			n := node{gridCoord: &coord{x: 0, y: 0}}
 
 			drawCoord := *g.mappingToDrawingCoord(&n)
 
@@ -79,7 +79,7 @@ func TestConvertMappingToDrawingCoord(t *testing.T) {
 		"1,0",
 		func(t *testing.T) {
 			g := mkGraph(orderedmap.NewOrderedMap[string, []textEdge]())
-			n := node{mappingCoord: &coord{x: 1, y: 0}}
+			n := node{gridCoord: &coord{x: 1, y: 0}}
 
 			drawCoord := *g.mappingToDrawingCoord(&n)
 
@@ -91,7 +91,7 @@ func TestConvertMappingToDrawingCoord(t *testing.T) {
 		"0,1",
 		func(t *testing.T) {
 			g := mkGraph(orderedmap.NewOrderedMap[string, []textEdge]())
-			n := node{mappingCoord: &coord{x: 0, y: 1}}
+			n := node{gridCoord: &coord{x: 0, y: 1}}
 
 			drawCoord := *g.mappingToDrawingCoord(&n)
 
@@ -103,7 +103,7 @@ func TestConvertMappingToDrawingCoord(t *testing.T) {
 		"1,1",
 		func(t *testing.T) {
 			g := mkGraph(orderedmap.NewOrderedMap[string, []textEdge]())
-			n := node{mappingCoord: &coord{x: 1, y: 1}}
+			n := node{gridCoord: &coord{x: 1, y: 1}}
 
 			drawCoord := *g.mappingToDrawingCoord(&n)
 

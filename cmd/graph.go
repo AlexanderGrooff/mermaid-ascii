@@ -5,25 +5,29 @@ import (
 
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
-type coord struct {
+type genericCoord struct {
 	x int
 	y int
 }
+
+type gridCoord genericCoord
+type drawingCoord genericCoord
 
 type graph struct {
 	nodes        []*node
 	edges        []*edge
 	drawing      *drawing
-	grid         map[coord]*node
+	grid         map[gridCoord]*node
 	columnWidth  map[int]int
 	styleClasses map[string]styleClass
 }
 
 func mkGraph(data *orderedmap.OrderedMap[string, []textEdge]) graph {
 	g := graph{drawing: mkDrawing(0, 0)}
-	g.grid = make(map[coord]*node)
+	g.grid = make(map[gridCoord]*node)
 	g.columnWidth = make(map[int]int)
 	g.styleClasses = make(map[string]styleClass)
 
@@ -76,14 +80,14 @@ func (g *graph) createMapping() {
 	// Set root nodes to level 0
 	for _, n := range g.nodes {
 		if len(g.getParents(n)) == 0 {
-			var mappingCoord *coord
+			var mappingCoord *gridCoord
 			if graphDirection == "LR" {
-				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &coord{x: 0, y: highestPositionPerLevel[0]})
+				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: 0, y: highestPositionPerLevel[0]})
 			} else {
-				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &coord{x: highestPositionPerLevel[0], y: 0})
+				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: highestPositionPerLevel[0], y: 0})
 			}
 			logrus.Debugf("Setting mapping coord for rootnode %s to %v", n.name, mappingCoord)
-			g.nodes[n.index].mappingCoord = mappingCoord
+			g.nodes[n.index].gridCoord = mappingCoord
 			highestPositionPerLevel[0] = highestPositionPerLevel[0] + 1
 		}
 	}
@@ -91,25 +95,25 @@ func (g *graph) createMapping() {
 	for _, n := range g.nodes {
 		var childLevel int
 		if graphDirection == "LR" {
-			childLevel = n.mappingCoord.x + 1
+			childLevel = n.gridCoord.x + 1
 		} else {
-			childLevel = n.mappingCoord.y + 1
+			childLevel = n.gridCoord.y + 1
 		}
 		highestPosition := highestPositionPerLevel[childLevel]
 		for _, child := range g.getChildren(n) {
 			// Skip if the child already has a mapping coord
-			if child.mappingCoord != nil {
+			if child.gridCoord != nil {
 				continue
 			}
 
-			var mappingCoord *coord
+			var mappingCoord *gridCoord
 			if graphDirection == "LR" {
-				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &coord{x: childLevel, y: highestPosition})
+				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: childLevel, y: highestPosition})
 			} else {
-				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &coord{x: highestPosition, y: childLevel})
+				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: highestPosition, y: childLevel})
 			}
 			logrus.Debugf("Setting mapping coord for child %s of parent %s to %v", child.name, n.name, mappingCoord)
-			g.nodes[child.index].mappingCoord = mappingCoord
+			g.nodes[child.index].gridCoord = mappingCoord
 			highestPositionPerLevel[childLevel] = highestPosition + 1
 		}
 	}
@@ -176,4 +180,38 @@ func (g *graph) getParents(n *node) []*node {
 		}
 	}
 	return parents
+}
+
+func (g *graph) gridToDrawingCoord(c gridCoord, dir *direction) drawingCoord {
+	var dc drawingCoord
+	x := 0
+	for column := 0; column < c.x; column++ {
+		x += g.columnWidth[column] + 2*paddingBetweenX
+	}
+	boxHeight := boxBorderWidth*2 + boxBorderPadding*2 + 1
+	var y int
+	if c.y == 0 {
+		y = 0
+	} else {
+		y = (boxHeight)*c.y + paddingBetweenY*(c.y)
+	}
+	if dir == nil {
+		// Top-left corner
+		dc = drawingCoord{x: x, y: y}
+	} else if *dir == Up {
+		dc = drawingCoord{x: x + g.columnWidth[c.x]/2, y: y}
+	} else if *dir == Left {
+		dc = drawingCoord{x: x, y: y + boxHeight/2}
+	} else if *dir == Right {
+		dc = drawingCoord{x: x + g.columnWidth[c.x], y: y + boxHeight/2}
+	} else if *dir == Down {
+		dc = drawingCoord{x: x + g.columnWidth[c.x]/2, y: y + boxHeight}
+	}
+
+	if dir == nil {
+		log.Debugf("Mapping grid coord %v to drawing coord %v", c, dc)
+	} else {
+		log.Debugf("Mapping grid coord %v to drawing coord %v (direction %v)", c, dc, *dir)
+	}
+	return dc
 }

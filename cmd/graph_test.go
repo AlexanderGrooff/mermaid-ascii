@@ -27,10 +27,10 @@ func TestRootNodeMappingCoords(t *testing.T) {
 	g := mkGraph(data)
 	g.createMapping()
 
-	assert.Equal(t, 0, g.nodes[0].mappingCoord.x)
-	assert.Equal(t, 0, g.nodes[0].mappingCoord.y)
-	assert.Equal(t, 0, g.nodes[1].mappingCoord.x)
-	assert.Equal(t, 1, g.nodes[1].mappingCoord.y)
+	assert.Equal(t, 0, g.nodes[0].gridCoord.x)
+	assert.Equal(t, 0, g.nodes[0].gridCoord.y)
+	assert.Equal(t, 0, g.nodes[1].gridCoord.x)
+	assert.Equal(t, 1, g.nodes[1].gridCoord.y)
 }
 
 func TestTopdownBoxes(t *testing.T) {
