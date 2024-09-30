@@ -13,6 +13,10 @@ type node struct {
 	styleClass     styleClass
 }
 
+func (n node) String() string {
+	return n.name
+}
+
 func (n *node) setCoord(c *drawingCoord) {
 	n.drawingCoord = c
 }

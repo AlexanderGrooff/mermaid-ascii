@@ -179,15 +179,13 @@ func (g *graph) drawArrow(from gridCoord, to gridCoord, label string) {
 			dir = Middle
 		}
 		if idx == len(path)-1 {
-			dir = determineDirection(genericCoord(previousCoord), genericCoord(nextCoord))
-			oppositeDir = dir.getOpposite()
+			oppositeDir = determineDirection(genericCoord(previousCoord), genericCoord(nextCoord)).getOpposite()
 		} else {
 			oppositeDir = Middle
 		}
 		previousDrawingCoord = g.gridToDrawingCoord(previousCoord, &dir)
 		nextDrawingCoord := g.gridToDrawingCoord(nextCoord, &oppositeDir)
-		log.Debugf("Instructing to draw line from %v to %v (grid %v, direction %v)", previousDrawingCoord, nextDrawingCoord, nextCoord, dir)
-		d.drawLine(previousDrawingCoord, nextDrawingCoord, 0, 0)
+		d.drawLine(previousDrawingCoord, nextDrawingCoord, 0, -1)
 		previousCoord = nextCoord
 	}
 }

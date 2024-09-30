@@ -23,6 +23,7 @@ func (g *graph) drawNode(n *node) {
 }
 
 func (g *graph) drawEdge(e *edge) {
+	log.Debugf("Drawing edge between %v and %v", *e.from, *e.to)
 	g.drawArrow(*e.from.gridCoord, *e.to.gridCoord, e.text)
 }
 
