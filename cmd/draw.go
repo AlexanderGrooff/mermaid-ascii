@@ -36,44 +36,54 @@ func (d *drawing) drawText(start drawingCoord, text string) {
 	}
 }
 
-func (d *drawing) drawLine(from drawingCoord, to drawingCoord, offsetFrom int, offsetTo int) {
+func (d *drawing) drawLine(from drawingCoord, to drawingCoord, offsetFrom int, offsetTo int) []drawingCoord {
 	// Offset determines how far from the actual coord the line should start/stop.
 	direction := determineDirection(genericCoord(from), genericCoord(to))
+	drawnCoords := make([]drawingCoord, 0)
 	log.Debug("Drawing line from ", from, " to ", to, " direction: ", direction, " offsetFrom: ", offsetFrom, " offsetTo: ", offsetTo)
 	switch direction {
 	case Up:
 		for y := from.y - offsetFrom; y >= to.y-offsetTo; y-- {
+			drawnCoords = append(drawnCoords, drawingCoord{from.x, y})
 			(*d)[from.x][y] = "|"
 		}
 	case Down:
 		for y := from.y + offsetFrom; y <= to.y+offsetTo; y++ {
+			drawnCoords = append(drawnCoords, drawingCoord{from.x, y})
 			(*d)[from.x][y] = "|"
 		}
 	case Left:
 		for x := from.x - offsetFrom; x >= to.x-offsetTo; x-- {
+			drawnCoords = append(drawnCoords, drawingCoord{x, from.y})
 			(*d)[x][from.y] = "-"
 		}
 	case Right:
 		for x := from.x + offsetFrom; x <= to.x+offsetTo; x++ {
+			drawnCoords = append(drawnCoords, drawingCoord{x, from.y})
 			(*d)[x][from.y] = "-"
 		}
 	case UpperLeft:
 		for x, y := from.x, from.y-offsetFrom; x >= to.x-offsetTo && y >= to.y-offsetTo; x, y = x-1, y-1 {
+			drawnCoords = append(drawnCoords, drawingCoord{x, y})
 			(*d)[x][y] = "\\"
 		}
 	case UpperRight:
 		for x, y := from.x, from.y-offsetFrom; x <= to.x+offsetTo && y >= to.y-offsetTo; x, y = x+1, y-1 {
+			drawnCoords = append(drawnCoords, drawingCoord{x, y})
 			(*d)[x][y] = "/"
 		}
 	case LowerLeft:
 		for x, y := from.x, from.y+offsetFrom; x >= to.x-offsetTo && y <= to.y+offsetTo; x, y = x-1, y+1 {
+			drawnCoords = append(drawnCoords, drawingCoord{x, y})
 			(*d)[x][y] = "/"
 		}
 	case LowerRight:
 		for x, y := from.x, from.y+offsetFrom; x <= to.x+offsetTo && y <= to.y+offsetTo; x, y = x+1, y+1 {
+			drawnCoords = append(drawnCoords, drawingCoord{x, y})
 			(*d)[x][y] = "\\"
 		}
 	}
+	return drawnCoords
 }
 
 func drawMap(data *orderedmap.OrderedMap[string, []textEdge], styleClasses map[string]styleClass) string {

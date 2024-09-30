@@ -6,7 +6,7 @@ import (
 
 func TestDrawUpArrow(t *testing.T) {
 	arrowDrawing := mkDrawing(0, 3)
-	arrowDrawing.drawArrow(coord{0, 3}, coord{0, 0}, "")
+	arrowDrawing.drawArrow(gridCoord{0, 3}, gridCoord{0, 0}, "")
 	boxString := drawingToString(arrowDrawing)
 	expected := ` 
 ^

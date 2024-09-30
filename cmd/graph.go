@@ -205,9 +205,9 @@ func (g *graph) gridToDrawingCoord(c gridCoord, dir *direction) drawingCoord {
 	} else if *dir == Left {
 		dc = drawingCoord{x: x, y: y + boxHeight/2}
 	} else if *dir == Right {
-		dc = drawingCoord{x: x + g.columnWidth[c.x], y: y + boxHeight/2}
+		dc = drawingCoord{x: x + g.columnWidth[c.x] - 1, y: y + boxHeight/2}
 	} else if *dir == Down {
-		dc = drawingCoord{x: x + g.columnWidth[c.x]/2, y: y + boxHeight}
+		dc = drawingCoord{x: x + g.columnWidth[c.x]/2, y: y + boxHeight - 1}
 	} else if *dir == Middle {
 		dc = drawingCoord{x: x + g.columnWidth[c.x]/2, y: y + boxHeight/2}
 	} else {

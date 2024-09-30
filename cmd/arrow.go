@@ -164,10 +164,16 @@ func hasStepBeenTaken(step gridCoord, steps []gridCoord) bool {
 
 func (g *graph) drawArrow(from gridCoord, to gridCoord, label string) {
 	path := g.getPath(from, to, []gridCoord{})
+	linesDrawn := g.drawPath(from, to, path)
+	g.drawArrowHead(linesDrawn[len(linesDrawn)-1])
+}
+
+func (g *graph) drawPath(from gridCoord, to gridCoord, path []gridCoord) [][]drawingCoord {
 	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, path)
 
 	d := g.drawing
 	previousCoord := from
+	linesDrawn := make([][]drawingCoord, 0)
 	var previousDrawingCoord drawingCoord
 	var dir direction
 	var oppositeDir direction
@@ -185,7 +191,32 @@ func (g *graph) drawArrow(from gridCoord, to gridCoord, label string) {
 		}
 		previousDrawingCoord = g.gridToDrawingCoord(previousCoord, &dir)
 		nextDrawingCoord := g.gridToDrawingCoord(nextCoord, &oppositeDir)
-		d.drawLine(previousDrawingCoord, nextDrawingCoord, 0, -1)
+		if idx == 0 {
+			// Don't cross the node border
+			linesDrawn = append(linesDrawn, d.drawLine(previousDrawingCoord, nextDrawingCoord, 1, -1))
+		} else {
+			linesDrawn = append(linesDrawn, d.drawLine(previousDrawingCoord, nextDrawingCoord, 0, -1))
+		}
 		previousCoord = nextCoord
+	}
+	return linesDrawn
+}
+
+func (g *graph) drawArrowHead(line []drawingCoord) {
+	// Determine the direction of the arrow for the last step
+	from := line[0]
+	lastPos := line[len(line)-1]
+	dir := determineDirection(genericCoord(from), genericCoord(lastPos))
+	switch dir {
+	case Up:
+		(*g.drawing)[lastPos.x][lastPos.y] = "^"
+	case Down:
+		(*g.drawing)[lastPos.x][lastPos.y] = "v"
+	case Left:
+		(*g.drawing)[lastPos.x][lastPos.y] = "<"
+	case Right:
+		(*g.drawing)[lastPos.x][lastPos.y] = ">"
+	default:
+		(*g.drawing)[lastPos.x][lastPos.y] = "+"
 	}
 }
