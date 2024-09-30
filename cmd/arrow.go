@@ -7,14 +7,15 @@ import (
 type direction string
 
 const (
-	Up         = "Up"
-	Down       = "Down"
-	Left       = "Left"
-	Right      = "Right"
-	UpperRight = "UpperRight"
-	UpperLeft  = "UpperLeft"
-	LowerRight = "LowerRight"
-	LowerLeft  = "LowerLeft"
+	Up         = direction("Up")
+	Down       = direction("Down")
+	Left       = direction("Left")
+	Right      = direction("Right")
+	UpperRight = direction("UpperRight")
+	UpperLeft  = direction("UpperLeft")
+	LowerRight = direction("LowerRight")
+	LowerLeft  = direction("LowerLeft")
+	Middle     = direction("Middle")
 )
 
 func (d direction) getOpposite() direction {
@@ -35,6 +36,8 @@ func (d direction) getOpposite() direction {
 		return UpperLeft
 	case LowerLeft:
 		return UpperRight
+	case Middle:
+		return Middle
 	}
 	return ""
 }
@@ -51,8 +54,26 @@ func (g *graph) getPath(from gridCoord, to gridCoord, prevSteps []gridCoord) []g
 	deltaX := to.x - from.x
 	deltaY := to.y - from.y
 
+	// These variables are used to determine what direction to head towards first. If the target is above (e.g. deltaY < 0)
+	// then we want to go up first.
+	var preferredXDirection int
+	var preferredYDirection int
+	if deltaX > 0 {
+		preferredXDirection = 1
+	} else {
+		preferredXDirection = -1
+	}
+	if deltaY > 0 {
+		preferredYDirection = 1
+	} else {
+		preferredYDirection = -1
+	}
+
 	absX := Abs(deltaX)
 	absY := Abs(deltaY)
+	if absX > 10 || absY > 10 {
+		panic("Out of bounds")
+	}
 	if (absX == 0 && absY == 1) || (absX == 1 && absY == 0) {
 		// Can go directly to the target
 		return []gridCoord{to}
@@ -95,31 +116,29 @@ func (g *graph) getPath(from gridCoord, to gridCoord, prevSteps []gridCoord) []g
 	} else {
 		// If we're in LR, we first go vertical then horizontal.
 		if graphDirection == "LR" {
-			if g.isFreeInGrid(gridCoord{x: from.x, y: from.y + 1}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y + 1}, prevSteps) {
-				nextPos = gridCoord{x: from.x, y: from.y + 1}
-			} else if g.isFreeInGrid(gridCoord{x: from.x, y: from.y - 1}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y - 1}, prevSteps) {
-				nextPos = gridCoord{x: from.x, y: from.y - 1}
-			} else if g.isFreeInGrid(gridCoord{x: from.x + 1, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x + 1, y: from.y}, prevSteps) {
+			if g.isFreeInGrid(gridCoord{x: from.x, y: from.y + preferredYDirection}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y + preferredYDirection}, prevSteps) {
+				nextPos = gridCoord{x: from.x, y: from.y + preferredYDirection}
+			} else if g.isFreeInGrid(gridCoord{x: from.x + preferredXDirection, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x + preferredXDirection, y: from.y}, prevSteps) {
 				// Vertical is blocked, let's try horizontal
-				nextPos = gridCoord{x: from.x + 1, y: from.y}
+				nextPos = gridCoord{x: from.x + preferredXDirection, y: from.y}
+			} else if g.isFreeInGrid(gridCoord{x: from.x, y: from.y - preferredYDirection}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y - preferredYDirection}, prevSteps) {
+				nextPos = gridCoord{x: from.x, y: from.y - preferredYDirection}
 			} else {
-				// Last resort, try left
 				// TODO: Diagonal?
-				nextPos = gridCoord{x: from.x - 1, y: from.y}
+				nextPos = gridCoord{x: from.x - preferredXDirection, y: from.y}
 			}
 		} else if graphDirection == "TD" {
 			// If we're in TD, we first go horizontal then vertical.
-			if g.isFreeInGrid(gridCoord{x: from.x + 1, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x + 1, y: from.y}, prevSteps) {
-				nextPos = gridCoord{x: from.x + 1, y: from.y}
-			} else if g.isFreeInGrid(gridCoord{x: from.x - 1, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x - 1, y: from.y}, prevSteps) {
-				nextPos = gridCoord{x: from.x - 1, y: from.y}
-			} else if g.isFreeInGrid(gridCoord{x: from.x, y: from.y + 1}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y + 1}, prevSteps) {
+			if g.isFreeInGrid(gridCoord{x: from.x + preferredXDirection, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x + preferredXDirection, y: from.y}, prevSteps) {
+				nextPos = gridCoord{x: from.x + preferredXDirection, y: from.y}
+			} else if g.isFreeInGrid(gridCoord{x: from.x, y: from.y + preferredYDirection}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y + preferredYDirection}, prevSteps) {
 				// Horizontal is blocked, let's try vertical
-				nextPos = gridCoord{x: from.x, y: from.y + 1}
+				nextPos = gridCoord{x: from.x, y: from.y + preferredYDirection}
+			} else if g.isFreeInGrid(gridCoord{x: from.x - preferredXDirection, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x - preferredXDirection, y: from.y}, prevSteps) {
+				nextPos = gridCoord{x: from.x - preferredXDirection, y: from.y}
 			} else {
-				// Last resort, try going above
 				// TODO: Diagonal?
-				nextPos = gridCoord{x: from.x, y: from.y - 1}
+				nextPos = gridCoord{x: from.x, y: from.y - preferredYDirection}
 			}
 		}
 	}
@@ -136,6 +155,7 @@ func (g *graph) isFreeInGrid(c gridCoord) bool {
 func hasStepBeenTaken(step gridCoord, steps []gridCoord) bool {
 	for _, s := range steps {
 		if s == step {
+			log.Debugf("Step %v has been taken", s)
 			return true
 		}
 	}
@@ -150,13 +170,23 @@ func (g *graph) drawArrow(from gridCoord, to gridCoord, label string) {
 	previousCoord := from
 	var previousDrawingCoord drawingCoord
 	var dir direction
-	for _, nextCoord := range path {
-		// TODO: intermediate steps should be drawn to the middle of the gridCoord instead of stop at direction.
-		dir = determineDirection(genericCoord(previousCoord), genericCoord(nextCoord))
-		oppositeDir := dir.getOpposite()
+	var oppositeDir direction
+	for idx, nextCoord := range path {
+		if idx == 0 {
+			// Only the last step goes to the edges of a node
+			dir = determineDirection(genericCoord(previousCoord), genericCoord(nextCoord))
+		} else {
+			dir = Middle
+		}
+		if idx == len(path)-1 {
+			dir = determineDirection(genericCoord(previousCoord), genericCoord(nextCoord))
+			oppositeDir = dir.getOpposite()
+		} else {
+			oppositeDir = Middle
+		}
 		previousDrawingCoord = g.gridToDrawingCoord(previousCoord, &dir)
 		nextDrawingCoord := g.gridToDrawingCoord(nextCoord, &oppositeDir)
-		log.Debugf("Instructing to draw line from %v to %v (grid %v)", previousDrawingCoord, nextDrawingCoord, nextCoord)
+		log.Debugf("Instructing to draw line from %v to %v (grid %v, direction %v)", previousDrawingCoord, nextDrawingCoord, nextCoord, dir)
 		d.drawLine(previousDrawingCoord, nextDrawingCoord, 0, 0)
 		previousCoord = nextCoord
 	}

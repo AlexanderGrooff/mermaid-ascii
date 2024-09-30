@@ -17,6 +17,7 @@ type styleClass struct {
 }
 
 func (g *graph) drawNode(n *node) {
+	log.Debug("Drawing node ", n.name, " at ", *n.drawingCoord)
 	m := mergeDrawings(g.drawing, n.drawing, *n.drawingCoord)
 	g.drawing = m
 }

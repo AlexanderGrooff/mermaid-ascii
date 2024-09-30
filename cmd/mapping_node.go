@@ -23,7 +23,7 @@ func (n *node) setDrawing() *drawing {
 	return d
 }
 
-func (g *graph) mappingToDrawingCoord(n *node) *drawingCoord {
+func (g *graph) setColumnWidth(n *node) {
 	// For every node there is:
 	// - 2 lines of border
 	// - 1 line of text
@@ -45,12 +45,6 @@ func (g *graph) mappingToDrawingCoord(n *node) *drawingCoord {
 		prevX += g.columnWidth[i] + 2*paddingBetweenX
 	}
 	g.columnWidth[n.gridCoord.x] = Max(g.columnWidth[n.gridCoord.x], w+labelLength)
-
-	x := prevX
-	y := n.gridCoord.y * 2 * paddingBetweenY
-	drawingCoord := drawingCoord{x: x, y: y}
-	logrus.Debugf("Mapping coord for %s from %v to %v", n.name, *n.gridCoord, drawingCoord)
-	return &drawingCoord
 }
 
 func (g *graph) reserveSpotInGrid(n *node, requestedCoord *gridCoord) *gridCoord {

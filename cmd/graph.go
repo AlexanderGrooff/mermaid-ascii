@@ -120,7 +120,9 @@ func (g *graph) createMapping() {
 
 	// After mapping coords are set, set drawing coords
 	for _, n := range g.nodes {
-		g.nodes[n.index].setCoord(g.mappingToDrawingCoord(n))
+		g.setColumnWidth(n)
+		dc := g.gridToDrawingCoord(*n.gridCoord, nil)
+		g.nodes[n.index].setCoord(&dc)
 		g.nodes[n.index].setDrawing()
 	}
 }
@@ -206,6 +208,10 @@ func (g *graph) gridToDrawingCoord(c gridCoord, dir *direction) drawingCoord {
 		dc = drawingCoord{x: x + g.columnWidth[c.x], y: y + boxHeight/2}
 	} else if *dir == Down {
 		dc = drawingCoord{x: x + g.columnWidth[c.x]/2, y: y + boxHeight}
+	} else if *dir == Middle {
+		dc = drawingCoord{x: x + g.columnWidth[c.x]/2, y: y + boxHeight/2}
+	} else {
+		dc = drawingCoord{x: x, y: y}
 	}
 	// TODO: corner directions
 
