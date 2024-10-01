@@ -96,7 +96,8 @@ func drawMap(data *orderedmap.OrderedMap[string, []textEdge], styleClasses map[s
 	g.createMapping()
 	d := g.draw()
 	if Verbose {
-		d = d.debugWrapper()
+		d = d.debugDrawingWrapper()
+		d = d.debugCoordWrapper(g)
 	}
 	s := drawingToString(d)
 	fmt.Println(s)
@@ -238,7 +239,7 @@ func determineDirection(from genericCoord, to genericCoord) direction {
 	}
 }
 
-func (d drawing) debugWrapper() *drawing {
+func (d drawing) debugDrawingWrapper() *drawing {
 	maxX, maxY := getDrawingSize(&d)
 	debugDrawing := *mkDrawing(maxX+2, maxY+1)
 	for x := 0; x <= maxX; x++ {
@@ -246,6 +247,28 @@ func (d drawing) debugWrapper() *drawing {
 	}
 	for y := 0; y <= maxY; y++ {
 		debugDrawing[0][y+1] = fmt.Sprintf("%2d", y)
+	}
+
+	return mergeDrawings(&debugDrawing, &d, drawingCoord{1, 1})
+}
+
+func (d drawing) debugCoordWrapper(g graph) *drawing {
+	maxX, maxY := getDrawingSize(&d)
+	debugDrawing := *mkDrawing(maxX+2, maxY+1)
+	currX := 3
+	currY := 2
+	for x := 0; currX <= maxX+g.columnWidth[x]; x++ {
+		w := g.columnWidth[x]
+		debugPos := currX + w/2
+		// log.Debugf("Grid coord %d has width %d: %d", x, w, currX)
+		debugDrawing[debugPos][0] = fmt.Sprintf("%d", x%10)
+		currX += w
+	}
+	for y := 0; currY <= maxY+g.rowHeight[y]; y++ {
+		h := g.rowHeight[y]
+		debugPos := currY + h/2
+		debugDrawing[0][debugPos] = fmt.Sprintf("%d", y%10)
+		currY += h
 	}
 
 	return mergeDrawings(&debugDrawing, &d, drawingCoord{1, 1})

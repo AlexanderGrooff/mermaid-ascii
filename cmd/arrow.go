@@ -4,44 +4,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type direction genericCoord
-
-var (
-	Up         = direction{1, 0}
-	Down       = direction{1, 2}
-	Left       = direction{0, 1}
-	Right      = direction{2, 1}
-	UpperRight = direction{2, 0}
-	UpperLeft  = direction{0, 0}
-	LowerRight = direction{2, 2}
-	LowerLeft  = direction{0, 2}
-	Middle     = direction{1, 1}
-)
-
-func (d direction) getOpposite() direction {
-	switch d {
-	case Up:
-		return Down
-	case Down:
-		return Up
-	case Left:
-		return Right
-	case Right:
-		return Left
-	case UpperRight:
-		return LowerLeft
-	case UpperLeft:
-		return LowerRight
-	case LowerRight:
-		return UpperLeft
-	case LowerLeft:
-		return UpperRight
-	case Middle:
-		return Middle
-	}
-	panic("Unknown direction")
-}
-
 func (g *graph) getPath(from gridCoord, to gridCoord, prevSteps []gridCoord) []gridCoord {
 	// Figure out what path the arrow should take by traversing the grid recursively.
 	var nextPos gridCoord
@@ -166,8 +128,7 @@ func hasStepBeenTaken(step gridCoord, steps []gridCoord) bool {
 
 func (g *graph) drawArrow(from gridCoord, to gridCoord, label string) {
 	// TODO: How to determine where the arrow should start/end?
-	dir := determineDirection(genericCoord(from), genericCoord(to))
-	path := g.getPath(from.Direction(dir), to.Direction(dir.getOpposite()), []gridCoord{})
+	path := g.getPath(from, to, []gridCoord{})
 	linesDrawn := g.drawPath(from, to, path)
 	g.drawArrowHead(linesDrawn[len(linesDrawn)-1])
 	// TODO: draw label. Maybe on a step that has long enough X? Or the longest X? How do you set column width? Maybe determine gridCoord for label?
@@ -180,22 +141,22 @@ func (g *graph) drawPath(from gridCoord, to gridCoord, path []gridCoord) [][]dra
 	previousCoord := from
 	linesDrawn := make([][]drawingCoord, 0)
 	var previousDrawingCoord drawingCoord
-	var dir direction
-	var oppositeDir direction
+	// var dir direction
+	// var oppositeDir direction
 	for idx, nextCoord := range path {
-		if idx == 0 {
-			// Only the first/last step goes from/to the edges of a node. Intermediate steps cross the middle.
-			dir = determineDirection(genericCoord(previousCoord), genericCoord(nextCoord))
-		} else {
-			dir = Middle
-		}
-		if idx == len(path)-1 {
-			oppositeDir = determineDirection(genericCoord(previousCoord), genericCoord(nextCoord)).getOpposite()
-		} else {
-			oppositeDir = Middle
-		}
-		previousDrawingCoord = g.gridToDrawingCoord(previousCoord, &dir)
-		nextDrawingCoord := g.gridToDrawingCoord(nextCoord, &oppositeDir)
+		// if idx == 0 {
+		// 	// Only the first/last step goes from/to the edges of a node. Intermediate steps cross the middle.
+		// 	dir = determineDirection(genericCoord(previousCoord), genericCoord(nextCoord))
+		// } else {
+		// 	dir = Middle
+		// }
+		// if idx == len(path)-1 {
+		// 	oppositeDir = determineDirection(genericCoord(previousCoord), genericCoord(nextCoord)).getOpposite()
+		// } else {
+		// 	oppositeDir = Middle
+		// }
+		previousDrawingCoord = g.gridToDrawingCoord(previousCoord, nil)
+		nextDrawingCoord := g.gridToDrawingCoord(nextCoord, nil)
 		if previousDrawingCoord.Equals(nextDrawingCoord) {
 			log.Debugf("Skipping drawing identical line on %v", nextCoord)
 			continue

@@ -22,12 +22,6 @@ func (c gridCoord) Equals(other gridCoord) bool {
 func (c drawingCoord) Equals(other drawingCoord) bool {
 	return c.x == other.x && c.y == other.y
 }
-func (c gridCoord) Direction(dir direction) gridCoord {
-	return gridCoord{x: c.x + dir.x, y: c.y + dir.y}
-}
-func (c drawingCoord) Direction(dir direction) drawingCoord {
-	return drawingCoord{x: c.x + dir.x, y: c.y + dir.y}
-}
 
 type graph struct {
 	nodes        []*node
@@ -216,7 +210,7 @@ func (g *graph) gridToDrawingCoord(c gridCoord, dir *direction) drawingCoord {
 	for row := 0; row < target.y; row++ {
 		y += g.rowHeight[row]
 	}
-	dc := drawingCoord{x: x, y: y}
+	dc := drawingCoord{x: x + g.columnWidth[target.x]/2, y: y + g.rowHeight[target.y]/2}
 
 	log.Debugf("Mapping grid coord %v to drawing coord %v (direction %v)", c, dc, dir)
 	return dc
