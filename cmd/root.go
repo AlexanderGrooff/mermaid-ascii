@@ -11,8 +11,8 @@ import (
 var Verbose bool
 var boxBorderWidth = 1
 var boxBorderPadding = 1
-var paddingBetweenX = 2
-var paddingBetweenY = 2
+var paddingBetweenX = 3
+var paddingBetweenY = 3
 var graphDirection = "LR"
 
 // rootCmd represents the base command when called without any subcommands
@@ -53,8 +53,8 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "verbose output")
-	rootCmd.PersistentFlags().IntVarP(&paddingBetweenX, "paddingX", "x", 2, "Horizontal space between nodes")
-	rootCmd.PersistentFlags().IntVarP(&paddingBetweenY, "paddingY", "y", 2, "Vertical space between nodes")
+	rootCmd.PersistentFlags().IntVarP(&paddingBetweenX, "paddingX", "x", 3, "Horizontal space between nodes")
+	rootCmd.PersistentFlags().IntVarP(&paddingBetweenY, "paddingY", "y", 3, "Vertical space between nodes")
 	rootCmd.PersistentFlags().IntVarP(&boxBorderPadding, "borderPadding", "p", 1, "Padding between text and border")
 
 	// Cobra also supports local flags, which will only run

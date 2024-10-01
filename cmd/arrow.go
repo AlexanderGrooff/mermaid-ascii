@@ -141,20 +141,7 @@ func (g *graph) drawPath(from gridCoord, to gridCoord, path []gridCoord) [][]dra
 	previousCoord := from
 	linesDrawn := make([][]drawingCoord, 0)
 	var previousDrawingCoord drawingCoord
-	// var dir direction
-	// var oppositeDir direction
 	for idx, nextCoord := range path {
-		// if idx == 0 {
-		// 	// Only the first/last step goes from/to the edges of a node. Intermediate steps cross the middle.
-		// 	dir = determineDirection(genericCoord(previousCoord), genericCoord(nextCoord))
-		// } else {
-		// 	dir = Middle
-		// }
-		// if idx == len(path)-1 {
-		// 	oppositeDir = determineDirection(genericCoord(previousCoord), genericCoord(nextCoord)).getOpposite()
-		// } else {
-		// 	oppositeDir = Middle
-		// }
 		previousDrawingCoord = g.gridToDrawingCoord(previousCoord, nil)
 		nextDrawingCoord := g.gridToDrawingCoord(nextCoord, nil)
 		if previousDrawingCoord.Equals(nextDrawingCoord) {
