@@ -176,6 +176,37 @@ This results in the following graph:
 
 ![](docs/colored_graph.png)
 
+## How it works
+
+We parse a mermaid file into basic components in order to render a grid. The grid is used for mapping purposes, which is eventually converted to a drawing.
+The grid looks a bit like this:
+
+```
+There are three grid-points per node, and one in-between nodes.
+These coords don't have to be the same size, as long as they
+can be used for pathing purposes where we convert them to drawing
+coordinates.
+This allows us to navigate edges between nodes, like the arrow in this
+drawing taking the path [(2,1), (3,1), (3,5), (4,5)].
+    0      1      2  3  4      5      6
+    |      |      |  |  |      |      |
+    v      v      v  v  v      v      v
+                                       
+0-> +-------------+     +-------------+
+    |             |     |             |
+1-> |  Some text  |---  |  Some text  |
+    |             |  |  |             |
+2-> +-------------+  |  +-------------+
+                     |                 
+3->                  |                 
+                     |                 
+4-> +-------------+  |  +-------------+
+    |             |  |  |             |
+5-> |  Some text  |  -->|  Some text  |
+    |             |     |             |
+6-> +-------------+     +-------------+
+```
+
 ## TODOs
 
 The baseline components for Mermaid work, but there are a lot of things that are not supported yet. Here's a list of things that are not yet supported:

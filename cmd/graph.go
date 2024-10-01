@@ -16,12 +16,26 @@ type genericCoord struct {
 type gridCoord genericCoord
 type drawingCoord genericCoord
 
+func (c gridCoord) Equals(other gridCoord) bool {
+	return c.x == other.x && c.y == other.y
+}
+func (c drawingCoord) Equals(other drawingCoord) bool {
+	return c.x == other.x && c.y == other.y
+}
+func (c gridCoord) Direction(dir direction) gridCoord {
+	return gridCoord{x: c.x + dir.x, y: c.y + dir.y}
+}
+func (c drawingCoord) Direction(dir direction) drawingCoord {
+	return drawingCoord{x: c.x + dir.x, y: c.y + dir.y}
+}
+
 type graph struct {
 	nodes        []*node
 	edges        []*edge
 	drawing      *drawing
 	grid         map[gridCoord]*node
 	columnWidth  map[int]int
+	rowHeight    map[int]int
 	styleClasses map[string]styleClass
 }
 
@@ -29,6 +43,7 @@ func mkGraph(data *orderedmap.OrderedMap[string, []textEdge]) graph {
 	g := graph{drawing: mkDrawing(0, 0)}
 	g.grid = make(map[gridCoord]*node)
 	g.columnWidth = make(map[int]int)
+	g.rowHeight = make(map[int]int)
 	g.styleClasses = make(map[string]styleClass)
 
 	index := 0
@@ -77,6 +92,7 @@ func (g *graph) createMapping() {
 		highestPositionPerLevel = append(highestPositionPerLevel, 0)
 	}
 
+	// TODO: should the mapping be bottom-to-top instead of top-to-bottom?
 	// Set root nodes to level 0
 	for _, n := range g.nodes {
 		if len(g.getParents(n)) == 0 {
@@ -94,10 +110,11 @@ func (g *graph) createMapping() {
 
 	for _, n := range g.nodes {
 		var childLevel int
+		// Next column is 4 coords further. This is because every node is 3 coords wide + 1 coord inbetween.
 		if graphDirection == "LR" {
-			childLevel = n.gridCoord.x + 1
+			childLevel = n.gridCoord.x + 4
 		} else {
-			childLevel = n.gridCoord.y + 1
+			childLevel = n.gridCoord.y + 4
 		}
 		highestPosition := highestPositionPerLevel[childLevel]
 		for _, child := range g.getChildren(n) {
@@ -185,40 +202,22 @@ func (g *graph) getParents(n *node) []*node {
 }
 
 func (g *graph) gridToDrawingCoord(c gridCoord, dir *direction) drawingCoord {
-	var dc drawingCoord
 	x := 0
-	for column := 0; column < c.x; column++ {
-		x += g.columnWidth[column] + 2*paddingBetweenX
-	}
-	boxHeight := boxBorderWidth*2 + boxBorderPadding*2 + 1
-	var y int
-	if c.y == 0 {
-		y = 0
-	} else {
-		y = (boxHeight)*c.y + paddingBetweenY*(c.y)
-	}
+	y := 0
+	var target gridCoord
 	if dir == nil {
-		// Top-left corner
-		dc = drawingCoord{x: x, y: y}
-	} else if *dir == Up {
-		dc = drawingCoord{x: x + g.columnWidth[c.x]/2, y: y}
-	} else if *dir == Left {
-		dc = drawingCoord{x: x, y: y + boxHeight/2}
-	} else if *dir == Right {
-		dc = drawingCoord{x: x + g.columnWidth[c.x] - 1, y: y + boxHeight/2}
-	} else if *dir == Down {
-		dc = drawingCoord{x: x + g.columnWidth[c.x]/2, y: y + boxHeight - 1}
-	} else if *dir == Middle {
-		dc = drawingCoord{x: x + g.columnWidth[c.x]/2, y: y + boxHeight/2}
+		target = c
 	} else {
-		dc = drawingCoord{x: x, y: y}
+		target = gridCoord{x: c.x + dir.x, y: c.y + dir.y}
 	}
-	// TODO: corner directions
+	for column := 0; column < target.x; column++ {
+		x += g.columnWidth[column]
+	}
+	for row := 0; row < target.y; row++ {
+		y += g.rowHeight[row]
+	}
+	dc := drawingCoord{x: x, y: y}
 
-	if dir == nil {
-		log.Debugf("Mapping grid coord %v to drawing coord %v", c, dc)
-	} else {
-		log.Debugf("Mapping grid coord %v to drawing coord %v (direction %v)", c, dc, *dir)
-	}
+	log.Debugf("Mapping grid coord %v to drawing coord %v (direction %v)", c, dc, dir)
 	return dc
 }

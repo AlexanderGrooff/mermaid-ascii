@@ -23,8 +23,12 @@ func (g *graph) drawNode(n *node) {
 }
 
 func (g *graph) drawEdge(e *edge) {
-	log.Debugf("Drawing edge between %v and %v", *e.from, *e.to)
-	g.drawArrow(*e.from.gridCoord, *e.to.gridCoord, e.text)
+	dir := determineDirection(genericCoord(*e.from.gridCoord), genericCoord(*e.to.gridCoord))
+	oppositeDir := dir.getOpposite()
+	from := e.from.gridCoord.Direction(dir)
+	to := e.to.gridCoord.Direction(oppositeDir)
+	log.Debugf("Drawing edge between %v (direction %v) and %v (direction %v)", *e.from, dir, *e.to, oppositeDir)
+	g.drawArrow(from, to, e.text)
 }
 
 func (d *drawing) drawText(start drawingCoord, text string) {

@@ -4,18 +4,18 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type direction string
+type direction genericCoord
 
-const (
-	Up         = direction("Up")
-	Down       = direction("Down")
-	Left       = direction("Left")
-	Right      = direction("Right")
-	UpperRight = direction("UpperRight")
-	UpperLeft  = direction("UpperLeft")
-	LowerRight = direction("LowerRight")
-	LowerLeft  = direction("LowerLeft")
-	Middle     = direction("Middle")
+var (
+	Up         = direction{1, 0}
+	Down       = direction{1, 2}
+	Left       = direction{0, 1}
+	Right      = direction{2, 1}
+	UpperRight = direction{2, 0}
+	UpperLeft  = direction{0, 0}
+	LowerRight = direction{2, 2}
+	LowerLeft  = direction{0, 2}
+	Middle     = direction{1, 1}
 )
 
 func (d direction) getOpposite() direction {
@@ -39,7 +39,7 @@ func (d direction) getOpposite() direction {
 	case Middle:
 		return Middle
 	}
-	return ""
+	panic("Unknown direction")
 }
 
 func (g *graph) getPath(from gridCoord, to gridCoord, prevSteps []gridCoord) []gridCoord {
@@ -71,7 +71,8 @@ func (g *graph) getPath(from gridCoord, to gridCoord, prevSteps []gridCoord) []g
 
 	absX := Abs(deltaX)
 	absY := Abs(deltaY)
-	if absX > 10 || absY > 10 {
+	// TODO: make nicer
+	if absX > 50 || absY > 50 {
 		panic("Out of bounds")
 	}
 	if (absX == 0 && absY == 1) || (absX == 1 && absY == 0) {
@@ -125,6 +126,7 @@ func (g *graph) getPath(from gridCoord, to gridCoord, prevSteps []gridCoord) []g
 				nextPos = gridCoord{x: from.x, y: from.y - preferredYDirection}
 			} else {
 				// TODO: Diagonal?
+				// TODO: what about inbetween nodes, on half/grid coords?
 				nextPos = gridCoord{x: from.x - preferredXDirection, y: from.y}
 			}
 		} else if graphDirection == "TD" {
@@ -163,9 +165,12 @@ func hasStepBeenTaken(step gridCoord, steps []gridCoord) bool {
 }
 
 func (g *graph) drawArrow(from gridCoord, to gridCoord, label string) {
-	path := g.getPath(from, to, []gridCoord{})
+	// TODO: How to determine where the arrow should start/end?
+	dir := determineDirection(genericCoord(from), genericCoord(to))
+	path := g.getPath(from.Direction(dir), to.Direction(dir.getOpposite()), []gridCoord{})
 	linesDrawn := g.drawPath(from, to, path)
 	g.drawArrowHead(linesDrawn[len(linesDrawn)-1])
+	// TODO: draw label. Maybe on a step that has long enough X? Or the longest X? How do you set column width? Maybe determine gridCoord for label?
 }
 
 func (g *graph) drawPath(from gridCoord, to gridCoord, path []gridCoord) [][]drawingCoord {
@@ -179,7 +184,7 @@ func (g *graph) drawPath(from gridCoord, to gridCoord, path []gridCoord) [][]dra
 	var oppositeDir direction
 	for idx, nextCoord := range path {
 		if idx == 0 {
-			// Only the last step goes to the edges of a node
+			// Only the first/last step goes from/to the edges of a node. Intermediate steps cross the middle.
 			dir = determineDirection(genericCoord(previousCoord), genericCoord(nextCoord))
 		} else {
 			dir = Middle
@@ -191,6 +196,10 @@ func (g *graph) drawPath(from gridCoord, to gridCoord, path []gridCoord) [][]dra
 		}
 		previousDrawingCoord = g.gridToDrawingCoord(previousCoord, &dir)
 		nextDrawingCoord := g.gridToDrawingCoord(nextCoord, &oppositeDir)
+		if previousDrawingCoord.Equals(nextDrawingCoord) {
+			log.Debugf("Skipping drawing identical line on %v", nextCoord)
+			continue
+		}
 		if idx == 0 {
 			// Don't cross the node border
 			linesDrawn = append(linesDrawn, d.drawLine(previousDrawingCoord, nextDrawingCoord, 1, -1))
@@ -216,6 +225,14 @@ func (g *graph) drawArrowHead(line []drawingCoord) {
 		(*g.drawing)[lastPos.x][lastPos.y] = "<"
 	case Right:
 		(*g.drawing)[lastPos.x][lastPos.y] = ">"
+	case UpperRight:
+		(*g.drawing)[lastPos.x][lastPos.y] = "┐"
+	case UpperLeft:
+		(*g.drawing)[lastPos.x][lastPos.y] = "┌"
+	case LowerRight:
+		(*g.drawing)[lastPos.x][lastPos.y] = "┘"
+	case LowerLeft:
+		(*g.drawing)[lastPos.x][lastPos.y] = "└"
 	default:
 		(*g.drawing)[lastPos.x][lastPos.y] = "+"
 	}
