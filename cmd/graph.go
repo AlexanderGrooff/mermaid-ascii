@@ -119,9 +119,9 @@ func (g *graph) createMapping() {
 
 			var mappingCoord *gridCoord
 			if graphDirection == "LR" {
-				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: childLevel, y: highestPosition})
+				mappingCoord = g.reserveSpotInGrid(g.nodes[child.index], &gridCoord{x: childLevel, y: highestPosition})
 			} else {
-				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: highestPosition, y: childLevel})
+				mappingCoord = g.reserveSpotInGrid(g.nodes[child.index], &gridCoord{x: highestPosition, y: childLevel})
 			}
 			logrus.Debugf("Setting mapping coord for child %s of parent %s to %v", child.name, n.name, mappingCoord)
 			g.nodes[child.index].gridCoord = mappingCoord

@@ -1,6 +1,8 @@
 package cmd
 
-import "github.com/sirupsen/logrus"
+import (
+	log "github.com/sirupsen/logrus"
+)
 
 type node struct {
 	name           string
@@ -62,7 +64,7 @@ func (g *graph) setColumnWidth(n *node) {
 
 func (g *graph) reserveSpotInGrid(n *node, requestedCoord *gridCoord) *gridCoord {
 	if g.grid[*requestedCoord] != nil {
-		logrus.Debugf("Coord %d,%d is already taken", requestedCoord.x, requestedCoord.y)
+		log.Debugf("Coord %d,%d is already taken", requestedCoord.x, requestedCoord.y)
 		// Next column is 4 coords further. This is because every node is 3 coords wide + 1 coord inbetween.
 		if graphDirection == "LR" {
 			return g.reserveSpotInGrid(n, &gridCoord{x: requestedCoord.x, y: requestedCoord.y + 4})
@@ -70,6 +72,14 @@ func (g *graph) reserveSpotInGrid(n *node, requestedCoord *gridCoord) *gridCoord
 			return g.reserveSpotInGrid(n, &gridCoord{x: requestedCoord.x + 4, y: requestedCoord.y})
 		}
 	}
-	g.grid[*requestedCoord] = n
+	// Reserve border + middle + border for node
+	for x := 0; x < 3; x++ {
+		for y := 0; y < 3; y++ {
+			reservedCoord := gridCoord{x: requestedCoord.x + x, y: requestedCoord.y + y}
+			log.Debugf("Reserving coord %d,%d for node %v", reservedCoord.x, reservedCoord.y, n)
+			g.grid[reservedCoord] = n
+		}
+	}
+	n.gridCoord = requestedCoord
 	return requestedCoord
 }
