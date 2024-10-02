@@ -22,50 +22,6 @@ func (g *graph) drawNode(n *node) {
 	g.drawing = m
 }
 
-func determineStartAndEndDir(e *edge) (direction, direction) {
-	d := determineDirection(genericCoord(*e.from.gridCoord), genericCoord(*e.to.gridCoord))
-	var dir direction
-	var oppositeDir direction
-	switch d {
-	case LowerRight:
-		if graphDirection == "LR" {
-			dir = Down
-			oppositeDir = Left
-		} else {
-			dir = Right
-			oppositeDir = Up
-		}
-	case UpperRight:
-		if graphDirection == "LR" {
-			dir = Up
-			oppositeDir = Left
-		} else {
-			dir = Right
-			oppositeDir = Down
-		}
-	case LowerLeft:
-		if graphDirection == "LR" {
-			dir = Down
-			oppositeDir = Right
-		} else {
-			dir = Left
-			oppositeDir = Up
-		}
-	case UpperLeft:
-		if graphDirection == "LR" {
-			dir = Up
-			oppositeDir = Right
-		} else {
-			dir = Left
-			oppositeDir = Down
-		}
-	default:
-		dir = d
-		oppositeDir = dir.getOpposite()
-	}
-	return dir, oppositeDir
-}
-
 func (g *graph) drawEdge(e *edge) {
 	dir, oppositeDir := determineStartAndEndDir(e)
 	from := e.from.gridCoord.Direction(dir)

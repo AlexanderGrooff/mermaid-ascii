@@ -1,16 +1,18 @@
 package cmd
 
 import (
+	"fmt"
+
 	log "github.com/sirupsen/logrus"
 )
 
-func (g *graph) getPath(from gridCoord, to gridCoord, prevSteps []gridCoord) []gridCoord {
+func (g *graph) getPath(from gridCoord, to gridCoord, prevSteps []gridCoord) ([]gridCoord, error) {
 	// Figure out what path the arrow should take by traversing the grid recursively.
 	var nextPos gridCoord
 	log.Debugf("Looking for path from %v to %v", from, to)
 
 	if from == to {
-		return []gridCoord{}
+		return []gridCoord{}, nil
 	}
 
 	deltaX := to.x - from.x
@@ -35,11 +37,11 @@ func (g *graph) getPath(from gridCoord, to gridCoord, prevSteps []gridCoord) []g
 	absY := Abs(deltaY)
 	// TODO: make nicer
 	if absX > 50 || absY > 50 {
-		panic("Out of bounds")
+		return []gridCoord{}, fmt.Errorf("Out of bounds")
 	}
 	if (absX == 0 && absY == 1) || (absX == 1 && absY == 0) {
 		// Can go directly to the target
-		return []gridCoord{to}
+		return []gridCoord{to}, nil
 	} else if deltaY == 0 {
 		if deltaX > 0 && g.isFreeInGrid(gridCoord{x: from.x + 1, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x + 1, y: from.y}, prevSteps) {
 			nextPos = gridCoord{x: from.x + 1, y: from.y}
@@ -108,8 +110,12 @@ func (g *graph) getPath(from gridCoord, to gridCoord, prevSteps []gridCoord) []g
 	}
 
 	item := nextPos
-	slice := g.getPath(nextPos, to, append(prevSteps, nextPos))
-	return append([]gridCoord{item}, slice...)
+	currSteps := append(prevSteps, nextPos)
+	slice, err := g.getPath(nextPos, to, currSteps)
+	if err != nil {
+		return currSteps, err
+	}
+	return append([]gridCoord{item}, slice...), nil
 }
 
 func (g *graph) isFreeInGrid(c gridCoord) bool {
@@ -128,7 +134,7 @@ func hasStepBeenTaken(step gridCoord, steps []gridCoord) bool {
 
 func (g *graph) drawArrow(from gridCoord, to gridCoord, label string) {
 	// TODO: How to determine where the arrow should start/end?
-	path := g.getPath(from, to, []gridCoord{})
+	path, _ := g.getPath(from, to, []gridCoord{})
 	linesDrawn := g.drawPath(from, to, path)
 	g.drawArrowHead(linesDrawn[len(linesDrawn)-1])
 	// TODO: draw label. Maybe on a step that has long enough X? Or the longest X? How do you set column width? Maybe determine gridCoord for label?

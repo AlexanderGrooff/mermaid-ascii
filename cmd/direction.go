@@ -44,3 +44,47 @@ func (c gridCoord) Direction(dir direction) gridCoord {
 func (c drawingCoord) Direction(dir direction) drawingCoord {
 	return drawingCoord{x: c.x + dir.x, y: c.y + dir.y}
 }
+
+func determineStartAndEndDir(e *edge) (direction, direction) {
+	d := determineDirection(genericCoord(*e.from.gridCoord), genericCoord(*e.to.gridCoord))
+	var dir direction
+	var oppositeDir direction
+	switch d {
+	case LowerRight:
+		if graphDirection == "LR" {
+			dir = Down
+			oppositeDir = Left
+		} else {
+			dir = Right
+			oppositeDir = Up
+		}
+	case UpperRight:
+		if graphDirection == "LR" {
+			dir = Right
+			oppositeDir = Down
+		} else {
+			dir = Up
+			oppositeDir = Left
+		}
+	case LowerLeft:
+		if graphDirection == "LR" {
+			dir = Down
+			oppositeDir = Right
+		} else {
+			dir = Down
+			oppositeDir = Right
+		}
+	case UpperLeft:
+		if graphDirection == "LR" {
+			dir = Left
+			oppositeDir = Down
+		} else {
+			dir = Up
+			oppositeDir = Right
+		}
+	default:
+		dir = d
+		oppositeDir = dir.getOpposite()
+	}
+	return dir, oppositeDir
+}
