@@ -49,6 +49,9 @@ func determineStartAndEndDir(e *edge) (direction, direction) {
 	d := determineDirection(genericCoord(*e.from.gridCoord), genericCoord(*e.to.gridCoord))
 	var dir direction
 	var oppositeDir direction
+	// LR: prefer vertical over horizontal
+	// TD: prefer horizontal over vertical
+	// TODO: This causes some squirmy lines if the corner spot is already occupied.
 	switch d {
 	case LowerRight:
 		if graphDirection == "LR" {
@@ -60,27 +63,27 @@ func determineStartAndEndDir(e *edge) (direction, direction) {
 		}
 	case UpperRight:
 		if graphDirection == "LR" {
-			dir = Right
-			oppositeDir = Down
-		} else {
 			dir = Up
 			oppositeDir = Left
+		} else {
+			dir = Right
+			oppositeDir = Down
 		}
 	case LowerLeft:
 		if graphDirection == "LR" {
 			dir = Down
 			oppositeDir = Right
 		} else {
-			dir = Down
-			oppositeDir = Right
+			dir = Left
+			oppositeDir = Up
 		}
 	case UpperLeft:
 		if graphDirection == "LR" {
-			dir = Left
-			oppositeDir = Down
-		} else {
 			dir = Up
 			oppositeDir = Right
+		} else {
+			dir = Left
+			oppositeDir = Down
 		}
 	default:
 		dir = d

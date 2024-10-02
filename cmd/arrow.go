@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"slices"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -109,13 +110,12 @@ func (g *graph) getPath(from gridCoord, to gridCoord, prevSteps []gridCoord) ([]
 		}
 	}
 
-	item := nextPos
 	currSteps := append(prevSteps, nextPos)
 	slice, err := g.getPath(nextPos, to, currSteps)
 	if err != nil {
 		return currSteps, err
 	}
-	return append([]gridCoord{item}, slice...), nil
+	return append([]gridCoord{nextPos}, slice...), nil
 }
 
 func (g *graph) isFreeInGrid(c gridCoord) bool {
@@ -133,21 +133,54 @@ func hasStepBeenTaken(step gridCoord, steps []gridCoord) bool {
 }
 
 func (g *graph) drawArrow(from gridCoord, to gridCoord, label string) {
-	// TODO: How to determine where the arrow should start/end?
-	path, _ := g.getPath(from, to, []gridCoord{})
-	linesDrawn := g.drawPath(from, to, path)
-	g.drawArrowHead(linesDrawn[len(linesDrawn)-1])
-	// TODO: draw label. Maybe on a step that has long enough X? Or the longest X? How do you set column width? Maybe determine gridCoord for label?
+	path, err := g.getPath(from, to, []gridCoord{from})
+	path = append([]gridCoord{from}, path...) // TODO: how to do this nicely in getPath?
+	if err != nil {
+		fmt.Printf("Error getting path from %v to %v: %v", from, to, err)
+	}
+	path = mergePath(path)
+	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, path)
+	dLabel := g.drawArrowLabel(path, label)
+	dPath, linesDrawn := g.drawPath(path)
+	dHead := g.drawArrowHead(linesDrawn[len(linesDrawn)-1])
+	g.drawing = mergeDrawings(g.drawing, dPath, drawingCoord{0, 0})
+	g.drawing = mergeDrawings(g.drawing, dHead, drawingCoord{0, 0})
+	g.drawing = mergeDrawings(g.drawing, dLabel, drawingCoord{0, 0})
 }
 
-func (g *graph) drawPath(from gridCoord, to gridCoord, path []gridCoord) [][]drawingCoord {
-	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, path)
+func mergePath(path []gridCoord) []gridCoord {
+	// If two steps are in the same direction, merge them to one step.
+	if len(path) <= 2 {
+		return path
+	}
+	indexToRemove := []int{}
+	step0 := path[0]
+	step1 := path[1]
+	for idx, step2 := range path[2:] {
+		prevDir := determineDirection(genericCoord(step0), genericCoord(step1))
+		dir := determineDirection(genericCoord(step1), genericCoord(step2))
+		if prevDir == dir {
+			log.Debugf("Removing %v from path", step1)
+			indexToRemove = append(indexToRemove, idx+1) // +1 because we skip the initial step
+		}
+		step0 = step1
+		step1 = step2
+	}
+	newPath := []gridCoord{}
+	for idx, step := range path {
+		if !slices.Contains(indexToRemove, idx) {
+			newPath = append(newPath, step)
+		}
+	}
+	return newPath
+}
 
-	d := g.drawing
-	previousCoord := from
+func (g *graph) drawPath(path []gridCoord) (*drawing, [][]drawingCoord) {
+	d := copyCanvas(g.drawing)
+	previousCoord := path[0]
 	linesDrawn := make([][]drawingCoord, 0)
 	var previousDrawingCoord drawingCoord
-	for idx, nextCoord := range path {
+	for idx, nextCoord := range path[1:] {
 		previousDrawingCoord = g.gridToDrawingCoord(previousCoord, nil)
 		nextDrawingCoord := g.gridToDrawingCoord(nextCoord, nil)
 		if previousDrawingCoord.Equals(nextDrawingCoord) {
@@ -162,32 +195,96 @@ func (g *graph) drawPath(from gridCoord, to gridCoord, path []gridCoord) [][]dra
 		}
 		previousCoord = nextCoord
 	}
-	return linesDrawn
+	return d, linesDrawn
 }
 
-func (g *graph) drawArrowHead(line []drawingCoord) {
+func (g *graph) drawArrowHead(line []drawingCoord) *drawing {
+	d := *(copyCanvas(g.drawing))
 	// Determine the direction of the arrow for the last step
 	from := line[0]
 	lastPos := line[len(line)-1]
 	dir := determineDirection(genericCoord(from), genericCoord(lastPos))
 	switch dir {
 	case Up:
-		(*g.drawing)[lastPos.x][lastPos.y] = "^"
+		d[lastPos.x][lastPos.y] = "^"
 	case Down:
-		(*g.drawing)[lastPos.x][lastPos.y] = "v"
+		d[lastPos.x][lastPos.y] = "v"
 	case Left:
-		(*g.drawing)[lastPos.x][lastPos.y] = "<"
+		d[lastPos.x][lastPos.y] = "<"
 	case Right:
-		(*g.drawing)[lastPos.x][lastPos.y] = ">"
+		d[lastPos.x][lastPos.y] = ">"
 	case UpperRight:
-		(*g.drawing)[lastPos.x][lastPos.y] = "┐"
+		d[lastPos.x][lastPos.y] = "┐"
 	case UpperLeft:
-		(*g.drawing)[lastPos.x][lastPos.y] = "┌"
+		d[lastPos.x][lastPos.y] = "┌"
 	case LowerRight:
-		(*g.drawing)[lastPos.x][lastPos.y] = "┘"
+		d[lastPos.x][lastPos.y] = "┘"
 	case LowerLeft:
-		(*g.drawing)[lastPos.x][lastPos.y] = "└"
+		d[lastPos.x][lastPos.y] = "└"
 	default:
-		(*g.drawing)[lastPos.x][lastPos.y] = "+"
+		d[lastPos.x][lastPos.y] = "+"
 	}
+	return &d
+}
+
+func (g *graph) drawArrowLabel(path []gridCoord, label string) *drawing {
+	d := copyCanvas(g.drawing)
+	lenLabel := len(label)
+	if lenLabel == 0 {
+		return d
+	}
+	prevStep := g.gridToDrawingCoord(path[0], nil)
+	var gridX, maxX, minX, largestLineSize int
+	// Init to first line if we find nothing else
+	largestLine := []drawingCoord{prevStep, g.gridToDrawingCoord(path[1], nil)}
+	largestLineSize = 0
+	for _, s := range path[1:] {
+		step := g.gridToDrawingCoord(s, nil)
+		if step.x > prevStep.x {
+			minX = prevStep.x
+			maxX = step.x
+		} else {
+			minX = step.x
+			maxX = step.x
+		}
+		if (maxX - minX) >= lenLabel {
+			gridX = s.x
+			largestLine = []drawingCoord{prevStep, step}
+			break
+		} else if (maxX - minX) > largestLineSize {
+			largestLineSize = maxX - minX
+			largestLine = []drawingCoord{prevStep, step}
+		}
+		prevStep = step
+	}
+	// TODO: this happens too late. We should not calculate drawingCoords before we do this.
+	g.columnWidth[gridX] = Max(g.columnWidth[gridX], lenLabel+2)
+	d.drawTextOnLine(largestLine, label)
+	return d
+}
+
+func (d *drawing) drawTextOnLine(line []drawingCoord, label string) {
+	// Write text in middle of the line
+	//  123456789
+	// |---------|
+	//     123
+	var minX, maxX, minY, maxY int
+	if line[0].x > line[1].x {
+		minX = line[1].x
+		maxX = line[0].x
+	} else {
+		minX = line[0].x
+		maxX = line[1].x
+	}
+	if line[0].y > line[1].y {
+		minY = line[1].y
+		maxY = line[0].y
+	} else {
+		minY = line[0].y
+		maxY = line[1].y
+	}
+	middleX := minX + (maxX-minX)/2
+	middleY := minY + (maxY-minY)/2
+	startLabelCoord := drawingCoord{x: middleX - len(label)/2, y: middleY}
+	d.drawText(startLabelCoord, label)
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/elliotchance/orderedmap/v2"
+	orderedmap "github.com/elliotchance/orderedmap/v2"
 	"github.com/gookit/color"
 	log "github.com/sirupsen/logrus"
 )
@@ -204,6 +204,11 @@ func mkDrawing(x int, y int) *drawing {
 		}
 	}
 	return &d
+}
+
+func copyCanvas(toBeCopied *drawing) *drawing {
+	x, y := getDrawingSize(toBeCopied)
+	return mkDrawing(x, y)
 }
 
 func getDrawingSize(d *drawing) (int, int) {
