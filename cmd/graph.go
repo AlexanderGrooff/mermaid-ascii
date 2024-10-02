@@ -22,6 +22,13 @@ func (c gridCoord) Equals(other gridCoord) bool {
 func (c drawingCoord) Equals(other drawingCoord) bool {
 	return c.x == other.x && c.y == other.y
 }
+func (g graph) lineToDrawing(line []gridCoord) []drawingCoord {
+	dc := []drawingCoord{}
+	for _, c := range line {
+		dc = append(dc, g.gridToDrawingCoord(c, nil))
+	}
+	return dc
+}
 
 type graph struct {
 	nodes        []*node
@@ -129,13 +136,23 @@ func (g *graph) createMapping() {
 		}
 	}
 
-	// After mapping coords are set, set drawing coords
 	for _, n := range g.nodes {
 		g.setColumnWidth(n)
+	}
+
+	for _, e := range g.edges {
+		g.determinePath(e)
+		g.determineLabelLine(e)
+	}
+
+	// ! Last point before we manipulate the drawing !
+
+	for _, n := range g.nodes {
 		dc := g.gridToDrawingCoord(*n.gridCoord, nil)
 		g.nodes[n.index].setCoord(&dc)
 		g.nodes[n.index].setDrawing()
 	}
+	g.setDrawingSizeToGridConstraints()
 }
 
 func (g *graph) draw() *drawing {

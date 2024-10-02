@@ -132,16 +132,10 @@ func hasStepBeenTaken(step gridCoord, steps []gridCoord) bool {
 	return false
 }
 
-func (g *graph) drawArrow(from gridCoord, to gridCoord, label string) {
-	path, err := g.getPath(from, to, []gridCoord{from})
-	path = append([]gridCoord{from}, path...) // TODO: how to do this nicely in getPath?
-	if err != nil {
-		fmt.Printf("Error getting path from %v to %v: %v", from, to, err)
-	}
-	path = mergePath(path)
-	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, path)
-	dLabel := g.drawArrowLabel(path, label)
-	dPath, linesDrawn := g.drawPath(path)
+func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) {
+	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, e.path)
+	dLabel := g.drawArrowLabel(e)
+	dPath, linesDrawn := g.drawPath(e.path)
 	dHead := g.drawArrowHead(linesDrawn[len(linesDrawn)-1])
 	g.drawing = mergeDrawings(g.drawing, dPath, drawingCoord{0, 0})
 	g.drawing = mergeDrawings(g.drawing, dHead, drawingCoord{0, 0})
@@ -227,39 +221,15 @@ func (g *graph) drawArrowHead(line []drawingCoord) *drawing {
 	return &d
 }
 
-func (g *graph) drawArrowLabel(path []gridCoord, label string) *drawing {
+func (g *graph) drawArrowLabel(e *edge) *drawing {
 	d := copyCanvas(g.drawing)
-	lenLabel := len(label)
+	lenLabel := len(e.text)
 	if lenLabel == 0 {
 		return d
 	}
-	prevStep := g.gridToDrawingCoord(path[0], nil)
-	var gridX, maxX, minX, largestLineSize int
-	// Init to first line if we find nothing else
-	largestLine := []drawingCoord{prevStep, g.gridToDrawingCoord(path[1], nil)}
-	largestLineSize = 0
-	for _, s := range path[1:] {
-		step := g.gridToDrawingCoord(s, nil)
-		if step.x > prevStep.x {
-			minX = prevStep.x
-			maxX = step.x
-		} else {
-			minX = step.x
-			maxX = step.x
-		}
-		if (maxX - minX) >= lenLabel {
-			gridX = s.x
-			largestLine = []drawingCoord{prevStep, step}
-			break
-		} else if (maxX - minX) > largestLineSize {
-			largestLineSize = maxX - minX
-			largestLine = []drawingCoord{prevStep, step}
-		}
-		prevStep = step
-	}
-	// TODO: this happens too late. We should not calculate drawingCoords before we do this.
-	g.columnWidth[gridX] = Max(g.columnWidth[gridX], lenLabel+2)
-	d.drawTextOnLine(largestLine, label)
+
+	log.Debugf("Drawing text '%s' on gridline %v", e.text, e.labelLine)
+	d.drawTextOnLine(g.lineToDrawing(e.labelLine), e.text)
 	return d
 }
 
@@ -268,6 +238,7 @@ func (d *drawing) drawTextOnLine(line []drawingCoord, label string) {
 	//  123456789
 	// |---------|
 	//     123
+	log.Debugf("Drawing text '%s' on drawingline %v", label, line)
 	var minX, maxX, minY, maxY int
 	if line[0].x > line[1].x {
 		minX = line[1].x

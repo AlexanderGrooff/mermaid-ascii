@@ -27,7 +27,7 @@ func (g *graph) drawEdge(e *edge) {
 	from := e.from.gridCoord.Direction(dir)
 	to := e.to.gridCoord.Direction(oppositeDir)
 	log.Debugf("Drawing edge between %v (direction %v) and %v (direction %v)", *e.from, dir, *e.to, oppositeDir)
-	g.drawArrow(from, to, e.text)
+	g.drawArrow(from, to, e)
 }
 
 func (d *drawing) drawText(start drawingCoord, text string) {
@@ -157,6 +157,20 @@ func (d *drawing) increaseSize(x int, y int) {
 	*d = *mergeDrawings(drawingWithNewSize, d, drawingCoord{0, 0})
 }
 
+func (g *graph) setDrawingSizeToGridConstraints() {
+	// Get largest column and row size
+	maxX := 0
+	maxY := 0
+	for _, w := range g.columnWidth {
+		maxX += w
+	}
+	for _, h := range g.rowHeight {
+		maxY += h
+	}
+	// Increase size of drawing to fit all nodes
+	g.drawing.increaseSize(maxX, maxY)
+}
+
 func mergeDrawings(d1 *drawing, d2 *drawing, mergeCoord drawingCoord) *drawing {
 	maxX1, maxY1 := getDrawingSize(d1)
 	maxX2, maxY2 := getDrawingSize(d2)
@@ -263,7 +277,8 @@ func (d drawing) debugCoordWrapper(g graph) *drawing {
 	currY := 2
 	for x := 0; currX <= maxX+g.columnWidth[x]; x++ {
 		w := g.columnWidth[x]
-		debugPos := currX + w/2
+		// debugPos := currX + w/2
+		debugPos := currX
 		// log.Debugf("Grid coord %d has width %d: %d", x, w, currX)
 		debugDrawing[debugPos][0] = fmt.Sprintf("%d", x%10)
 		currX += w
