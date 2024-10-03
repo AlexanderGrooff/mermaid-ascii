@@ -23,8 +23,8 @@ func (n *node) setCoord(c *drawingCoord) {
 	n.drawingCoord = c
 }
 
-func (n *node) setDrawing() *drawing {
-	d := drawBox(n)
+func (n *node) setDrawing(g graph) *drawing {
+	d := drawBox(n, g)
 	n.drawing = d
 	return d
 }

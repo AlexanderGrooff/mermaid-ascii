@@ -103,10 +103,19 @@ func drawMap(data *orderedmap.OrderedMap[string, []textEdge], styleClasses map[s
 	return s
 }
 
-func drawBox(n *node) *drawing {
+func drawBox(n *node, g graph) *drawing {
+	// Box is always 3x3 on the grid
+	w := 0
+	for i := 0; i < 2; i++ {
+		w += g.columnWidth[n.gridCoord.x+i]
+	}
+	h := 0
+	for i := 0; i < 2; i++ {
+		h += g.rowHeight[n.gridCoord.y+i]
+	}
+
 	from := drawingCoord{0, 0}
-	// -1 because we start at 0
-	to := drawingCoord{len(n.name) + boxBorderPadding*2 + boxBorderWidth*2 - 1, boxBorderWidth*2 + boxBorderPadding*2}
+	to := drawingCoord{w, h}
 	boxDrawing := *(mkDrawing(Max(from.x, to.x), Max(from.y, to.y)))
 	log.Debug("Drawing box from ", from, " to ", to)
 	// Draw top border
@@ -132,14 +141,14 @@ func drawBox(n *node) *drawing {
 		c = color.HEX(n.styleClass.styles["color"])
 	}
 	// Draw text
-	textY := from.y + boxBorderPadding + boxBorderWidth
-	textXOffset := from.x + boxBorderPadding + boxBorderWidth
-	for x := from.x + boxBorderPadding + boxBorderWidth; x < textXOffset+len(n.name); x++ {
+	textY := from.y + h/2
+	textX := from.x + w/2
+	for x := 0; x < len(n.name); x++ {
 		if n.styleClass.styles["color"] != "" {
 			log.Debugf("Setting color for node %s to %s", n.name, n.styleClass.styles["color"])
-			boxDrawing[x][textY] = c.Sprint(string(n.name[x-textXOffset])) // Text
+			boxDrawing[textX+x][textY] = c.Sprint(string(n.name[x]))
 		} else {
-			boxDrawing[x][textY] = string(n.name[x-textXOffset]) // Text
+			boxDrawing[textX+x][textY] = string(n.name[x])
 		}
 	}
 	// Draw corners

@@ -150,7 +150,7 @@ func (g *graph) createMapping() {
 	for _, n := range g.nodes {
 		dc := g.gridToDrawingCoord(*n.gridCoord, nil)
 		g.nodes[n.index].setCoord(&dc)
-		g.nodes[n.index].setDrawing()
+		g.nodes[n.index].setDrawing(*g)
 	}
 	g.setDrawingSizeToGridConstraints()
 }
