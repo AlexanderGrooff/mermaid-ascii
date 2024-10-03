@@ -177,7 +177,7 @@ func (g *graph) setDrawingSizeToGridConstraints() {
 		maxY += h
 	}
 	// Increase size of drawing to fit all nodes
-	g.drawing.increaseSize(maxX, maxY)
+	g.drawing.increaseSize(maxX-1, maxY-1)
 }
 
 func mergeDrawings(d1 *drawing, d2 *drawing, mergeCoord drawingCoord) *drawing {
