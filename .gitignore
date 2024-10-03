@@ -2,6 +2,10 @@
 .direnv
 *.mermaid
 
+# Editor
+.idea
+*.patch
+
 # Build artifacts
 build
 dist/

@@ -1,155 +1,261 @@
 package cmd
 
 import (
+	"fmt"
+	"slices"
+
 	log "github.com/sirupsen/logrus"
 )
 
-type direction string
+func (g *graph) getPath(from gridCoord, to gridCoord, prevSteps []gridCoord) ([]gridCoord, error) {
+	// Figure out what path the arrow should take by traversing the grid recursively.
+	var nextPos gridCoord
+	log.Debugf("Looking for path from %v to %v", from, to)
 
-const (
-	Up         = "Up"
-	Down       = "Down"
-	Left       = "Left"
-	Right      = "Right"
-	UpperRight = "UpperRight"
-	UpperLeft  = "UpperLeft"
-	LowerRight = "LowerRight"
-	LowerLeft  = "LowerLeft"
-)
-
-func (d *drawing) drawArrow(from coord, to coord, label string) {
-	dir := determineDirection(from, to)
-	log.Debugf("Drawing arrow from %v to %v with direction %s", from, to, dir)
-
-	// Draw arrow body. This lines up between the coords, so the actual from/to
-	// coords are offset by 1.
-	diffY := Abs(to.y - from.y)
-	diffX := Abs(to.x - from.x)
-	yLongerThanX := diffY - diffX
-	var textCoord coord
-	log.Debug("yLongerThanXY: ", diffY, " yLongerThanXX: ", diffX, " yLongerThanX: ", yLongerThanX)
-	switch dir {
-	case Up:
-		(*d).drawLine(from, to, 1, -1)
-		textCoord = coord{to.x - (len(label) / 2), from.y - (diffY / 2)}
-	case Down:
-		(*d).drawLine(from, to, 1, -1)
-		textCoord = coord{to.x - (len(label) / 2), from.y + (diffY / 2)}
-	case Left:
-		(*d).drawLine(from, to, 1, -1)
-		textCoord = coord{to.x + (diffX / 2) - (len(label) / 2) + 1, to.y}
-	case Right:
-		(*d).drawLine(from, to, 1, -1)
-		textCoord = coord{from.x + (diffX / 2) - (len(label) / 2), to.y}
-	// Draw diagonal if the arrow is going from one corner to another.
-	// If there can't be a straight diagonal, first draw a vertical or
-	// horizontal line to the corner, then draw the diagonal.
-	// Draw straight line until we can make a straight diagonal
-	// If yLongerThanX is positive, we need to draw a vertical line first
-	case LowerRight:
-		if yLongerThanX == 0 {
-			(*d).drawLine(from, to, 1, -1)
-			textCoord = coord{from.x + (diffX / 2) - (len(label) / 2), from.y + (diffY / 2)}
-		} else {
-			var corner coord
-			if yLongerThanX > 0 {
-				corner = coord{from.x, from.y + yLongerThanX + 2}
-				textCoord = coord{Max(from.x-(len(label)/2), 0), from.y + yLongerThanX}
-			} else {
-				corner = coord{from.x + (diffX + yLongerThanX), to.y}
-				if Abs(yLongerThanX) > len(label)+4 {
-					textCoord = coord{from.x + (diffY) + Abs(yLongerThanX/2) - (len(label) / 2) - 2, to.y}
-				} else {
-					textCoord = coord{Max(from.x+diffY-(len(label)/2)-2, 0), Max(corner.y-2, from.y+1)}
-				}
-			}
-			(*d).drawLine(from, corner, 1, -1)
-			(*d).drawLine(corner, to, -1, -1)
-		}
-	case LowerLeft:
-		if yLongerThanX == 0 {
-			(*d).drawLine(from, to, 1, -1)
-			textCoord = coord{from.x - (diffX / 2) - (len(label) / 2), from.y + (diffY / 2)}
-		} else {
-			var corner coord
-			if yLongerThanX > 0 {
-				corner = coord{from.x, from.y + yLongerThanX + 2}
-				textCoord = coord{from.x - (len(label) / 2), from.y + yLongerThanX}
-			} else {
-				corner = coord{to.x - yLongerThanX, to.y}
-				if Abs(yLongerThanX) > len(label)+4 {
-					textCoord = coord{from.x - (diffY) - Abs(yLongerThanX/2) - (len(label) / 4), to.y}
-				} else {
-					textCoord = coord{from.x - diffY + (len(label) / 2) - 4, Max(corner.y-2, from.y+1)}
-				}
-			}
-			(*d).drawLine(from, corner, 1, -1)
-			(*d).drawLine(corner, to, -1, -1)
-		}
-	case UpperRight:
-		if yLongerThanX == 0 {
-			corner1 := coord{from.x + 1, from.y}
-			corner2 := coord{to.x, to.y + 1}
-			(*d).drawLine(from, corner1, 0, 0)
-			(*d).drawLine(corner1, corner2, 0, 0)
-			(*d).drawLine(corner2, to, 0, -2)
-			textCoord = coord{Max(from.x+(diffX/2)-(len(label)/2), 0), from.y - (diffY / 2)}
-		} else {
-			var corner coord
-			if yLongerThanX > 0 {
-				corner = coord{to.x, to.y + yLongerThanX - 1}
-				textCoord = coord{corner.x - len(label) - 1, corner.y + 1 + len(label)/2}
-			} else {
-				corner = coord{from.x - yLongerThanX + 1, from.y}
-				textCoord = coord{Min(corner.x-len(label)-1, from.x), corner.y}
-			}
-			(*d).drawLine(from, corner, 1, 0)
-			(*d).drawLine(corner, to, 0, -1)
-		}
-	case UpperLeft:
-		if yLongerThanX == 0 {
-			(*d).drawLine(from, to, 1, -1)
-			textCoord = coord{from.x - (diffX / 2) - (len(label) / 2), from.y - (diffY / 2)}
-		} else {
-			var corner coord
-			if yLongerThanX > 0 {
-				corner = coord{from.x, from.y - yLongerThanX}
-				textCoord = coord{from.x - (len(label) / 2), from.y - yLongerThanX}
-			} else {
-				corner = coord{to.x - yLongerThanX + 1, to.y}
-				if Abs(yLongerThanX) > len(label)+4 {
-					textCoord = coord{from.x - (diffY) - Abs(yLongerThanX/2) - (len(label) / 4), to.y}
-				} else {
-					textCoord = coord{from.x - diffY + (len(label) / 2) - 4, Max(corner.y+2, from.y-1)}
-				}
-			}
-			(*d).drawLine(from, corner, 1, 0)
-			(*d).drawLine(corner, to, 0, -1)
-		}
-	}
-	if label != "" {
-		(*d).drawText(textCoord, label)
+	if from == to {
+		return []gridCoord{}, nil
 	}
 
-	// Draw arrow head depending on direction
-	if from.x == to.x {
-		// Vertical arrow
-		if from.y < to.y {
-			// Down
-			(*d)[to.x][to.y-1] = "v"
+	deltaX := to.x - from.x
+	deltaY := to.y - from.y
+
+	// These variables are used to determine what direction to head towards first. If the target is above (e.g. deltaY < 0)
+	// then we want to go up first.
+	var preferredXDirection int
+	var preferredYDirection int
+	if deltaX > 0 {
+		preferredXDirection = 1
+	} else {
+		preferredXDirection = -1
+	}
+	if deltaY > 0 {
+		preferredYDirection = 1
+	} else {
+		preferredYDirection = -1
+	}
+
+	absX := Abs(deltaX)
+	absY := Abs(deltaY)
+	// TODO: make nicer
+	if absX > 50 || absY > 50 {
+		return []gridCoord{}, fmt.Errorf("Out of bounds")
+	}
+	if (absX == 0 && absY == 1) || (absX == 1 && absY == 0) {
+		// Can go directly to the target
+		return []gridCoord{to}, nil
+	} else if deltaY == 0 {
+		if deltaX > 0 && g.isFreeInGrid(gridCoord{x: from.x + 1, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x + 1, y: from.y}, prevSteps) {
+			nextPos = gridCoord{x: from.x + 1, y: from.y}
+		} else if g.isFreeInGrid(gridCoord{x: from.x - 1, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x - 1, y: from.y}, prevSteps) {
+			nextPos = gridCoord{x: from.x - 1, y: from.y}
 		} else {
-			// Up
-			(*d)[to.x][to.y+1] = "^"
+			// We're on the correct Y level, but the X direction is not free. We have to go around either from
+			// above or below our neighbour.
+			// TODO: prevent from taking steps that have already been assigned
+			// TODO: diagonal?
+			// We start by trying below first
+			if g.isFreeInGrid(gridCoord{x: from.x, y: from.y + 1}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y + 1}, prevSteps) {
+				nextPos = gridCoord{x: from.x, y: from.y + 1}
+			} else {
+				// TODO: what if all positions are taken?
+				nextPos = gridCoord{x: from.x, y: from.y - 1}
+			}
 		}
-	} else if from.x < to.x {
-		// Right
-		if dir == UpperRight {
-			(*d)[to.x][to.y+1] = "^"
+	} else if deltaX == 0 {
+		if deltaY > 0 && g.isFreeInGrid(gridCoord{x: from.x, y: from.y + 1}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y + 1}, prevSteps) {
+			nextPos = gridCoord{x: from.x, y: from.y + 1}
+		} else if g.isFreeInGrid(gridCoord{x: from.x, y: from.y - 1}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y - 1}, prevSteps) {
+			nextPos = gridCoord{x: from.x, y: from.y - 1}
 		} else {
-			(*d)[to.x-1][to.y] = ">"
+			// We're on the correct X level, but the Y direction is not free. We have to go around either from
+			// above or below our neighbour.
+			// TODO: prevent from taking steps that have already been assigned
+			// TODO: diagonal?
+			// We start by trying right first
+			if g.isFreeInGrid(gridCoord{x: from.x + 1, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x + 1, y: from.y}, prevSteps) {
+				nextPos = gridCoord{x: from.x + 1, y: from.y}
+			} else {
+				// TODO: what if all positions are taken?
+				nextPos = gridCoord{x: from.x - 1, y: from.y}
+			}
 		}
 	} else {
-		// Left
-		(*d)[to.x+1][to.y] = "<"
+		// If we're in LR, we first go vertical then horizontal.
+		if graphDirection == "LR" {
+			if g.isFreeInGrid(gridCoord{x: from.x, y: from.y + preferredYDirection}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y + preferredYDirection}, prevSteps) {
+				nextPos = gridCoord{x: from.x, y: from.y + preferredYDirection}
+			} else if g.isFreeInGrid(gridCoord{x: from.x + preferredXDirection, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x + preferredXDirection, y: from.y}, prevSteps) {
+				// Vertical is blocked, let's try horizontal
+				nextPos = gridCoord{x: from.x + preferredXDirection, y: from.y}
+			} else if g.isFreeInGrid(gridCoord{x: from.x, y: from.y - preferredYDirection}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y - preferredYDirection}, prevSteps) {
+				nextPos = gridCoord{x: from.x, y: from.y - preferredYDirection}
+			} else {
+				// TODO: Diagonal?
+				// TODO: what about inbetween nodes, on half/grid coords?
+				nextPos = gridCoord{x: from.x - preferredXDirection, y: from.y}
+			}
+		} else if graphDirection == "TD" {
+			// If we're in TD, we first go horizontal then vertical.
+			if g.isFreeInGrid(gridCoord{x: from.x + preferredXDirection, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x + preferredXDirection, y: from.y}, prevSteps) {
+				nextPos = gridCoord{x: from.x + preferredXDirection, y: from.y}
+			} else if g.isFreeInGrid(gridCoord{x: from.x, y: from.y + preferredYDirection}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y + preferredYDirection}, prevSteps) {
+				// Horizontal is blocked, let's try vertical
+				nextPos = gridCoord{x: from.x, y: from.y + preferredYDirection}
+			} else if g.isFreeInGrid(gridCoord{x: from.x - preferredXDirection, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x - preferredXDirection, y: from.y}, prevSteps) {
+				nextPos = gridCoord{x: from.x - preferredXDirection, y: from.y}
+			} else {
+				// TODO: Diagonal?
+				nextPos = gridCoord{x: from.x, y: from.y - preferredYDirection}
+			}
+		}
 	}
+
+	currSteps := append(prevSteps, nextPos)
+	slice, err := g.getPath(nextPos, to, currSteps)
+	if err != nil {
+		return currSteps, err
+	}
+	return append([]gridCoord{nextPos}, slice...), nil
+}
+
+func (g *graph) isFreeInGrid(c gridCoord) bool {
+	return g.grid[c] == nil
+}
+
+func hasStepBeenTaken(step gridCoord, steps []gridCoord) bool {
+	for _, s := range steps {
+		if s == step {
+			log.Debugf("Step %v has been taken", s)
+			return true
+		}
+	}
+	return false
+}
+
+func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) {
+	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, e.path)
+	dLabel := g.drawArrowLabel(e)
+	dPath, linesDrawn := g.drawPath(e.path)
+	dHead := g.drawArrowHead(linesDrawn[len(linesDrawn)-1])
+	g.drawing = mergeDrawings(g.drawing, dPath, drawingCoord{0, 0})
+	g.drawing = mergeDrawings(g.drawing, dHead, drawingCoord{0, 0})
+	g.drawing = mergeDrawings(g.drawing, dLabel, drawingCoord{0, 0})
+}
+
+func mergePath(path []gridCoord) []gridCoord {
+	// If two steps are in the same direction, merge them to one step.
+	if len(path) <= 2 {
+		return path
+	}
+	indexToRemove := []int{}
+	step0 := path[0]
+	step1 := path[1]
+	for idx, step2 := range path[2:] {
+		prevDir := determineDirection(genericCoord(step0), genericCoord(step1))
+		dir := determineDirection(genericCoord(step1), genericCoord(step2))
+		if prevDir == dir {
+			log.Debugf("Removing %v from path", step1)
+			indexToRemove = append(indexToRemove, idx+1) // +1 because we skip the initial step
+		}
+		step0 = step1
+		step1 = step2
+	}
+	newPath := []gridCoord{}
+	for idx, step := range path {
+		if !slices.Contains(indexToRemove, idx) {
+			newPath = append(newPath, step)
+		}
+	}
+	return newPath
+}
+
+func (g *graph) drawPath(path []gridCoord) (*drawing, [][]drawingCoord) {
+	d := copyCanvas(g.drawing)
+	previousCoord := path[0]
+	linesDrawn := make([][]drawingCoord, 0)
+	var previousDrawingCoord drawingCoord
+	for idx, nextCoord := range path[1:] {
+		previousDrawingCoord = g.gridToDrawingCoord(previousCoord, nil)
+		nextDrawingCoord := g.gridToDrawingCoord(nextCoord, nil)
+		if previousDrawingCoord.Equals(nextDrawingCoord) {
+			log.Debugf("Skipping drawing identical line on %v", nextCoord)
+			continue
+		}
+		if idx == 0 {
+			// Don't cross the node border
+			linesDrawn = append(linesDrawn, d.drawLine(previousDrawingCoord, nextDrawingCoord, 1, -1))
+		} else {
+			linesDrawn = append(linesDrawn, d.drawLine(previousDrawingCoord, nextDrawingCoord, 0, -1))
+		}
+		previousCoord = nextCoord
+	}
+	return d, linesDrawn
+}
+
+func (g *graph) drawArrowHead(line []drawingCoord) *drawing {
+	d := *(copyCanvas(g.drawing))
+	// Determine the direction of the arrow for the last step
+	from := line[0]
+	lastPos := line[len(line)-1]
+	dir := determineDirection(genericCoord(from), genericCoord(lastPos))
+	switch dir {
+	case Up:
+		d[lastPos.x][lastPos.y] = "^"
+	case Down:
+		d[lastPos.x][lastPos.y] = "v"
+	case Left:
+		d[lastPos.x][lastPos.y] = "<"
+	case Right:
+		d[lastPos.x][lastPos.y] = ">"
+	case UpperRight:
+		d[lastPos.x][lastPos.y] = "┐"
+	case UpperLeft:
+		d[lastPos.x][lastPos.y] = "┌"
+	case LowerRight:
+		d[lastPos.x][lastPos.y] = "┘"
+	case LowerLeft:
+		d[lastPos.x][lastPos.y] = "└"
+	default:
+		d[lastPos.x][lastPos.y] = "+"
+	}
+	return &d
+}
+
+func (g *graph) drawArrowLabel(e *edge) *drawing {
+	d := copyCanvas(g.drawing)
+	lenLabel := len(e.text)
+	if lenLabel == 0 {
+		return d
+	}
+
+	log.Debugf("Drawing text '%s' on gridline %v", e.text, e.labelLine)
+	d.drawTextOnLine(g.lineToDrawing(e.labelLine), e.text)
+	return d
+}
+
+func (d *drawing) drawTextOnLine(line []drawingCoord, label string) {
+	// Write text in middle of the line
+	//  123456789
+	// |---------|
+	//     123
+	log.Debugf("Drawing text '%s' on drawingline %v", label, line)
+	var minX, maxX, minY, maxY int
+	if line[0].x > line[1].x {
+		minX = line[1].x
+		maxX = line[0].x
+	} else {
+		minX = line[0].x
+		maxX = line[1].x
+	}
+	if line[0].y > line[1].y {
+		minY = line[1].y
+		maxY = line[0].y
+	} else {
+		minY = line[0].y
+		maxY = line[1].y
+	}
+	middleX := minX + (maxX-minX)/2
+	middleY := minY + (maxY-minY)/2
+	startLabelCoord := drawingCoord{x: middleX - len(label)/2, y: middleY}
+	d.drawText(startLabelCoord, label)
 }

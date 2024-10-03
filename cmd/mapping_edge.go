@@ -1,55 +1,77 @@
 package cmd
 
+import (
+	"fmt"
+
+	log "github.com/sirupsen/logrus"
+)
+
 type edge struct {
-	from *node
-	to   *node
-	text string
+	from      *node
+	to        *node
+	text      string
+	path      []gridCoord
+	labelLine []gridCoord
 }
 
-func getArrowStartEndOffset(from *node, to *node) (coord, coord) {
-	// Find which sides the arrow should start/end.
-	// This is the middle of one of the sides, depending on the direction of the arrow.
-	// Note that the coord returned is relative to the box.
-	fromBoxWidth, fromBoxHeight := getDrawingSize(from.drawing)
-	toBoxWidth, toBoxHeight := getDrawingSize(to.drawing)
-	if from.drawingCoord.x == to.drawingCoord.x {
-		// Vertical arrow
-		if from.drawingCoord.y < to.drawingCoord.y {
-			// Down
-			return coord{fromBoxWidth / 2, fromBoxHeight}, coord{toBoxWidth / 2, 0}
-		} else {
-			// Up
-			return coord{fromBoxWidth / 2, 0}, coord{toBoxWidth / 2, toBoxHeight}
-		}
-	} else if from.drawingCoord.y == to.drawingCoord.y {
-		// Horizontal arrow
-		if from.drawingCoord.x < to.drawingCoord.x {
-			// Right
-			return coord{fromBoxWidth, fromBoxHeight / 2}, coord{0, toBoxHeight / 2}
-		} else {
-			// Left
-			return coord{0, fromBoxHeight / 2}, coord{toBoxWidth, toBoxHeight / 2}
-		}
-	} else {
-		// Diagonal arrow
-		if from.drawingCoord.x < to.drawingCoord.x {
-			// Right
-			if from.drawingCoord.y < to.drawingCoord.y {
-				// Down
-				return coord{fromBoxWidth / 2, fromBoxHeight}, coord{0, toBoxHeight / 2}
-			} else {
-				// Up
-				return coord{fromBoxWidth + 1, fromBoxHeight / 2}, coord{toBoxWidth / 2, toBoxHeight}
-			}
-		} else {
-			// Left
-			if from.drawingCoord.y < to.drawingCoord.y {
-				// Down
-				return coord{fromBoxWidth / 2, fromBoxHeight}, coord{toBoxWidth, toBoxHeight / 2}
-			} else {
-				// Up
-				return coord{fromBoxWidth / 2, 0}, coord{toBoxWidth, toBoxHeight / 2}
-			}
-		}
+func (g *graph) determinePath(e *edge) {
+	dir, oppositeDir := determineStartAndEndDir(e)
+	from := e.from.gridCoord.Direction(dir)
+	to := e.to.gridCoord.Direction(oppositeDir)
+	log.Debugf("Determining path from %v (direction %v) to %v (direction %v)", *e.from, dir, *e.to, oppositeDir)
+
+	path, err := g.getPath(from, to, []gridCoord{from})
+	path = append([]gridCoord{from}, path...) // TODO: how to do add 'from' to path nicely?
+	if err != nil {
+		fmt.Printf("Error getting path from %v to %v: %v", from, to, err)
 	}
+	path = mergePath(path)
+	e.path = path
+}
+
+func (g *graph) determineLabelLine(e *edge) {
+	// What line on the path should the label be placed?
+	lenLabel := len(e.text)
+	if lenLabel == 0 {
+		return
+	}
+	prevStep := e.path[0]
+	var largestLineSize int
+	// Init to first line if we find nothing else
+	largestLine := []gridCoord{prevStep, e.path[1]}
+	largestLineSize = 0
+	for _, step := range e.path[1:] {
+		line := []gridCoord{gridCoord(prevStep), gridCoord(step)}
+		lineWidth := g.calculateLineWidth(line)
+		if lineWidth >= lenLabel {
+			largestLine = line
+			break
+		} else if lineWidth > largestLineSize {
+			largestLineSize = lineWidth
+			largestLine = line
+		}
+		prevStep = step
+	}
+
+	var maxX, minX int
+	if largestLine[0].x > largestLine[1].x {
+		maxX = largestLine[0].x
+		minX = largestLine[1].x
+	} else {
+		maxX = largestLine[1].x
+		minX = largestLine[0].x
+	}
+	middleX := minX + (maxX-minX)/2
+	log.Debugf("Increasing column width for column %v from size %v to %v", middleX, g.columnWidth[middleX], lenLabel+2)
+	g.columnWidth[middleX] = Max(g.columnWidth[middleX], lenLabel+2) // Wrap with dashes + arrowhead
+	log.Debugf("New column sizes: %v", g.columnWidth)
+	e.labelLine = largestLine
+}
+
+func (g graph) calculateLineWidth(line []gridCoord) int {
+	totalSize := 0
+	for _, c := range line {
+		totalSize += g.columnWidth[c.x]
+	}
+	return totalSize
 }

@@ -1,21 +1,67 @@
 <html>
 <head>
     <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            padding: 10px;
+        }
         .container {
             display: flex;
+            gap: 20px;
         }
         .column {
-            flex: 50%;
-            padding: 10px;
+            flex: 1;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         textarea {
             width: 100%;
             height: 300px;
         }
+        .github-link {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+        }
+        .github-link img {
+            margin-right: 3px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: #fff;
+            cursor: pointer;
+            font-family: 'Roboto', sans-serif;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #e9ecef;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            min-height: 300px;
+        }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/htmx.org@1.7.0"></script>
+    <script src="https://unpkg.com/hyperscript.org@0.9.12"></script>
 </head>
 <body>
+    <a href="https://github.com/AlexanderGrooff/mermaid-ascii" class="github-link">
+        <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHub" width="32" height="32">
+        AlexanderGrooff/mermaid-ascii
+    </a>
     <h1>Mermaid ASCII</h1>
     <div class="container">
         <div class="column">
@@ -30,8 +76,15 @@
                 <button type="submit">Generate</button>
             </form>
         </div>
-        <div id="result" class="column result">
-            <!-- Result content goes here -->
+        <div class="column">
+            <!-- Credit: https://github.com/bigskysoftware/_hyperscript/issues/531#issuecomment-2049830473 -->
+            <button _="on click
+                writeText(my nextElementSibling's innerText) on navigator.clipboard
+                put 'Copied!' into me
+                wait 2s
+                put 'Copy' into me
+            ">Copy</button>
+            <div id="result"><!-- Result content goes here --></div>
         </div>
     </div>
 </body>

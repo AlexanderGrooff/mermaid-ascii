@@ -5,26 +5,46 @@ import (
 
 	"github.com/elliotchance/orderedmap/v2"
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
-type coord struct {
+type genericCoord struct {
 	x int
 	y int
+}
+
+type gridCoord genericCoord
+type drawingCoord genericCoord
+
+func (c gridCoord) Equals(other gridCoord) bool {
+	return c.x == other.x && c.y == other.y
+}
+func (c drawingCoord) Equals(other drawingCoord) bool {
+	return c.x == other.x && c.y == other.y
+}
+func (g graph) lineToDrawing(line []gridCoord) []drawingCoord {
+	dc := []drawingCoord{}
+	for _, c := range line {
+		dc = append(dc, g.gridToDrawingCoord(c, nil))
+	}
+	return dc
 }
 
 type graph struct {
 	nodes        []*node
 	edges        []*edge
 	drawing      *drawing
-	grid         map[coord]*node
+	grid         map[gridCoord]*node
 	columnWidth  map[int]int
+	rowHeight    map[int]int
 	styleClasses map[string]styleClass
 }
 
 func mkGraph(data *orderedmap.OrderedMap[string, []textEdge]) graph {
 	g := graph{drawing: mkDrawing(0, 0)}
-	g.grid = make(map[coord]*node)
+	g.grid = make(map[gridCoord]*node)
 	g.columnWidth = make(map[int]int)
+	g.rowHeight = make(map[int]int)
 	g.styleClasses = make(map[string]styleClass)
 
 	index := 0
@@ -73,52 +93,66 @@ func (g *graph) createMapping() {
 		highestPositionPerLevel = append(highestPositionPerLevel, 0)
 	}
 
+	// TODO: should the mapping be bottom-to-top instead of top-to-bottom?
 	// Set root nodes to level 0
 	for _, n := range g.nodes {
 		if len(g.getParents(n)) == 0 {
-			var mappingCoord *coord
+			var mappingCoord *gridCoord
 			if graphDirection == "LR" {
-				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &coord{x: 0, y: highestPositionPerLevel[0]})
+				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: 0, y: highestPositionPerLevel[0]})
 			} else {
-				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &coord{x: highestPositionPerLevel[0], y: 0})
+				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: highestPositionPerLevel[0], y: 0})
 			}
 			logrus.Debugf("Setting mapping coord for rootnode %s to %v", n.name, mappingCoord)
-			g.nodes[n.index].mappingCoord = mappingCoord
+			g.nodes[n.index].gridCoord = mappingCoord
 			highestPositionPerLevel[0] = highestPositionPerLevel[0] + 1
 		}
 	}
 
 	for _, n := range g.nodes {
 		var childLevel int
+		// Next column is 4 coords further. This is because every node is 3 coords wide + 1 coord inbetween.
 		if graphDirection == "LR" {
-			childLevel = n.mappingCoord.x + 1
+			childLevel = n.gridCoord.x + 4
 		} else {
-			childLevel = n.mappingCoord.y + 1
+			childLevel = n.gridCoord.y + 4
 		}
 		highestPosition := highestPositionPerLevel[childLevel]
 		for _, child := range g.getChildren(n) {
 			// Skip if the child already has a mapping coord
-			if child.mappingCoord != nil {
+			if child.gridCoord != nil {
 				continue
 			}
 
-			var mappingCoord *coord
+			var mappingCoord *gridCoord
 			if graphDirection == "LR" {
-				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &coord{x: childLevel, y: highestPosition})
+				mappingCoord = g.reserveSpotInGrid(g.nodes[child.index], &gridCoord{x: childLevel, y: highestPosition})
 			} else {
-				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &coord{x: highestPosition, y: childLevel})
+				mappingCoord = g.reserveSpotInGrid(g.nodes[child.index], &gridCoord{x: highestPosition, y: childLevel})
 			}
 			logrus.Debugf("Setting mapping coord for child %s of parent %s to %v", child.name, n.name, mappingCoord)
-			g.nodes[child.index].mappingCoord = mappingCoord
-			highestPositionPerLevel[childLevel] = highestPosition + 1
+			g.nodes[child.index].gridCoord = mappingCoord
+			highestPositionPerLevel[childLevel] = highestPosition + 4
 		}
 	}
 
-	// After mapping coords are set, set drawing coords
 	for _, n := range g.nodes {
-		g.nodes[n.index].setCoord(g.mappingToDrawingCoord(n))
-		g.nodes[n.index].setDrawing()
+		g.setColumnWidth(n)
 	}
+
+	for _, e := range g.edges {
+		g.determinePath(e)
+		g.determineLabelLine(e)
+	}
+
+	// ! Last point before we manipulate the drawing !
+
+	for _, n := range g.nodes {
+		dc := g.gridToDrawingCoord(*n.gridCoord, nil)
+		g.nodes[n.index].setCoord(&dc)
+		g.nodes[n.index].setDrawing(*g)
+	}
+	g.setDrawingSizeToGridConstraints()
 }
 
 func (g *graph) draw() *drawing {
@@ -176,4 +210,25 @@ func (g *graph) getParents(n *node) []*node {
 		}
 	}
 	return parents
+}
+
+func (g *graph) gridToDrawingCoord(c gridCoord, dir *direction) drawingCoord {
+	x := 0
+	y := 0
+	var target gridCoord
+	if dir == nil {
+		target = c
+	} else {
+		target = gridCoord{x: c.x + dir.x, y: c.y + dir.y}
+	}
+	for column := 0; column < target.x; column++ {
+		x += g.columnWidth[column]
+	}
+	for row := 0; row < target.y; row++ {
+		y += g.rowHeight[row]
+	}
+	dc := drawingCoord{x: x + g.columnWidth[target.x]/2, y: y + g.rowHeight[target.y]/2}
+
+	log.Debugf("Mapping grid coord %v to drawing coord %v (direction %v)", c, dc, dir)
+	return dc
 }

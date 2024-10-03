@@ -1,10 +1,9 @@
 package cmd
 
 import (
-		"html/template"
-	"net/http"
 	"fmt"
-
+	"html/template"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
@@ -20,7 +19,10 @@ var webCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		r := setupRouter()
 		// Listen and Server in 0.0.0.0:8080
-		r.Run(":3000")
+		err := r.Run(":3001")
+		if err != nil {
+			panic(err)
+		}
 	},
 }
 
@@ -29,8 +31,7 @@ func setupRouter() *gin.Engine {
 
 	r.LoadHTMLGlob("templates/*")
 	r.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.tmpl", gin.H{
-		})
+		c.HTML(http.StatusOK, "index.tmpl", gin.H{})
 	})
 
 	r.POST("/generate", func(c *gin.Context) {
@@ -47,7 +48,7 @@ func generate_map(input string) string {
 	if err != nil {
 		return "Failed to parse mermaid file"
 	}
-	
+
 	ascii_art := drawMap(mermaidMap, nil)
 	escaped_ascii_art := template.HTMLEscapeString(ascii_art)
 	html_ascii_art := fmt.Sprintf("<pre>%s</pre>", escaped_ascii_art)

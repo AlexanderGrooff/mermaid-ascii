@@ -1,67 +1,85 @@
 package cmd
 
-import "github.com/sirupsen/logrus"
+import (
+	log "github.com/sirupsen/logrus"
+)
 
 type node struct {
 	name           string
 	drawing        *drawing
-	drawingCoord   *coord
-	mappingCoord   *coord
+	drawingCoord   *drawingCoord
+	gridCoord      *gridCoord
 	drawn          bool
 	index          int // Index of the node in the graph.nodes slice
 	styleClassName string
 	styleClass     styleClass
 }
 
-func (n *node) setCoord(c *coord) {
+func (n node) String() string {
+	return n.name
+}
+
+func (n *node) setCoord(c *drawingCoord) {
 	n.drawingCoord = c
 }
 
-func (n *node) setDrawing() *drawing {
-	d := drawBox(n)
+func (n *node) setDrawing(g graph) *drawing {
+	d := drawBox(n, g)
 	n.drawing = d
 	return d
 }
 
-func (g *graph) mappingToDrawingCoord(n *node) *coord {
-	// For every node there is:
+func (g *graph) setColumnWidth(n *node) {
+	// For every node there are three columns:
 	// - 2 lines of border
 	// - 1 line of text
 	// - 2x padding
 	// - 2x margin
-	w := 2*boxBorderWidth + 2*boxBorderPadding + len(n.name)
+	col1 := 1
+	col2 := 2*boxBorderPadding + len(n.name)
+	col3 := 1
+	colsToBePlaced := []int{col1, col2, col3}
+	rowsToBePlaced := []int{1, 1 + 2*boxBorderPadding, 1} // Border, padding + line, border
 
-	labelLength := 0
-	for _, e := range g.getEdgesFromNode(n) {
-		// Does the edge go to the next column?
-		if e.to.mappingCoord.x == n.mappingCoord.x+1 {
-			labelLength = Max(labelLength, len(e.text))
-		}
+	for idx, col := range colsToBePlaced {
+		// Set new width for column if the size increased
+		xCoord := n.gridCoord.x + idx
+		g.columnWidth[xCoord] = Max(g.columnWidth[xCoord], col)
 	}
 
-	// Next to that you have previous columns, which have a max width based on the longest name
-	prevX := 0
-	for i := 0; i < n.mappingCoord.x; i++ {
-		prevX += g.columnWidth[i] + 2*paddingBetweenX
+	for idx, row := range rowsToBePlaced {
+		// Set new width for column if the size increased
+		yCoord := n.gridCoord.y + idx
+		g.rowHeight[yCoord] = Max(g.rowHeight[yCoord], row)
 	}
-	g.columnWidth[n.mappingCoord.x] = Max(g.columnWidth[n.mappingCoord.x], w+labelLength)
 
-	x := prevX
-	y := n.mappingCoord.y * 2 * paddingBetweenY
-	drawingCoord := coord{x: x, y: y}
-	logrus.Debugf("Mapping coord for %s from %v to %v", n.name, *n.mappingCoord, drawingCoord)
-	return &drawingCoord
+	// Set padding before node
+	if n.gridCoord.x > 0 {
+		g.columnWidth[n.gridCoord.x-1] = paddingBetweenX // TODO: x2?
+	}
+	if n.gridCoord.y > 0 {
+		g.rowHeight[n.gridCoord.y-1] = paddingBetweenY // TODO: x2?
+	}
 }
 
-func (g *graph) reserveSpotInGrid(n *node, requestedCoord *coord) *coord {
+func (g *graph) reserveSpotInGrid(n *node, requestedCoord *gridCoord) *gridCoord {
 	if g.grid[*requestedCoord] != nil {
-		logrus.Debugf("Coord %d,%d is already taken", requestedCoord.x, requestedCoord.y)
+		log.Debugf("Coord %d,%d is already taken", requestedCoord.x, requestedCoord.y)
+		// Next column is 4 coords further. This is because every node is 3 coords wide + 1 coord inbetween.
 		if graphDirection == "LR" {
-			return g.reserveSpotInGrid(n, &coord{x: requestedCoord.x, y: requestedCoord.y + 1})
+			return g.reserveSpotInGrid(n, &gridCoord{x: requestedCoord.x, y: requestedCoord.y + 4})
 		} else {
-			return g.reserveSpotInGrid(n, &coord{x: requestedCoord.x + 1, y: requestedCoord.y})
+			return g.reserveSpotInGrid(n, &gridCoord{x: requestedCoord.x + 4, y: requestedCoord.y})
 		}
 	}
-	g.grid[*requestedCoord] = n
+	// Reserve border + middle + border for node
+	log.Debugf("Reserving coord %v for node %v", requestedCoord, n)
+	for x := 0; x < 3; x++ {
+		for y := 0; y < 3; y++ {
+			reservedCoord := gridCoord{x: requestedCoord.x + x, y: requestedCoord.y + y}
+			g.grid[reservedCoord] = n
+		}
+	}
+	n.gridCoord = requestedCoord
 	return requestedCoord
 }
