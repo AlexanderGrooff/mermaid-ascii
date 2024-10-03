@@ -132,7 +132,7 @@ func (g *graph) createMapping() {
 			}
 			logrus.Debugf("Setting mapping coord for child %s of parent %s to %v", child.name, n.name, mappingCoord)
 			g.nodes[child.index].gridCoord = mappingCoord
-			highestPositionPerLevel[childLevel] = highestPosition + 1
+			highestPositionPerLevel[childLevel] = highestPosition + 4
 		}
 	}
 
