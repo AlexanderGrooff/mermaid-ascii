@@ -1,3 +1,7 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
 project_name: mermaid-ascii
 
 before:
@@ -7,78 +11,32 @@ before:
     # you may remove this if you don't need go generate
     - go generate ./...
 
-release:
-  github:
-    owner: AlexanderGrooff
-    name: mermaid-ascii
-  name_template: 'Release {{.Tag}}'
-  draft: true
-
-changelog:
-  skip: true
-
 builds:
-- main: .
-  binary: mermaid-ascii
-  flags:
-  - -trimpath
-  env:
-    - GO111MODULE=on
-    - CGO_ENABLED=0
-  goos:
-  - darwin
-  - linux
-  - windows
-  - freebsd
-  goarch:
-  - amd64
-  - arm
-  - arm64
-  - 386
-  - mips64le
-  - s390x
-  goarm:
-  - 6
-  - 7
-  ignore:
-    - goos: darwin
-      goarch: 386
-    - goos: freebsd
-      goarch: arm
-    - goos: freebsd
-      goarch: arm64
-    - goos: freebsd
-      goarch: 386
-
-nfpms:
-  - file_name_template: '{{.ProjectName}}-{{.Tag}}-{{.Arch}}{{if .Arm}}{{.Arm}}{{end}}'
-    description: Render mermaid diagrams in your terminal
-    maintainer: Alexander Grooff <alexandergrooff@gmail.com>
-    license: MIT
-    formats:
-    - deb
-    - rpm
-    - archlinux
-    contents:
-    - src: /usr/bin/mermaid-ascii
-      dst: /usr/local/bin/mermaid-ascii
-      type: "symlink"
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
 
 archives:
-  - name_template: '{{.ProjectName}}-{{.Tag}}-{{.Os}}-{{.Arch}}{{if .Arm}}{{.Arm}}{{end}}'
-    wrap_in_directory: true
-    format: zip
-    files:
-      - README.md
-      - LICENSE
-  - name_template: '{{.ProjectName}}-{{.Tag}}-{{.Os}}-{{.Arch}}{{if .Arm}}{{.Arm}}{{end}}'
-    id: targz-archives
-    wrap_in_directory: true
-    format: tar.gz
-    files:
-      - README.md
-      - LICENSE
+  - format: tar.gz
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    # use zip for windows archives
+    format_overrides:
+      - goos: windows
+        format: zip
 
-checksum:
-  name_template: 'SHA256SUMS'
-  algorithm: sha256
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
