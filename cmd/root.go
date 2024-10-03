@@ -10,7 +10,6 @@ import (
 // Global flags
 var Verbose bool
 var Coords bool
-var boxBorderWidth = 1
 var boxBorderPadding = 1
 var paddingBetweenX = 5
 var paddingBetweenY = 5

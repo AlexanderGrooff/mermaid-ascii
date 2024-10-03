@@ -19,7 +19,10 @@ var webCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		r := setupRouter()
 		// Listen and Server in 0.0.0.0:8080
-		r.Run(":3001")
+		err := r.Run(":3001")
+		if err != nil {
+			panic(err)
+		}
 	},
 }
 
