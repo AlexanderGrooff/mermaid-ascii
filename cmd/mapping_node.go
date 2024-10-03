@@ -73,10 +73,10 @@ func (g *graph) reserveSpotInGrid(n *node, requestedCoord *gridCoord) *gridCoord
 		}
 	}
 	// Reserve border + middle + border for node
+	log.Debugf("Reserving coord %v for node %v", requestedCoord, n)
 	for x := 0; x < 3; x++ {
 		for y := 0; y < 3; y++ {
 			reservedCoord := gridCoord{x: requestedCoord.x + x, y: requestedCoord.y + y}
-			log.Debugf("Reserving coord %d,%d for node %v", reservedCoord.x, reservedCoord.y, n)
 			g.grid[reservedCoord] = n
 		}
 	}
