@@ -32,6 +32,9 @@ $ ./result/bin/mermaid-ascii --help
 ```
 
 ## Usage
+
+You can render graphs directly from the command line or start a web interface to render them interactively.
+
 ```bash
 $ cat test.mermaid
 graph LR
@@ -39,55 +42,67 @@ A --> B
 A --> C
 B --> C
 B --> D
-C --> D
+D --> C
 $ mermaid-ascii --file test.mermaid
-+---+          +---+          +---+
-|   |          |   |          |   |
-| A |--------->| B |--------->| D |
-|   |          |   |          |   |
-+---+          +---+          +---+
-  \              |              ^
-   \             |             /
-    \            v            /
-     \         +---+         /
-      \        |   |        /
-       ------->| C | ------/
-               |   |
-               +---+
++---+     +---+     +---+
+|   |     |   |     |   |
+| A |---->| B |---->| D |
+|   |     |   |     |   |
++---+     +---+     +---+
+  |         |         |
+  |         |         |
+  |         |         |
+  |         |         |
+  |         v         |
+  |       +---+       |
+  |       |   |       |
+  ------->| C |<-------
+          |   |
+          +---+
 
 # Increase horizontal spacing
 $ mermaid-ascii --file test.mermaid -x 8
-+---+                +---+                +---+
-|   |                |   |                |   |
-| A |--------------->| B |--------------->| D |
-|   |                |   |                |   |
-+---+                +---+                +---+
-  \                    |                    ^
-   \                   |                   /
-    \                  v                  /
-     \               +---+               /
-      \              |   |              /
-       ------------->| C | ------------/
-                     |   |
-                     +---+
++---+        +---+        +---+
+|   |        |   |        |   |
+| A |------->| B |------->| D |
+|   |        |   |        |   |
++---+        +---+        +---+
+  |            |            |
+  |            |            |
+  |            |            |
+  |            |            |
+  |            v            |
+  |          +---+          |
+  |          |   |          |
+  ---------->| C |<----------
+             |   |
+             +---+
 
 # Increase box padding
 $ mermaid-ascii -f ./test.mermaid -p 3
-+-----+          +-----+          +-----+
-|     |          |     |          |     |
-|     |          |     |          |     |
-|  A  |--------->|  B  |--------->|  D  |
-|     |          |     |          |     |
-|     |          |     |          |     |
-+-----+          +-----+          +-----+
-   \                v                ^
-    \            +-----+            /
-     \           |     |           /
-      \          |     |          /
-       --------->|  C  | --------/
-                 |     |
-                 |     |
-                 +-----+
++-------+     +-------+     +-------+
+|       |     |       |     |       |
+|       |     |       |     |       |
+|       |     |       |     |       |
+|   A   |---->|   B   |---->|   D   |
+|       |     |       |     |       |
+|       |     |       |     |       |
+|       |     |       |     |       |
++-------+     +-------+     +-------+
+    |             |             |
+    |             |             |
+    |             |             |
+    |             |             |
+    |             v             |
+    |         +-------+         |
+    |         |       |         |
+    |         |       |         |
+    |         |       |         |
+    --------->|   C   |<---------
+              |       |
+              |       |
+              |       |
+              +-------+
 
 # Labeled edges
 $ cat test.mermaid
@@ -96,69 +111,81 @@ A --> B
 A --> C
 B --> C
 B -->|example| D
-C --> D
-$ mermaid-ascii -f ./test.mermaid -x 2 -y 4
-+---+    +---+           +---+
-|   |    |   |           |   |
-| A |--->| B |--example->| D |
-|   |    |   |           |   |
-+---+    +---+           +---+
-  \        |               ^
-   \       |              /
-    \      v             /
-     \   +---+          /
-      \  |   |         /
-       ->| C | -------/
-         |   |
-         +---+
+D --> C
+$ mermaid-ascii -f ./test.mermaid
++---+     +---+         +---+
+|   |     |   |         |   |
+| A |---->| B |-example>| D |
+|   |     |   |         |   |
++---+     +---+         +---+
+  |         |             |
+  |         |             |
+  |         |             |
+  |         |             |
+  |         v             |
+  |       +---+           |
+  |       |   |           |
+  ------->| C |<-----------
+          |   |
+          +---+
 
 # Top-down layout
 $ cat test.mermaid
 graph TD
 A --> B
+A --> C
 B --> C
-B --> D
-C --> D
-X --> C
-$ mermaid-ascii -f ./test.mermaid -y 5
-+---+          +---+
-|   |          |   |
-| A |          | X |
-|   |          |   |
-+---+          +---+
-  |              |
-  |              |
-  |              |
-  |              |
-  v              |
-+---+            /
-|   |           /
-| B |          /
-|   |         /
-+---+        /
-  \         /
-  |\       /
-  | \     /
-  |  \   /
-  v   \ /
-+---+  /       +---+
-|   | / \      |   |
-| C |<-------->| D |
-|   |          |   |
-+---+          +---+
+B -->|example| D
+D --> C
+$ mermaid-ascii -f ./test.mermaid
++---------+          
+|         |          
+|    A    |-------|  
+|         |       |  
++---------+       |  
+     |            |  
+     |            |  
+     |            |  
+     |            |  
+     v            v  
++---------+     +---+
+|         |     |   |
+|    B    |---->| C |
+|         |     |   |
++---------+     +---+
+     |            ^  
+     |            |  
+  example         |  
+     |            |  
+     v            |  
++---------+       |  
+|         |       |  
+|    D    |-------|  
+|         |          
++---------+          
 
 $ mermaid-ascii --help
 Generate ASCII diagrams from mermaid code.
 
 Usage:
   mermaid-ascii [flags]
+  mermaid-ascii [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  web         HTTP server for rendering mermaid diagrams.
 
 Flags:
-  -f, --file string    Mermaid file to parse
-  -h, --help           help for mermaid-ascii
-  -x, --paddingX int   Horizontal space between nodes (default 5)
-  -y, --paddingY int   Vertical space between nodes (default 4)
-  -v, --verbose        verbose output
+  -p, --borderPadding int   Padding between text and border (default 1)
+  -c, --coords              Show coordinates
+  -f, --file string         Mermaid file to parse
+  -h, --help                help for mermaid-ascii
+  -x, --paddingX int        Horizontal space between nodes (default 5)
+  -y, --paddingY int        Vertical space between nodes (default 5)
+  -v, --verbose             Verbose output
+
+Use "mermaid-ascii [command] --help" for more information about a command.
 ```
 
 Colored output is also supported (given that your terminal supports it) using the `classDef` syntax:
@@ -207,6 +234,29 @@ drawing taking the path [(2,1), (3,1), (3,5), (4,5)].
 6-> +-------------+     +-------------+
 ```
 
+You can show these coords in your graph by enabling the `--coords` flag:
+
+```bash
+$ mermaid-ascii -f ./test.mermaid --coords
+   01  23    45  67  89       0
+   0123456789012345678901234567
+0 0+---+     +---+   +--------+
+  1|   |     |   |   |        |
+1 2| A |-123>| B |-->|   D    |
+  3|   |     |   |   |        |
+2 4+---+     +---+   +--------+
+  5  |         |          |
+3 6  |         2          |
+  7  |         v       123456
+4 8  |       +---+        |
+  9  |       |   |        |
+510  ------->| C |<--------
+ 11          |   |
+612          +---+
+```
+
+Note that with `--coords` enabled, the grid-coords shown show the starting location of the coord, not the center of the coord. This is why `(1,0)` is next to `(0,0)` instead of in the center of the `A` node.
+
 ## TODOs
 
 The baseline components for Mermaid work, but there are a lot of things that are not supported yet. Here's a list of things that are not yet supported:
@@ -224,7 +274,7 @@ The baseline components for Mermaid work, but there are a lot of things that are
 
 ### Rendering
 
-- [x] Diagonal arrows
-- [ ] Prevent arrows overlapping nodes
+- [x] Prevent arrows overlapping nodes
+- [ ] Diagonal arrows
 - [ ] Place nodes in a more compact way
 - [ ] Prevent rendering more than X characters wide (like default 80 for terminal width)

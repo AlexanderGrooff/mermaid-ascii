@@ -142,7 +142,7 @@ func drawBox(n *node, g graph) *drawing {
 	}
 	// Draw text
 	textY := from.y + h/2
-	textX := from.x + w/2
+	textX := from.x + w/2 - CeilDiv(len(n.name), 2) + 1
 	for x := 0; x < len(n.name); x++ {
 		if n.styleClass.styles["color"] != "" {
 			log.Debugf("Setting color for node %s to %s", n.name, n.styleClass.styles["color"])

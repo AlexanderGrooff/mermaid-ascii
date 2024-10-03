@@ -20,3 +20,10 @@ func Abs(x int) int {
 	}
 	return x
 }
+
+func CeilDiv(x, y int) int {
+	if x%y == 0 {
+		return x / y
+	}
+	return x/y + 1
+}
