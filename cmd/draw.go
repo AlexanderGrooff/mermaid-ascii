@@ -94,7 +94,7 @@ func drawMap(data *orderedmap.OrderedMap[string, []textEdge], styleClasses map[s
 	g.setStyleClasses(styleClasses)
 	g.createMapping()
 	d := g.draw()
-	if Verbose {
+	if Coords {
 		d = d.debugDrawingWrapper()
 		d = d.debugCoordWrapper(g)
 	}

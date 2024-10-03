@@ -9,6 +9,7 @@ import (
 
 // Global flags
 var Verbose bool
+var Coords bool
 var boxBorderWidth = 1
 var boxBorderPadding = 1
 var paddingBetweenX = 3
@@ -52,7 +53,8 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "verbose output")
+	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Verbose output")
+	rootCmd.PersistentFlags().BoolVarP(&Coords, "coords", "c", false, "Show coordinates")
 	rootCmd.PersistentFlags().IntVarP(&paddingBetweenX, "paddingX", "x", 3, "Horizontal space between nodes")
 	rootCmd.PersistentFlags().IntVarP(&paddingBetweenY, "paddingY", "y", 3, "Vertical space between nodes")
 	rootCmd.PersistentFlags().IntVarP(&boxBorderPadding, "borderPadding", "p", 1, "Padding between text and border")
