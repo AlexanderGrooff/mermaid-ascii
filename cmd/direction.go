@@ -45,49 +45,67 @@ func (c drawingCoord) Direction(dir direction) drawingCoord {
 	return drawingCoord{x: c.x + dir.x, y: c.y + dir.y}
 }
 
-func determineStartAndEndDir(e *edge) (direction, direction) {
+func determineStartAndEndDir(e *edge) (direction, direction, direction, direction) {
 	d := determineDirection(genericCoord(*e.from.gridCoord), genericCoord(*e.to.gridCoord))
-	var dir direction
-	var oppositeDir direction
+	var preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir direction
 	// LR: prefer vertical over horizontal
 	// TD: prefer horizontal over vertical
 	// TODO: This causes some squirmy lines if the corner spot is already occupied.
 	switch d {
 	case LowerRight:
 		if graphDirection == "LR" {
-			dir = Down
-			oppositeDir = Left
+			preferredDir = Down
+			preferredOppositeDir = Left
+			alternativeDir = Right
+			alternativeOppositeDir = Up
 		} else {
-			dir = Right
-			oppositeDir = Up
+			preferredDir = Right
+			preferredOppositeDir = Up
+			alternativeDir = Down
+			alternativeOppositeDir = Left
 		}
 	case UpperRight:
 		if graphDirection == "LR" {
-			dir = Up
-			oppositeDir = Left
+			preferredDir = Up
+			preferredOppositeDir = Left
+			alternativeDir = Right
+			alternativeOppositeDir = Down
 		} else {
-			dir = Right
-			oppositeDir = Down
+			preferredDir = Right
+			preferredOppositeDir = Down
+			alternativeDir = Up
+			alternativeOppositeDir = Left
 		}
 	case LowerLeft:
 		if graphDirection == "LR" {
-			dir = Down
-			oppositeDir = Right
+			preferredDir = Down
+			preferredOppositeDir = Right
+			alternativeDir = Left
+			alternativeOppositeDir = Up
 		} else {
-			dir = Left
-			oppositeDir = Up
+			preferredDir = Left
+			preferredOppositeDir = Up
+			alternativeDir = Down
+			alternativeOppositeDir = Right
 		}
 	case UpperLeft:
 		if graphDirection == "LR" {
-			dir = Up
-			oppositeDir = Right
+			preferredDir = Up
+			preferredOppositeDir = Right
+			alternativeDir = Left
+			alternativeOppositeDir = Down
 		} else {
-			dir = Left
-			oppositeDir = Down
+			preferredDir = Left
+			preferredOppositeDir = Down
+			alternativeDir = Up
+			alternativeOppositeDir = Right
 		}
 	default:
-		dir = d
-		oppositeDir = dir.getOpposite()
+		preferredDir = d
+		preferredOppositeDir = preferredDir.getOpposite()
+		// TODO: just return null and don't calculate alternative path
+		alternativeDir = d
+		alternativeOppositeDir = preferredOppositeDir
 	}
-	return dir, oppositeDir
+	return preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir
 }
