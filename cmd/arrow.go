@@ -68,7 +68,6 @@ func (g *graph) getPath(from gridCoord, to gridCoord) ([]gridCoord, error) {
 
 	for pq.Len() > 0 {
 		current := heap.Pop(pq).(*priorityQueueItem).coord
-		log.Debugf("Current: %v", current)
 
 		if current.Equals(to) {
 			path := []gridCoord{}
