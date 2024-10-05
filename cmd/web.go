@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"fmt"
-	"html/template"
 	"net/http"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
@@ -35,7 +35,8 @@ func setupRouter() *gin.Engine {
 	})
 
 	r.POST("/generate", func(c *gin.Context) {
-		inputText := c.PostForm("inputText")
+		inputText := c.PostForm("mermaid")
+		log.Infof("Received input: %s", inputText)
 		result := generate_map(inputText)
 		c.String(http.StatusOK, result)
 	})
@@ -49,8 +50,5 @@ func generate_map(input string) string {
 		return "Failed to parse mermaid file"
 	}
 
-	ascii_art := drawMap(mermaidMap, nil)
-	escaped_ascii_art := template.HTMLEscapeString(ascii_art)
-	html_ascii_art := fmt.Sprintf("<pre>%s</pre>", escaped_ascii_art)
-	return html_ascii_art
+	return drawMap(mermaidMap, nil)
 }

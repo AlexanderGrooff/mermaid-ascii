@@ -68,7 +68,7 @@
             <p>Note: styleclasses are not yet supported</p>
             <form hx-post="/generate" hx-target="#result">
                 <textarea
-                    name="inputText" placeholder="graph LR"
+                    name="mermaid" placeholder="graph LR"
                     hx-post="/generate"
                     hx-trigger="keyup changed delay:200ms"
                     hx-target="#result"
@@ -84,7 +84,7 @@
                 wait 2s
                 put 'Copy' into me
             ">Copy</button>
-            <div id="result"><!-- Result content goes here --></div>
+            <pre id="result"><!-- Result content goes here --></pre>
         </div>
     </div>
 </body>

@@ -78,67 +78,52 @@ func setData(parent textNode, edge textEdge, data *orderedmap.OrderedMap[string,
 }
 
 func mermaidFileToMap(mermaid string) (*orderedmap.OrderedMap[string, []textEdge], *map[string]styleClass, error) {
-	// Parse the mermaid code into a map
-	// The map is a tree of the form:
-	// {
-	//   "A": ["B", "C"],
-	//   "B": ["C"],
-	//   "C": []
-	// }
-
-	// This is an ordered map so that the output is deterministic
-	// and the order of the keys is the order in which the nodes
-	// are drawn
+	// Allow split on both \n and the actual string "\n" for curl compatibility
+	newlinePattern := regexp.MustCompile(`\n|\\n`)
+	lines := newlinePattern.Split(string(mermaid), -1)
 	data := orderedmap.NewOrderedMap[string, []textEdge]()
 	styleClasses := make(map[string]styleClass)
-	// Split the mermaid code into lines
-	lines := strings.Split(string(mermaid), "\n")
 
-	arrowPattern, err := regexp.Compile(`^(.+)\s+-->\s+(.+)$`)
-	if err != nil {
-		return nil, nil, err
-	}
-	arrowWithLabelPattern, err := regexp.Compile(`^(.+)\s+-->\|(.+)\|\s+(.+)$`)
-	if err != nil {
-		return nil, nil, err
-	}
-	styleClassDefPattern, err := regexp.Compile(`^classDef\s+(.+)\s+(.+)$`)
-	if err != nil {
-		return nil, nil, err
+	patterns := map[*regexp.Regexp]func([]string){
+		regexp.MustCompile(`^(.+)\s+-->\s+(.+)$`): func(match []string) {
+			setArrow(match, data)
+		},
+		regexp.MustCompile(`^(.+)\s+-->\|(.+)\|\s+(.+)$`): func(match []string) {
+			setArrowWithLabel(match, data)
+		},
+		regexp.MustCompile(`^classDef\s+(.+)\s+(.+)$`): func(match []string) {
+			s := parseStyleClass(match)
+			styleClasses[s.name] = s
+		},
 	}
 
 	// First line should either say "graph TD" or "graph LR"
 	switch lines[0] {
-	case "graph LR":
+	case "graph LR", "flowchart LR":
 		graphDirection = "LR"
-	case "graph TD":
-		graphDirection = "TD"
-	case "flowchart LR":
-		graphDirection = "LR"
-	case "flowchart TD":
+	case "graph TD", "flowchart TD":
 		graphDirection = "TD"
 	default:
 		return nil, nil, errors.New("first line should define the graph")
 	}
-	// Pop first line
 	lines = lines[1:]
 
 	// Iterate over the lines
 	log.Debug("Parsing mermaid code")
 	for _, line := range lines {
 		if line == "" {
-			// Skip empty lines
 			continue
 		}
 		log.Debug("Parsing line: ", line)
-		if match := arrowWithLabelPattern.FindStringSubmatch(line); match != nil {
-			setArrowWithLabel(match[1:], data)
-		} else if match := arrowPattern.FindStringSubmatch(line); match != nil {
-			setArrow(match[1:], data)
-		} else if match := styleClassDefPattern.FindStringSubmatch(line); match != nil {
-			s := parseStyleClass(match[1:])
-			styleClasses[s.name] = s
-		} else {
+		matched := false
+		for pattern, handler := range patterns {
+			if match := pattern.FindStringSubmatch(line); match != nil {
+				handler(match[1:])
+				matched = true
+				break
+			}
+		}
+		if !matched {
 			return nil, nil, errors.New("Could not parse line: " + line)
 		}
 	}
