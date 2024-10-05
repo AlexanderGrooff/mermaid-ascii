@@ -44,13 +44,32 @@
         button:hover {
             background-color: #0056b3;
         }
-        #result {
-            margin-top: 20px;
-            padding: 20px;
+        .code-block {
+            /* margin-top: 20px; */
+            padding: 10px;
             background-color: #e9ecef;
             border: 1px solid #ccc;
             border-radius: 4px;
+            position: relative; /* To position the copy button */
+        }
+        #result {
             min-height: 300px;
+        }
+        .copy-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: #fff;
+            cursor: pointer;
+            font-family: 'Roboto', sans-serif;
+            transition: background-color 0.3s;
+        }
+        .copy-button:hover {
+            background-color: #0056b3;
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
@@ -65,7 +84,6 @@
     <h1>Mermaid ASCII</h1>
     <div class="container">
         <div class="column">
-            <p>Note: styleclasses are not yet supported</p>
             <form hx-post="/generate" hx-target="#result">
                 <textarea
                     name="mermaid" placeholder="graph LR"
@@ -75,6 +93,29 @@
                 ></textarea>
                 <button type="submit">Generate</button>
             </form>
+            <p>There are alternative forms of generating mermaid graphs in ASCII using this same Git repository.</p>
+            <h2>cUrl request with data</h2>
+            <div class="code-block">
+                <button class="copy-button" _="on click
+                    writeText(my nextElementSibling.innerText) on navigator.clipboard
+                    put 'Copied!' into me
+                    wait 2s
+                    put 'Copy' into me
+                ">Copy</button>
+                <pre><code>curl https://mermaid-ascii.art/generate -d mermaid="graph LR\nABC --> DEF"</code></pre>
+            </div>
+            <h2>Run Golang in CLI</h2>
+            <div class="code-block">
+                <button class="copy-button" _="on click
+                    writeText(my nextElementSibling.innerText) on navigator.clipboard
+                    put 'Copied!' into me
+                    wait 2s
+                    put 'Copy' into me
+                ">Copy</button>
+                <pre><code>git clone https://github.com/AlexanderGrooff/mermaid-ascii
+cd mermaid-ascii
+go run main.go graph LR\nABC --> DEF</code></pre>
+            </div>
         </div>
         <div class="column">
             <!-- Credit: https://github.com/bigskysoftware/_hyperscript/issues/531#issuecomment-2049830473 -->
@@ -84,7 +125,7 @@
                 wait 2s
                 put 'Copy' into me
             ">Copy</button>
-            <pre id="result"><!-- Result content goes here --></pre>
+            <pre id="result" class="code-block"><!-- Result content goes here --></pre>
         </div>
     </div>
 </body>
