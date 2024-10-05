@@ -67,6 +67,60 @@ A --> C`
 	verifyMap(t, mermaid, expectedMap)
 }
 
+func TestBacklinkFromTop(t *testing.T) {
+	mermaid :=
+		`graph LR
+A --> B
+B --> C
+A --> C
+B --> D
+D --> C`
+	expectedMap :=
+		`+---+     +---+     +---+
+|   |     |   |     |   |
+| A |---->| B |---->| D |
+|   |     |   |     |   |
++---+     +---+     +---+
+  |         |         |  
+  |         |         |  
+  |         |         |  
+  |         |         |  
+  |         v         |  
+  |       +---+       |  
+  |       |   |       |  
+  ------->| C |<-------  
+          |   |          
+          +---+          `
+	verifyMap(t, mermaid, expectedMap)
+}
+
+func TestBacklinkFromBottom(t *testing.T) {
+	mermaid :=
+		`graph LR
+A --> B
+B --> C
+A --> C
+B --> D
+C --> D`
+	expectedMap :=
+		`+---+     +---+     +---+
+|   |     |   |     |   |
+| A |---->| B |---->| D |
+|   |     |   |     |   |
++---+     +---+     +---+
+  |         |         ^  
+  |         |         |  
+  |         |         |  
+  |         |         |  
+  |         v         |  
+  |       +---+       |  
+  |       |   |       |  
+  ------->| C |-------|  
+          |   |          
+          +---+          `
+	verifyMap(t, mermaid, expectedMap)
+}
+
 func TestTwoLayerSingleGraphLongerNames(t *testing.T) {
 	mermaid :=
 		`graph LR

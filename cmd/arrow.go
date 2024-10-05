@@ -1,135 +1,107 @@
 package cmd
 
 import (
+	"container/heap"
 	"fmt"
 	"slices"
 
 	log "github.com/sirupsen/logrus"
 )
 
-func (g *graph) getPath(from gridCoord, to gridCoord, prevSteps []gridCoord) ([]gridCoord, error) {
-	// Figure out what path the arrow should take by traversing the grid recursively.
-	var nextPos gridCoord
-	log.Debugf("Looking for path from %v to %v", from, to)
+type priorityQueueItem struct {
+	coord    gridCoord
+	priority int
+	index    int
+}
 
-	if from == to {
-		return []gridCoord{}, nil
-	}
+type priorityQueue []*priorityQueueItem
 
-	deltaX := to.x - from.x
-	deltaY := to.y - from.y
+func (pq priorityQueue) Len() int { return len(pq) }
 
-	// These variables are used to determine what direction to head towards first. If the target is above (e.g. deltaY < 0)
-	// then we want to go up first.
-	var preferredXDirection int
-	var preferredYDirection int
-	if deltaX > 0 {
-		preferredXDirection = 1
+func (pq priorityQueue) Less(i, j int) bool {
+	return pq[i].priority < pq[j].priority
+}
+
+func (pq priorityQueue) Swap(i, j int) {
+	pq[i], pq[j] = pq[j], pq[i]
+	pq[i].index = i
+	pq[j].index = j
+}
+
+func (pq *priorityQueue) Push(x interface{}) {
+	n := len(*pq)
+	item := x.(*priorityQueueItem)
+	item.index = n
+	*pq = append(*pq, item)
+}
+
+func (pq *priorityQueue) Pop() interface{} {
+	old := *pq
+	n := len(old)
+	item := old[n-1]
+	old[n-1] = nil
+	item.index = -1
+	*pq = old[0 : n-1]
+	return item
+}
+
+func heuristic(a, b gridCoord) int {
+	absX := Abs(a.x - b.x)
+	absY := Abs(a.y - b.y)
+	if absX == 0 || absY == 0 {
+		return absX + absY
 	} else {
-		preferredXDirection = -1
+		// Punish for taking extra corner, we prefer straight (less complex) lines
+		return absX + absY + 1
 	}
-	if deltaY > 0 {
-		preferredYDirection = 1
-	} else {
-		preferredYDirection = -1
-	}
+}
 
-	absX := Abs(deltaX)
-	absY := Abs(deltaY)
-	// TODO: make nicer
-	if absX > 50 || absY > 50 {
-		return []gridCoord{}, fmt.Errorf("Out of bounds")
-	}
-	if (absX == 0 && absY == 1) || (absX == 1 && absY == 0) {
-		// Can go directly to the target
-		return []gridCoord{to}, nil
-	} else if deltaY == 0 {
-		if deltaX > 0 && g.isFreeInGrid(gridCoord{x: from.x + 1, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x + 1, y: from.y}, prevSteps) {
-			nextPos = gridCoord{x: from.x + 1, y: from.y}
-		} else if g.isFreeInGrid(gridCoord{x: from.x - 1, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x - 1, y: from.y}, prevSteps) {
-			nextPos = gridCoord{x: from.x - 1, y: from.y}
-		} else {
-			// We're on the correct Y level, but the X direction is not free. We have to go around either from
-			// above or below our neighbour.
-			// TODO: prevent from taking steps that have already been assigned
-			// TODO: diagonal?
-			// We start by trying below first
-			if g.isFreeInGrid(gridCoord{x: from.x, y: from.y + 1}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y + 1}, prevSteps) {
-				nextPos = gridCoord{x: from.x, y: from.y + 1}
-			} else {
-				// TODO: what if all positions are taken?
-				nextPos = gridCoord{x: from.x, y: from.y - 1}
+func (g *graph) getPath(from gridCoord, to gridCoord) ([]gridCoord, error) {
+	pq := &priorityQueue{}
+	heap.Init(pq)
+	heap.Push(pq, &priorityQueueItem{coord: from, priority: 0})
+
+	costSoFar := map[gridCoord]int{from: 0}
+	cameFrom := map[gridCoord]*gridCoord{from: nil}
+
+	directions := []gridCoord{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+
+	for pq.Len() > 0 {
+		current := heap.Pop(pq).(*priorityQueueItem).coord
+
+		if current.Equals(to) {
+			path := []gridCoord{}
+			for c := &current; c != nil; c = cameFrom[*c] {
+				path = append([]gridCoord{*c}, path...)
 			}
+			log.Debugf("Found it! path: %v", path)
+			return path, nil
 		}
-	} else if deltaX == 0 {
-		if deltaY > 0 && g.isFreeInGrid(gridCoord{x: from.x, y: from.y + 1}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y + 1}, prevSteps) {
-			nextPos = gridCoord{x: from.x, y: from.y + 1}
-		} else if g.isFreeInGrid(gridCoord{x: from.x, y: from.y - 1}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y - 1}, prevSteps) {
-			nextPos = gridCoord{x: from.x, y: from.y - 1}
-		} else {
-			// We're on the correct X level, but the Y direction is not free. We have to go around either from
-			// above or below our neighbour.
-			// TODO: prevent from taking steps that have already been assigned
-			// TODO: diagonal?
-			// We start by trying right first
-			if g.isFreeInGrid(gridCoord{x: from.x + 1, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x + 1, y: from.y}, prevSteps) {
-				nextPos = gridCoord{x: from.x + 1, y: from.y}
-			} else {
-				// TODO: what if all positions are taken?
-				nextPos = gridCoord{x: from.x - 1, y: from.y}
+
+		for _, dir := range directions {
+			next := gridCoord{x: current.x + dir.x, y: current.y + dir.y}
+			if !g.isFreeInGrid(next) && !next.Equals(to) {
+				continue
 			}
-		}
-	} else {
-		// If we're in LR, we first go vertical then horizontal.
-		if graphDirection == "LR" {
-			if g.isFreeInGrid(gridCoord{x: from.x, y: from.y + preferredYDirection}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y + preferredYDirection}, prevSteps) {
-				nextPos = gridCoord{x: from.x, y: from.y + preferredYDirection}
-			} else if g.isFreeInGrid(gridCoord{x: from.x + preferredXDirection, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x + preferredXDirection, y: from.y}, prevSteps) {
-				// Vertical is blocked, let's try horizontal
-				nextPos = gridCoord{x: from.x + preferredXDirection, y: from.y}
-			} else if g.isFreeInGrid(gridCoord{x: from.x, y: from.y - preferredYDirection}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y - preferredYDirection}, prevSteps) {
-				nextPos = gridCoord{x: from.x, y: from.y - preferredYDirection}
-			} else {
-				// TODO: Diagonal?
-				// TODO: what about inbetween nodes, on half/grid coords?
-				nextPos = gridCoord{x: from.x - preferredXDirection, y: from.y}
-			}
-		} else if graphDirection == "TD" {
-			// If we're in TD, we first go horizontal then vertical.
-			if g.isFreeInGrid(gridCoord{x: from.x + preferredXDirection, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x + preferredXDirection, y: from.y}, prevSteps) {
-				nextPos = gridCoord{x: from.x + preferredXDirection, y: from.y}
-			} else if g.isFreeInGrid(gridCoord{x: from.x, y: from.y + preferredYDirection}) && !hasStepBeenTaken(gridCoord{x: from.x, y: from.y + preferredYDirection}, prevSteps) {
-				// Horizontal is blocked, let's try vertical
-				nextPos = gridCoord{x: from.x, y: from.y + preferredYDirection}
-			} else if g.isFreeInGrid(gridCoord{x: from.x - preferredXDirection, y: from.y}) && !hasStepBeenTaken(gridCoord{x: from.x - preferredXDirection, y: from.y}, prevSteps) {
-				nextPos = gridCoord{x: from.x - preferredXDirection, y: from.y}
-			} else {
-				// TODO: Diagonal?
-				nextPos = gridCoord{x: from.x, y: from.y - preferredYDirection}
+
+			newCost := costSoFar[current] + 1
+			if cost, ok := costSoFar[next]; !ok || newCost < cost {
+				costSoFar[next] = newCost
+				priority := newCost + heuristic(next, to)
+				heap.Push(pq, &priorityQueueItem{coord: next, priority: priority})
+				cameFrom[next] = &current
 			}
 		}
 	}
 
-	currSteps := append(prevSteps, nextPos)
-	slice, err := g.getPath(nextPos, to, currSteps)
-	if err != nil {
-		return currSteps, err
-	}
-	return append([]gridCoord{nextPos}, slice...), nil
+	return nil, fmt.Errorf("no path found")
 }
 
 func (g *graph) isFreeInGrid(c gridCoord) bool {
-	return g.grid[c] == nil
-}
-
-func hasStepBeenTaken(step gridCoord, steps []gridCoord) bool {
-	for _, s := range steps {
-		if s == step {
-			log.Debugf("Step %v has been taken", s)
-			return true
-		}
+	if c.x < 0 || c.y < 0 || c.x >= len(g.columnWidth) || c.y >= len(g.rowHeight) {
+		return false
 	}
-	return false
+	return g.grid[c] == nil
 }
 
 func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) {

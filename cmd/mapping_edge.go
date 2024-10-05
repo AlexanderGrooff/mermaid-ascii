@@ -12,21 +12,60 @@ type edge struct {
 	text      string
 	path      []gridCoord
 	labelLine []gridCoord
+	startDir  direction
+	endDir    direction
 }
 
 func (g *graph) determinePath(e *edge) {
-	dir, oppositeDir := determineStartAndEndDir(e)
-	from := e.from.gridCoord.Direction(dir)
-	to := e.to.gridCoord.Direction(oppositeDir)
-	log.Debugf("Determining path from %v (direction %v) to %v (direction %v)", *e.from, dir, *e.to, oppositeDir)
+	// Get both paths and use least amount of steps
+	var preferredPath, alternativePath []gridCoord
+	var err error
+	preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir := determineStartAndEndDir(e)
+	from := e.from.gridCoord.Direction(preferredDir)
+	to := e.to.gridCoord.Direction(preferredOppositeDir)
+	log.Debugf("Determining preferred path from %v (direction %v) to %v (direction %v)", *e.from, preferredDir, *e.to, preferredOppositeDir)
 
-	path, err := g.getPath(from, to, []gridCoord{from})
-	path = append([]gridCoord{from}, path...) // TODO: how to do add 'from' to path nicely?
+	// Get preferred path
+	preferredPath, err = g.getPath(from, to)
+	// preferredPath = append([]gridCoord{from}, preferredPath...) // TODO: how to do add 'from' to path nicely?
 	if err != nil {
 		fmt.Printf("Error getting path from %v to %v: %v", from, to, err)
+		// This is a big assumption, but if we can't get the preferred path, we assume the alternative path is better
+		e.startDir = alternativeDir
+		e.endDir = alternativeOppositeDir
+		e.path = alternativePath
+		return
 	}
-	path = mergePath(path)
-	e.path = path
+	preferredPath = mergePath(preferredPath)
+
+	// Alternative path
+	from = e.from.gridCoord.Direction(alternativeDir)
+	to = e.to.gridCoord.Direction(alternativeOppositeDir)
+	log.Debugf("Determining alternative path from %v (direction %v) to %v (direction %v)", *e.from, alternativeDir, *e.to, alternativeOppositeDir)
+
+	alternativePath, err = g.getPath(from, to)
+	// alternativePath = append([]gridCoord{from}, alternativePath...)
+	if err != nil {
+		fmt.Printf("Error getting path from %v to %v: %v", from, to, err)
+		e.startDir = preferredDir
+		e.endDir = preferredOppositeDir
+		e.path = preferredPath
+	}
+	alternativePath = mergePath(alternativePath)
+
+	nrStepsPreferred := len(preferredPath)
+	nrStepsAlternative := len(alternativePath)
+	if nrStepsPreferred <= nrStepsAlternative {
+		log.Debugf("Using preferred path with %v steps instead of alternative path with %v steps", nrStepsPreferred, nrStepsAlternative)
+		e.startDir = preferredDir
+		e.endDir = preferredOppositeDir
+		e.path = preferredPath
+	} else {
+		log.Debugf("Using alternative path with %v steps instead of alternative path with %v steps", nrStepsAlternative, nrStepsPreferred)
+		e.startDir = alternativeDir
+		e.endDir = alternativeOppositeDir
+		e.path = alternativePath
+	}
 }
 
 func (g *graph) determineLabelLine(e *edge) {

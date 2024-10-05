@@ -146,6 +146,7 @@ func (g *graph) createMapping() {
 	}
 
 	// ! Last point before we manipulate the drawing !
+	log.Debug("Mapping complete, starting to draw")
 
 	for _, n := range g.nodes {
 		dc := g.gridToDrawingCoord(*n.gridCoord, nil)
