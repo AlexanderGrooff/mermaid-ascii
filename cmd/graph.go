@@ -38,6 +38,7 @@ type graph struct {
 	columnWidth  map[int]int
 	rowHeight    map[int]int
 	styleClasses map[string]styleClass
+	styleType    string
 }
 
 func mkGraph(data *orderedmap.OrderedMap[string, []textEdge]) graph {
@@ -73,9 +74,10 @@ func mkGraph(data *orderedmap.OrderedMap[string, []textEdge]) graph {
 	return g
 }
 
-func (g *graph) setStyleClasses(styleClasses map[string]styleClass) {
-	logrus.Debugf("Setting style classes to %v", styleClasses)
-	g.styleClasses = styleClasses
+func (g *graph) setStyleClasses(properties *graphProperties) {
+	logrus.Debugf("Setting style classes to %v", properties.styleClasses)
+	g.styleClasses = *properties.styleClasses
+	g.styleType = properties.styleType
 	for _, n := range g.nodes {
 		if n.styleClassName != "" {
 			logrus.Debugf("Setting style class for node %s to %s", n.name, n.styleClassName)

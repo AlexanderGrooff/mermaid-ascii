@@ -1,9 +1,10 @@
 package cmd
 
 import (
-	"fmt"
-	"html/template"
 	"net/http"
+	"strconv"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
@@ -35,8 +36,27 @@ func setupRouter() *gin.Engine {
 	})
 
 	r.POST("/generate", func(c *gin.Context) {
-		inputText := c.PostForm("inputText")
-		result := generate_map(inputText)
+		mermaidString := c.PostForm("mermaid")
+		// Parse xPadding and yPadding as integers
+		xPadding := c.PostForm("xPadding")
+		if xPadding != "" {
+			if padding, err := strconv.Atoi(xPadding); err == nil {
+				paddingBetweenX = padding
+			} else {
+				log.Warnf("Invalid xPadding value: %s", xPadding)
+			}
+		}
+
+		yPadding := c.PostForm("yPadding")
+		if yPadding != "" {
+			if padding, err := strconv.Atoi(yPadding); err == nil {
+				paddingBetweenY = padding
+			} else {
+				log.Warnf("Invalid yPadding value: %s", yPadding)
+			}
+		}
+		log.Infof("Received input %s", c.Request.PostForm.Encode())
+		result := generate_map(mermaidString)
 		c.String(http.StatusOK, result)
 	})
 
@@ -44,13 +64,11 @@ func setupRouter() *gin.Engine {
 }
 
 func generate_map(input string) string {
-	mermaidMap, _, err := mermaidFileToMap(input)
+	properties, err := mermaidFileToMap(input, "html")
+	log.Infof("Properties: %v", properties)
 	if err != nil {
 		return "Failed to parse mermaid file"
 	}
 
-	ascii_art := drawMap(mermaidMap, nil)
-	escaped_ascii_art := template.HTMLEscapeString(ascii_art)
-	html_ascii_art := fmt.Sprintf("<pre>%s</pre>", escaped_ascii_art)
-	return html_ascii_art
+	return drawMap(properties)
 }

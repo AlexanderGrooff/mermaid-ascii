@@ -7,11 +7,11 @@ import (
 )
 
 func verifyMap(t *testing.T, mermaid string, expectedMap string) {
-	mermaidMap, styleClasses, err := mermaidFileToMap(mermaid)
+	properties, err := mermaidFileToMap(mermaid, "cli")
 	if err != nil {
 		log.Fatal("Failed to parse mermaid: ", err)
 	}
-	actualMap := drawMap(mermaidMap, *styleClasses)
+	actualMap := drawMap(properties)
 	if expectedMap != actualMap {
 		t.Errorf("Map didn't match actual map\nExpected: %v\nActual: %v", expectedMap, actualMap)
 	}

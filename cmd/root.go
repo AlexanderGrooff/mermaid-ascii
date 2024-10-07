@@ -30,11 +30,11 @@ var rootCmd = &cobra.Command{
 			log.Fatal("Failed to parse mermaid file: ", err)
 			return
 		}
-		mermaidMap, styleClasses, err := mermaidFileToMap(string(mermaid))
+		properties, err := mermaidFileToMap(string(mermaid), "cli")
 		if err != nil {
 			log.Fatal("Failed to parse mermaid file: ", err)
 		}
-		drawMap(mermaidMap, *styleClasses)
+		drawMap(properties)
 	},
 }
 
