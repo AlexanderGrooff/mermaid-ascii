@@ -7,7 +7,7 @@ import (
 )
 
 func verifyMap(t *testing.T, mermaid string, expectedMap string) {
-	properties, err := mermaidFileToMap(mermaid)
+	properties, err := mermaidFileToMap(mermaid, "cli")
 	if err != nil {
 		log.Fatal("Failed to parse mermaid: ", err)
 	}

@@ -30,7 +30,7 @@ var rootCmd = &cobra.Command{
 			log.Fatal("Failed to parse mermaid file: ", err)
 			return
 		}
-		properties, err := mermaidFileToMap(string(mermaid))
+		properties, err := mermaidFileToMap(string(mermaid), "cli")
 		if err != nil {
 			log.Fatal("Failed to parse mermaid file: ", err)
 		}

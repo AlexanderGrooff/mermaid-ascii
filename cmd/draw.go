@@ -89,7 +89,7 @@ func (d *drawing) drawLine(from drawingCoord, to drawingCoord, offsetFrom int, o
 
 func drawMap(properties *graphProperties) string {
 	g := mkGraph(properties.data)
-	g.setStyleClasses(*properties.styleClasses)
+	g.setStyleClasses(properties)
 	g.createMapping()
 	d := g.draw()
 	if Coords {
@@ -132,22 +132,11 @@ func drawBox(n *node, g graph) *drawing {
 	for y := from.y; y < to.y; y++ {
 		boxDrawing[to.x][y] = "|" // Vertical line
 	}
-	// Set up text color
-	var c color.RGBColor
-	log.Debugf("Color for node %s is %s", n.name, n.styleClass)
-	if n.styleClass.styles["color"] != "" {
-		c = color.HEX(n.styleClass.styles["color"])
-	}
 	// Draw text
 	textY := from.y + h/2
 	textX := from.x + w/2 - CeilDiv(len(n.name), 2) + 1
 	for x := 0; x < len(n.name); x++ {
-		if n.styleClass.styles["color"] != "" {
-			log.Debugf("Setting color for node %s to %s", n.name, n.styleClass.styles["color"])
-			boxDrawing[textX+x][textY] = c.Sprint(string(n.name[x]))
-		} else {
-			boxDrawing[textX+x][textY] = string(n.name[x])
-		}
+		boxDrawing[textX+x][textY] = wrapTextInColor(string(n.name[x]), n.styleClass.styles["color"], g.styleType)
 	}
 	// Draw corners
 	boxDrawing[from.x][from.y] = "+" // Top left corner
@@ -156,6 +145,22 @@ func drawBox(n *node, g graph) *drawing {
 	boxDrawing[to.x][to.y] = "+"     // Bottom right corner
 
 	return &boxDrawing
+}
+
+func wrapTextInColor(text, c, styleType string) string {
+	log.Infof("Wrapping text '%s' in color %s", text, c)
+	if c == "" {
+		return text
+	}
+	if styleType == "html" {
+		return fmt.Sprintf("<span style='color: %s'>%s</span>", c, text)
+	} else if styleType == "cli" {
+		cliColor := color.HEX(c)
+		return cliColor.Sprint(text)
+	} else {
+		log.Warnf("Unknown style type %s", styleType)
+		return text
+	}
 }
 
 func (d *drawing) increaseSize(x int, y int) {

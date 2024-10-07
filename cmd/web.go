@@ -64,7 +64,8 @@ func setupRouter() *gin.Engine {
 }
 
 func generate_map(input string) string {
-	properties, err := mermaidFileToMap(input)
+	properties, err := mermaidFileToMap(input, "html")
+	log.Infof("Properties: %v", properties)
 	if err != nil {
 		return "Failed to parse mermaid file"
 	}

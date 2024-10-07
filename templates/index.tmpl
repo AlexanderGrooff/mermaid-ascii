@@ -103,6 +103,15 @@
             const valueDisplay = slider.previousElementSibling.querySelector('.slider-value');
             valueDisplay.textContent = slider.value;
         }
+
+        function initializeSliderValues() {
+            const sliders = document.querySelectorAll('input[type="range"]');
+            sliders.forEach(slider => {
+                updateSliderValue(slider);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', initializeSliderValues);
     </script>
 </head>
 <body>

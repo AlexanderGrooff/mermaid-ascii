@@ -13,6 +13,7 @@ type graphProperties struct {
 	data           *orderedmap.OrderedMap[string, []textEdge]
 	styleClasses   *map[string]styleClass
 	graphDirection string
+	styleType      string
 }
 
 type textNode struct {
@@ -113,13 +114,13 @@ func (gp *graphProperties) parseString(line string) error {
 	return nil
 }
 
-func mermaidFileToMap(mermaid string) (*graphProperties, error) {
+func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 	// Allow split on both \n and the actual string "\n" for curl compatibility
 	newlinePattern := regexp.MustCompile(`\n|\\n`)
 	lines := newlinePattern.Split(string(mermaid), -1)
 	data := orderedmap.NewOrderedMap[string, []textEdge]()
 	styleClasses := make(map[string]styleClass)
-	properties := graphProperties{data, &styleClasses, ""}
+	properties := graphProperties{data, &styleClasses, "", styleType}
 
 	// First line should either say "graph TD" or "graph LR"
 	switch lines[0] {
