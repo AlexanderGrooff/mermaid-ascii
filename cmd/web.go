@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"net/http"
+	"strconv"
 
 	log "github.com/sirupsen/logrus"
 
@@ -35,9 +36,27 @@ func setupRouter() *gin.Engine {
 	})
 
 	r.POST("/generate", func(c *gin.Context) {
-		inputText := c.PostForm("mermaid")
-		log.Infof("Received input: %s", inputText)
-		result := generate_map(inputText)
+		mermaidString := c.PostForm("mermaid")
+		// Parse xPadding and yPadding as integers
+		xPadding := c.PostForm("xPadding")
+		if xPadding != "" {
+			if padding, err := strconv.Atoi(xPadding); err == nil {
+				paddingBetweenX = padding
+			} else {
+				log.Warnf("Invalid xPadding value: %s", xPadding)
+			}
+		}
+
+		yPadding := c.PostForm("yPadding")
+		if yPadding != "" {
+			if padding, err := strconv.Atoi(yPadding); err == nil {
+				paddingBetweenY = padding
+			} else {
+				log.Warnf("Invalid yPadding value: %s", yPadding)
+			}
+		}
+		log.Infof("Received input %s", c.Request.PostForm.Encode())
+		result := generate_map(mermaidString)
 		c.String(http.StatusOK, result)
 	})
 

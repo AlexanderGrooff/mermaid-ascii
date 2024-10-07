@@ -16,6 +16,11 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+        #input {
+            display: flex;
+            flex-direction: column;
+            gap: 10px; /* Add space between form elements */
+        }
         textarea {
             width: 100%;
             height: 300px;
@@ -71,10 +76,34 @@
         .copy-button:hover {
             background-color: #0056b3;
         }
+        .slider-container {
+            display: flex;
+            /* flex-direction: column;
+            align-items: flex-start; */
+        }
+        .slider-label-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .slider-value {
+            background-color: #fff;
+            padding: 2px 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: 'Roboto', sans-serif;
+            margin-left: 10px;
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/htmx.org@1.7.0"></script>
     <script src="https://unpkg.com/hyperscript.org@0.9.12"></script>
+    <script>
+        function updateSliderValue(slider) {
+            const valueDisplay = slider.previousElementSibling.querySelector('.slider-value');
+            valueDisplay.textContent = slider.value;
+        }
+    </script>
 </head>
 <body>
     <a href="https://github.com/AlexanderGrooff/mermaid-ascii" class="github-link">
@@ -84,13 +113,36 @@
     <h1>Mermaid ASCII</h1>
     <div class="container">
         <div class="column">
-            <form hx-post="/generate" hx-target="#result">
+            <form id="input" hx-post="/generate" hx-target="#result">
                 <textarea
                     name="mermaid" placeholder="graph LR"
                     hx-post="/generate"
                     hx-trigger="keyup changed delay:200ms"
-                    hx-target="#result"
                 ></textarea>
+                <div class="slider-container">
+                    <div class="slider-label-container">
+                        <label for="xPadding">xPadding:</label>
+                        <p class="slider-value">3</p>
+                    </div>
+                    <input
+                        type="range" id="xPadding" name="xPadding" min="3" max="10" value="3"
+                        hx-post="/generate"
+                        hx-trigger="change delay:200ms"
+                        oninput="updateSliderValue(this)"
+                    >
+                </div>
+                <div class="slider-container">
+                    <div class="slider-label-container">
+                        <label for="yPadding">yPadding:</label>
+                        <p class="slider-value">3</p>
+                    </div>
+                    <input
+                        type="range" id="yPadding" name="yPadding" min="3" max="10" value="3"
+                        hx-post="/generate"
+                        hx-trigger="change delay:200ms"
+                        oninput="updateSliderValue(this)"
+                    >
+                </div>
                 <button type="submit">Generate</button>
             </form>
             <p>There are alternative forms of generating mermaid graphs in ASCII using this same Git repository.</p>
