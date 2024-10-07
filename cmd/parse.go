@@ -9,6 +9,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type graphProperties struct {
+	data           *orderedmap.OrderedMap[string, []textEdge]
+	styleClasses   *map[string]styleClass
+	graphDirection string
+}
+
 type textNode struct {
 	name       string
 	styleClass string
@@ -77,25 +83,43 @@ func setData(parent textNode, edge textEdge, data *orderedmap.OrderedMap[string,
 	}
 }
 
-func mermaidFileToMap(mermaid string) (*orderedmap.OrderedMap[string, []textEdge], *map[string]styleClass, error) {
+func (gp *graphProperties) parseString(line string) error {
+	patterns := map[*regexp.Regexp]func([]string){
+		regexp.MustCompile(`^\s*$`): func(match []string) {
+			// Ignore empty lines
+		},
+		regexp.MustCompile(`^(.+)\s+-->\s+(.+)$`): func(match []string) {
+			setArrow(match, gp.data)
+		},
+		regexp.MustCompile(`^(.+)\s+-->\|(.+)\|\s+(.+)$`): func(match []string) {
+			setArrowWithLabel(match, gp.data)
+		},
+		regexp.MustCompile(`^classDef\s+(.+)\s+(.+)$`): func(match []string) {
+			s := parseStyleClass(match)
+			(*gp.styleClasses)[s.name] = s
+		},
+	}
+	matched := false
+	for pattern, handler := range patterns {
+		if match := pattern.FindStringSubmatch(line); match != nil {
+			handler(match[1:])
+			matched = true
+			break
+		}
+	}
+	if !matched {
+		return errors.New("Could not parse line: " + line)
+	}
+	return nil
+}
+
+func mermaidFileToMap(mermaid string) (*graphProperties, error) {
 	// Allow split on both \n and the actual string "\n" for curl compatibility
 	newlinePattern := regexp.MustCompile(`\n|\\n`)
 	lines := newlinePattern.Split(string(mermaid), -1)
 	data := orderedmap.NewOrderedMap[string, []textEdge]()
 	styleClasses := make(map[string]styleClass)
-
-	patterns := map[*regexp.Regexp]func([]string){
-		regexp.MustCompile(`^(.+)\s+-->\s+(.+)$`): func(match []string) {
-			setArrow(match, data)
-		},
-		regexp.MustCompile(`^(.+)\s+-->\|(.+)\|\s+(.+)$`): func(match []string) {
-			setArrowWithLabel(match, data)
-		},
-		regexp.MustCompile(`^classDef\s+(.+)\s+(.+)$`): func(match []string) {
-			s := parseStyleClass(match)
-			styleClasses[s.name] = s
-		},
-	}
+	properties := graphProperties{data, &styleClasses, ""}
 
 	// First line should either say "graph TD" or "graph LR"
 	switch lines[0] {
@@ -104,28 +128,18 @@ func mermaidFileToMap(mermaid string) (*orderedmap.OrderedMap[string, []textEdge
 	case "graph TD", "flowchart TD":
 		graphDirection = "TD"
 	default:
-		return nil, nil, errors.New("first line should define the graph")
+		return &properties, errors.New("first line should define the graph")
 	}
 	lines = lines[1:]
 
 	// Iterate over the lines
 	log.Debug("Parsing mermaid code")
 	for _, line := range lines {
-		if line == "" {
-			continue
-		}
 		log.Debug("Parsing line: ", line)
-		matched := false
-		for pattern, handler := range patterns {
-			if match := pattern.FindStringSubmatch(line); match != nil {
-				handler(match[1:])
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			return nil, nil, errors.New("Could not parse line: " + line)
+		err := properties.parseString(line)
+		if err != nil {
+			return &properties, err
 		}
 	}
-	return data, &styleClasses, nil
+	return &properties, nil
 }

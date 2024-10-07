@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	orderedmap "github.com/elliotchance/orderedmap/v2"
 	"github.com/gookit/color"
 	log "github.com/sirupsen/logrus"
 )
@@ -88,9 +87,9 @@ func (d *drawing) drawLine(from drawingCoord, to drawingCoord, offsetFrom int, o
 	return drawnCoords
 }
 
-func drawMap(data *orderedmap.OrderedMap[string, []textEdge], styleClasses map[string]styleClass) string {
-	g := mkGraph(data)
-	g.setStyleClasses(styleClasses)
+func drawMap(properties *graphProperties) string {
+	g := mkGraph(properties.data)
+	g.setStyleClasses(*properties.styleClasses)
 	g.createMapping()
 	d := g.draw()
 	if Coords {
