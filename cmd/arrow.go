@@ -126,7 +126,6 @@ func mergePath(path []gridCoord) []gridCoord {
 		prevDir := determineDirection(genericCoord(step0), genericCoord(step1))
 		dir := determineDirection(genericCoord(step1), genericCoord(step2))
 		if prevDir == dir {
-			log.Debugf("Removing %v from path", step1)
 			indexToRemove = append(indexToRemove, idx+1) // +1 because we skip the initial step
 		}
 		step0 = step1
@@ -138,6 +137,7 @@ func mergePath(path []gridCoord) []gridCoord {
 			newPath = append(newPath, step)
 		}
 	}
+	log.Debugf("Reduced path from %v to %v", path, newPath)
 	return newPath
 }
 

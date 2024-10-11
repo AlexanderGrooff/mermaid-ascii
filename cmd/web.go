@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -18,13 +17,11 @@ var (
 		sync.RWMutex
 		m map[string]cacheEntry
 	}{m: make(map[string]cacheEntry)}
-	maxCacheSize = 1000          // Maximum number of entries in the cache
-	cacheTTL     = 1 * time.Hour // Time-to-live for cache entries
+	maxCacheSize = 10000 // Maximum number of entries in the cache
 )
 
 type cacheEntry struct {
-	value      string
-	expiration time.Time
+	value string
 }
 
 func init() {
@@ -35,6 +32,11 @@ var webCmd = &cobra.Command{
 	Use:   "web",
 	Short: "HTTP server for rendering mermaid diagrams.",
 	Run: func(cmd *cobra.Command, args []string) {
+		if Verbose {
+			log.SetLevel(log.DebugLevel)
+		} else {
+			log.SetLevel(log.InfoLevel)
+		}
 		r := setupRouter()
 		// Listen and Server in 0.0.0.0:8080
 		err := r.Run(":3001")
@@ -72,7 +74,7 @@ func setupRouter() *gin.Engine {
 				log.Warnf("Invalid yPadding value: %s", yPadding)
 			}
 		}
-		log.Infof("Received input %s", c.Request.PostForm.Encode())
+		log.Debugf("Received input %s", c.Request.PostForm.Encode())
 
 		// Create a cache key using the input parameters
 		cacheKey := mermaidString + xPadding + yPadding
@@ -82,7 +84,7 @@ func setupRouter() *gin.Engine {
 		entry, found := resultCache.m[cacheKey]
 		resultCache.RUnlock()
 
-		if found && time.Now().Before(entry.expiration) {
+		if found {
 			log.Infof("Cache hit for key: %s", cacheKey)
 			c.String(http.StatusOK, entry.value)
 			return
@@ -94,6 +96,7 @@ func setupRouter() *gin.Engine {
 		// Store the result in the cache
 		resultCache.Lock()
 		if len(resultCache.m) >= maxCacheSize {
+			log.Infof("Cache is full, removing oldest entry")
 			// Remove a random entry if cache is full
 			for k := range resultCache.m {
 				delete(resultCache.m, k)
@@ -101,8 +104,7 @@ func setupRouter() *gin.Engine {
 			}
 		}
 		resultCache.m[cacheKey] = cacheEntry{
-			value:      result,
-			expiration: time.Now().Add(cacheTTL),
+			value: result,
 		}
 		resultCache.Unlock()
 
@@ -114,7 +116,6 @@ func setupRouter() *gin.Engine {
 
 func generate_map(input string) string {
 	properties, err := mermaidFileToMap(input, "html")
-	log.Infof("Properties: %v", properties)
 	if err != nil {
 		return "Failed to parse mermaid file"
 	}
