@@ -232,6 +232,5 @@ func (g *graph) gridToDrawingCoord(c gridCoord, dir *direction) drawingCoord {
 	}
 	dc := drawingCoord{x: x + g.columnWidth[target.x]/2, y: y + g.rowHeight[target.y]/2}
 
-	log.Debugf("Mapping grid coord %v to drawing coord %v (direction %v)", c, dc, dir)
 	return dc
 }

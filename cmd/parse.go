@@ -134,9 +134,7 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 	lines = lines[1:]
 
 	// Iterate over the lines
-	log.Debug("Parsing mermaid code")
 	for _, line := range lines {
-		log.Debug("Parsing line: ", line)
 		err := properties.parseString(line)
 		if err != nil {
 			return &properties, err

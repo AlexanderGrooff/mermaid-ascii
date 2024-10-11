@@ -148,7 +148,6 @@ func drawBox(n *node, g graph) *drawing {
 }
 
 func wrapTextInColor(text, c, styleType string) string {
-	log.Infof("Wrapping text '%s' in color %s", text, c)
 	if c == "" {
 		return text
 	}
