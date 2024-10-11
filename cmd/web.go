@@ -3,12 +3,29 @@ package cmd
 import (
 	"net/http"
 	"strconv"
+	"sync"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 )
+
+// Add the resultCache variable with additional fields
+var (
+	resultCache = struct {
+		sync.RWMutex
+		m map[string]cacheEntry
+	}{m: make(map[string]cacheEntry)}
+	maxCacheSize = 1000          // Maximum number of entries in the cache
+	cacheTTL     = 1 * time.Hour // Time-to-live for cache entries
+)
+
+type cacheEntry struct {
+	value      string
+	expiration time.Time
+}
 
 func init() {
 	rootCmd.AddCommand(webCmd)
@@ -56,7 +73,39 @@ func setupRouter() *gin.Engine {
 			}
 		}
 		log.Infof("Received input %s", c.Request.PostForm.Encode())
+
+		// Create a cache key using the input parameters
+		cacheKey := mermaidString + xPadding + yPadding
+
+		// Check if the result is already in the cache
+		resultCache.RLock()
+		entry, found := resultCache.m[cacheKey]
+		resultCache.RUnlock()
+
+		if found && time.Now().Before(entry.expiration) {
+			log.Infof("Cache hit for key: %s", cacheKey)
+			c.String(http.StatusOK, entry.value)
+			return
+		}
+
+		// If not in cache or expired, generate the map
 		result := generate_map(mermaidString)
+
+		// Store the result in the cache
+		resultCache.Lock()
+		if len(resultCache.m) >= maxCacheSize {
+			// Remove a random entry if cache is full
+			for k := range resultCache.m {
+				delete(resultCache.m, k)
+				break
+			}
+		}
+		resultCache.m[cacheKey] = cacheEntry{
+			value:      result,
+			expiration: time.Now().Add(cacheTTL),
+		}
+		resultCache.Unlock()
+
 		c.String(http.StatusOK, result)
 	})
 
