@@ -11,7 +11,7 @@ NEXT_TAG=$1
 CURRENT_TAG=$(git describe --tags)
 
 # Replace all occurrences of the current version with the next version
-find . -type f -exec sed -i "s/${CURRENT_TAG}/${NEXT_TAG}/g" {} +
+rg -l "${CURRENT_TAG}" | xargs sed -i "s/${CURRENT_TAG}/${NEXT_TAG}/g"
 git add .
 git commit -am "release version ${NEXT_TAG}"
 
