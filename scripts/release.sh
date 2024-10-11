@@ -14,7 +14,6 @@ CURRENT_TAG=$(git describe --tags)
 find . -type f -exec sed -i "s/${CURRENT_TAG}/${NEXT_TAG}/g" {} +
 git add .
 git commit -am "release version ${NEXT_TAG}"
-git tag ${NEXT_TAG}
 
 # Show changes of last commit
 git show HEAD
@@ -22,5 +21,6 @@ git show HEAD
 # Ask for confirmation before pushing
 read -p "Push to origin? [y/N] " -n 1 -r
 
+git tag ${NEXT_TAG}
 git push
 git push --tags
