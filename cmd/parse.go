@@ -50,20 +50,24 @@ func parseStyleClass(matchedLine []string) styleClass {
 	return styleClass{className, styleMap}
 }
 
-func setArrowWithLabel(matchedLine []string, data *orderedmap.OrderedMap[string, []textEdge]) {
-	parent := parseNode(matchedLine[0])
-	label := matchedLine[1]
-	child := parseNode(matchedLine[2])
-	log.Debug("Setting arrow from ", parent, " to ", child, " with label ", label)
-	setData(parent, textEdge{parent, child, label}, data)
+func setArrowWithLabel(lhs, rhs []textNode, label string, data *orderedmap.OrderedMap[string, []textEdge]) []textNode {
+	log.Debug("Setting arrow from ", lhs, " to ", rhs, " with label ", label)
+	for _, l := range lhs {
+		for _, r := range rhs {
+			setData(l, textEdge{l, r, label}, data)
+		}
+	}
+	return rhs
 }
 
-func setArrow(matchedLine []string, data *orderedmap.OrderedMap[string, []textEdge]) {
-	parent := parseNode(matchedLine[0])
-	child := parseNode(matchedLine[1])
-	label := ""
-	log.Debug("Setting arrow from ", parent, " to ", child)
-	setData(parent, textEdge{parent, child, label}, data)
+func setArrow(lhs, rhs []textNode, data *orderedmap.OrderedMap[string, []textEdge]) []textNode {
+	return setArrowWithLabel(lhs, rhs, "", data)
+}
+
+func addNode(node textNode, data *orderedmap.OrderedMap[string, []textEdge]) {
+	if _, ok := data.Get(node.name); !ok {
+		data.Set(node.name, []textEdge{})
+	}
 }
 
 func setData(parent textNode, edge textEdge, data *orderedmap.OrderedMap[string, []textEdge]) {
@@ -84,34 +88,82 @@ func setData(parent textNode, edge textEdge, data *orderedmap.OrderedMap[string,
 	}
 }
 
-func (gp *graphProperties) parseString(line string) error {
-	patterns := map[*regexp.Regexp]func([]string){
-		regexp.MustCompile(`^\s*$`): func(match []string) {
-			// Ignore empty lines
+func (gp *graphProperties) parseString(line string) ([]textNode, error) {
+	log.Debugf("Parsing line: %v", line)
+	var lhs, rhs []textNode
+	var err error
+	// Patterns are matched in order
+	patterns := []struct {
+		regex   *regexp.Regexp
+		handler func([]string) ([]textNode, error)
+	}{
+		{
+			regex: regexp.MustCompile(`^\s*$`),
+			handler: func(match []string) ([]textNode, error) {
+				// Ignore empty lines
+				return []textNode{}, nil
+			},
 		},
-		regexp.MustCompile(`^(.+)\s+-->\s+(.+)$`): func(match []string) {
-			setArrow(match, gp.data)
+		{
+			regex: regexp.MustCompile(`^(.+)\s+-->\s+(.+)$`),
+			handler: func(match []string) ([]textNode, error) {
+				if lhs, err = gp.parseString(match[0]); err != nil {
+					lhs = []textNode{parseNode(match[0])}
+				}
+				if rhs, err = gp.parseString(match[1]); err != nil {
+					rhs = []textNode{parseNode(match[1])}
+				}
+				return setArrow(lhs, rhs, gp.data), nil
+			},
 		},
-		regexp.MustCompile(`^(.+)\s+-->\|(.+)\|\s+(.+)$`): func(match []string) {
-			setArrowWithLabel(match, gp.data)
+		{
+			regex: regexp.MustCompile(`^(.+)\s+-->\|(.+)\|\s+(.+)$`),
+			handler: func(match []string) ([]textNode, error) {
+				if lhs, err = gp.parseString(match[0]); err != nil {
+					lhs = []textNode{parseNode(match[0])}
+				}
+				if rhs, err = gp.parseString(match[2]); err != nil {
+					rhs = []textNode{parseNode(match[2])}
+				}
+				return setArrowWithLabel(lhs, rhs, match[1], gp.data), nil
+			},
 		},
-		regexp.MustCompile(`^classDef\s+(.+)\s+(.+)$`): func(match []string) {
-			s := parseStyleClass(match)
-			(*gp.styleClasses)[s.name] = s
+		{
+			regex: regexp.MustCompile(`^classDef\s+(.+)\s+(.+)$`),
+			handler: func(match []string) ([]textNode, error) {
+				s := parseStyleClass(match)
+				(*gp.styleClasses)[s.name] = s
+				return []textNode{}, nil
+			},
+		},
+		{
+			regex: regexp.MustCompile(`^(.+) & (.+)$`),
+			handler: func(match []string) ([]textNode, error) {
+				log.Debugf("Found & pattern node %v to %v", match[0], match[1])
+				var node textNode
+				if lhs, err = gp.parseString(match[0]); err != nil {
+					node = parseNode(match[0])
+					addNode(node, gp.data)
+					lhs = []textNode{node}
+				}
+				if rhs, err = gp.parseString(match[1]); err != nil {
+					node = parseNode(match[1])
+					addNode(node, gp.data)
+					rhs = []textNode{node}
+				}
+				return append(lhs, rhs...), nil
+			},
 		},
 	}
-	matched := false
-	for pattern, handler := range patterns {
-		if match := pattern.FindStringSubmatch(line); match != nil {
-			handler(match[1:])
-			matched = true
-			break
+	for _, pattern := range patterns {
+		if match := pattern.regex.FindStringSubmatch(line); match != nil {
+			nodes, err := pattern.handler(match[1:])
+			if err == nil {
+				return nodes, nil
+			}
 		}
 	}
-	if !matched {
-		return errors.New("Could not parse line: " + line)
-	}
-	return nil
+	return []textNode{}, errors.New("Could not parse line: " + line)
 }
 
 func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
@@ -135,9 +187,11 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 
 	// Iterate over the lines
 	for _, line := range lines {
-		err := properties.parseString(line)
+		_, err := properties.parseString(line)
 		if err != nil {
-			return &properties, err
+			log.Debugf("Parsing remaining text to node %v", line)
+			node := parseNode(line)
+			addNode(node, properties.data)
 		}
 	}
 	return &properties, nil

@@ -159,6 +159,19 @@ B --> C`
 	verifyMap(t, mermaid, expectedMap)
 }
 
+func TestThreeNodesOneLine(t *testing.T) {
+	mermaid :=
+		`graph LR
+A --> B --> C`
+	expectedMap :=
+		`+---+     +---+     +---+
+|   |     |   |     |   |
+| A |---->| B |---->| C |
+|   |     |   |     |   |
++---+     +---+     +---+`
+	verifyMap(t, mermaid, expectedMap)
+}
+
 func TestTwoRootNodes(t *testing.T) {
 	mermaid :=
 		`graph LR
@@ -204,5 +217,28 @@ CDEFGH --> DEF`
 | CDEFGH |---->|  DEF   |
 |        |     |        |
 +--------+     +--------+`
+	verifyMap(t, mermaid, expectedMap)
+}
+
+func TestAmpersandLHS(t *testing.T) {
+	mermaid :=
+		`graph LR
+A & B --> C`
+	expectedMap :=
+		`+---+     +---+
+|   |     |   |
+| A |---->| C |
+|   |     |   |
++---+     +---+
+            ^  
+            |  
+            |  
+            |  
+            |  
++---+       |  
+|   |       |  
+| B |-------|  
+|   |          
++---+          `
 	verifyMap(t, mermaid, expectedMap)
 }
