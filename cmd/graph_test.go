@@ -17,7 +17,57 @@ func verifyMap(t *testing.T, mermaid string, expectedMap string) {
 	}
 }
 
-func TestTwoNodes(t *testing.T) {
+func TestSingleNode(t *testing.T) {
+	mermaid :=
+		`graph LR
+A`
+	expectedMap :=
+		`+---+
+|   |
+| A |
+|   |
++---+`
+	verifyMap(t, mermaid, expectedMap)
+}
+
+func TestSingleNodeLongerName(t *testing.T) {
+	mermaid :=
+		`graph LR
+ABC`
+	expectedMap :=
+		`+-----+
+|     |
+| ABC |
+|     |
++-----+`
+	verifyMap(t, mermaid, expectedMap)
+}
+
+func TestTwoSingleRootNodes(t *testing.T) {
+	mermaid :=
+		`graph LR
+A
+B`
+	expectedMap :=
+		`+---+
+|   |
+| A |
+|   |
++---+
+     
+     
+     
+     
+     
++---+
+|   |
+| B |
+|   |
++---+`
+	verifyMap(t, mermaid, expectedMap)
+}
+
+func TestTwoNodesLinked(t *testing.T) {
 	mermaid :=
 		`graph LR
 A --> B`
@@ -240,5 +290,74 @@ A & B --> C`
 | B |-------|  
 |   |          
 +---+          `
+	verifyMap(t, mermaid, expectedMap)
+}
+
+func TestAmpersandRHS(t *testing.T) {
+	mermaid :=
+		`graph LR
+A --> B & C`
+	expectedMap :=
+		`+---+     +---+
+|   |     |   |
+| A |---->| B |
+|   |     |   |
++---+     +---+
+  |            
+  |            
+  |            
+  |            
+  |            
+  |       +---+
+  |       |   |
+  ------->| C |
+          |   |
+          +---+`
+	verifyMap(t, mermaid, expectedMap)
+}
+
+func TestAmpersandLHSAndRHS(t *testing.T) {
+	mermaid :=
+		`graph LR
+A & B --> C & D`
+	expectedMap :=
+		`+---+     +---+
+|   |     |   |
+| A |---->| C |
+|   |  |  |   |
++---+  |  +---+
+  |    |       
+  |    |       
+  -----|       
+  |    |       
+  |    |       
++---+  |  +---+
+|   |  |  |   |
+| B |---->| D |
+|   |     |   |
++---+     +---+`
+	verifyMap(t, mermaid, expectedMap)
+}
+
+func TestAmpersandWithoutEdge(t *testing.T) {
+	mermaid :=
+		`graph LR
+A & B`
+	expectedMap :=
+		`+---+
+|   |
+| A |
+|   |
++---+
+     
+     
+     
+     
+     
++---+
+|   |
+| B |
+|   |
++---+`
 	verifyMap(t, mermaid, expectedMap)
 }

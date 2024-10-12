@@ -143,12 +143,10 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 				var node textNode
 				if lhs, err = gp.parseString(match[0]); err != nil {
 					node = parseNode(match[0])
-					addNode(node, gp.data)
 					lhs = []textNode{node}
 				}
 				if rhs, err = gp.parseString(match[1]); err != nil {
 					node = parseNode(match[1])
-					addNode(node, gp.data)
 					rhs = []textNode{node}
 				}
 				return append(lhs, rhs...), nil
@@ -187,11 +185,16 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 
 	// Iterate over the lines
 	for _, line := range lines {
-		_, err := properties.parseString(line)
+		nodes, err := properties.parseString(line)
 		if err != nil {
 			log.Debugf("Parsing remaining text to node %v", line)
 			node := parseNode(line)
 			addNode(node, properties.data)
+		} else {
+			// Ensure all nodes are in the map, even if they don't have an edge
+			for _, node := range nodes {
+				addNode(node, properties.data)
+			}
 		}
 	}
 	return &properties, nil

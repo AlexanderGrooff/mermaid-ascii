@@ -112,6 +112,7 @@ func (g *graph) createMapping() {
 	}
 
 	for _, n := range g.nodes {
+		log.Debugf("Creating mapping for node %s at %v", n.name, n.gridCoord)
 		var childLevel int
 		// Next column is 4 coords further. This is because every node is 3 coords wide + 1 coord inbetween.
 		if graphDirection == "LR" {
