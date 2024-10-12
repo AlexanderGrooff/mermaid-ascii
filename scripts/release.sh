@@ -8,7 +8,7 @@ if [ -z "$1" ]; then
   exit 1
 fi
 NEXT_TAG=$1
-CURRENT_TAG=$(git describe --tags)
+CURRENT_TAG=$(git tag | tail -n1)
 
 # Replace all occurrences of the current version with the next version
 rg -l "${CURRENT_TAG}" | xargs sed -i "s/${CURRENT_TAG}/${NEXT_TAG}/g"
