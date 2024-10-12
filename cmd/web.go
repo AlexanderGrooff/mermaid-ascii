@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"net/http"
+	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -23,6 +25,11 @@ var (
 type cacheEntry struct {
 	value string
 }
+
+var (
+	gitVersion     string
+	gitVersionOnce sync.Once
+)
 
 func init() {
 	rootCmd.AddCommand(webCmd)
@@ -46,12 +53,30 @@ var webCmd = &cobra.Command{
 	},
 }
 
+// Add this function near the top of the file, after the imports
+func getGitVersion() string {
+	gitVersionOnce.Do(func() {
+		log.Info("Getting git version")
+		cmd := exec.Command("git", "describe", "--tags", "--always")
+		output, err := cmd.Output()
+		if err != nil {
+			log.Warnf("Failed to get git version: %v", err)
+			gitVersion = "unknown"
+		} else {
+			gitVersion = strings.TrimSpace(string(output))
+		}
+	})
+	return gitVersion
+}
+
 func setupRouter() *gin.Engine {
 	r := gin.Default()
 
 	r.LoadHTMLGlob("templates/*")
 	r.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.tmpl", gin.H{})
+		c.HTML(http.StatusOK, "index.tmpl", gin.H{
+			"Version": getGitVersion(),
+		})
 	})
 
 	r.POST("/generate", func(c *gin.Context) {
