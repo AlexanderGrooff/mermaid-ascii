@@ -38,10 +38,8 @@ You can render graphs directly from the command line or start a web interface to
 ```bash
 $ cat test.mermaid
 graph LR
-A --> B
-A --> C
-B --> C
-B --> D
+A --> B & C
+B --> C & D
 D --> C
 $ mermaid-ascii --file test.mermaid
 +---+     +---+     +---+
@@ -305,10 +303,10 @@ The baseline components for Mermaid work, but there are a lot of things that are
 - [x] Labelled edges (like `A -->|label| B`)
 - [x] Graph directions like `graph LR` and `graph TB`
 - [x] `classDef` and `class`
+- [x] `A & B`
+- [x] Multiple arrows on one line (like `A --> B --> C`)
 - [ ] `subgraph`
 - [ ] Shapes other than rectangles
-- [ ] `A & B`
-- [ ] Multiple arrows on one line (like `A --> B --> C`)
 - [ ] Whitespacing and comments
 
 ### Rendering
