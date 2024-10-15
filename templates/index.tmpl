@@ -157,7 +157,9 @@
                         oninput="updateSliderValue(this)"
                     >
                 </div>
-                <button type="submit">Generate</button>
+                <button
+                    hx-post="/generate"
+                >Generate</button>
             </form>
             <div class="example-buttons">
                 <button type="button" onclick="setExample('graph LR\nA --> B & C\nB --> C & D\nD --> C')">Example 1</button>
