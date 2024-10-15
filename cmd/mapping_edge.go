@@ -19,15 +19,16 @@ type edge struct {
 func (g *graph) determinePath(e *edge) {
 	// Get both paths and use least amount of steps
 	var preferredPath, alternativePath []gridCoord
+	var from, to gridCoord
 	var err error
 	preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir := determineStartAndEndDir(e)
-	from := e.from.gridCoord.Direction(preferredDir)
-	to := e.to.gridCoord.Direction(preferredOppositeDir)
+
+	from = e.from.gridCoord.Direction(preferredDir)
+	to = e.to.gridCoord.Direction(preferredOppositeDir)
 	log.Debugf("Determining preferred path from %v (direction %v) to %v (direction %v)", *e.from, preferredDir, *e.to, preferredOppositeDir)
 
 	// Get preferred path
 	preferredPath, err = g.getPath(from, to)
-	// preferredPath = append([]gridCoord{from}, preferredPath...) // TODO: how to do add 'from' to path nicely?
 	if err != nil {
 		fmt.Printf("Error getting path from %v to %v: %v", from, to, err)
 		// This is a big assumption, but if we can't get the preferred path, we assume the alternative path is better
@@ -44,7 +45,6 @@ func (g *graph) determinePath(e *edge) {
 	log.Debugf("Determining alternative path from %v (direction %v) to %v (direction %v)", *e.from, alternativeDir, *e.to, alternativeOppositeDir)
 
 	alternativePath, err = g.getPath(from, to)
-	// alternativePath = append([]gridCoord{from}, alternativePath...)
 	if err != nil {
 		fmt.Printf("Error getting path from %v to %v: %v", from, to, err)
 		e.startDir = preferredDir

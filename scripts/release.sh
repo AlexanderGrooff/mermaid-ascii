@@ -11,7 +11,7 @@ NEXT_TAG=$1
 CURRENT_TAG=$(git tag | tail -n1)
 
 # Replace all occurrences of the current version with the next version
-rg -l "${CURRENT_TAG}" | grep -v 'go\.\(mod\|sum\)' | xargs sed -i "s/${CURRENT_TAG}/${NEXT_TAG}/g"
+rg -F -l "${CURRENT_TAG}" | grep -v 'go\.mod\|go\.sum' | xargs sed -i "s/${CURRENT_TAG}/${NEXT_TAG}/g"
 git add .
 git commit -am "release version ${NEXT_TAG}"
 

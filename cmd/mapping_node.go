@@ -62,6 +62,17 @@ func (g *graph) setColumnWidth(n *node) {
 	}
 }
 
+func (g *graph) increaseGridSizeForPath(path []gridCoord) {
+	for _, c := range path {
+		if _, exists := g.columnWidth[c.x]; !exists {
+			g.columnWidth[c.x] = paddingBetweenX / 2
+		}
+		if _, exists := g.rowHeight[c.y]; !exists {
+			g.rowHeight[c.y] = paddingBetweenY / 2
+		}
+	}
+}
+
 func (g *graph) reserveSpotInGrid(n *node, requestedCoord *gridCoord) *gridCoord {
 	if g.grid[*requestedCoord] != nil {
 		log.Debugf("Coord %d,%d is already taken", requestedCoord.x, requestedCoord.y)

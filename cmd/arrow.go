@@ -98,13 +98,17 @@ func (g *graph) getPath(from gridCoord, to gridCoord) ([]gridCoord, error) {
 }
 
 func (g *graph) isFreeInGrid(c gridCoord) bool {
-	if c.x < 0 || c.y < 0 || c.x >= len(g.columnWidth) || c.y >= len(g.rowHeight) {
+	// We'll fix it later if we overshoot the grid size
+	if c.x < 0 || c.y < 0 {
 		return false
 	}
 	return g.grid[c] == nil
 }
 
 func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) {
+	if len(e.path) == 0 {
+		return
+	}
 	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, e.path)
 	dLabel := g.drawArrowLabel(e)
 	dPath, linesDrawn := g.drawPath(e.path)

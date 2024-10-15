@@ -361,3 +361,76 @@ A & B`
 +---+`
 	verifyMap(t, mermaid, expectedMap)
 }
+
+func TestSelfReference(t *testing.T) {
+	mermaid :=
+		`graph LR
+A --> A`
+	expectedMap :=
+		`+---+  
+|   |  
+| A |-|
+|   | |
++---+ |
+  ^   |
+  |----`
+	verifyMap(t, mermaid, expectedMap)
+}
+
+func TestSelfReferenceWithEdge(t *testing.T) {
+	mermaid :=
+		`graph LR
+A --> A & B`
+	expectedMap :=
+		`+---+     +---+
+|   |     |   |
+| A |---->| B |
+|   |  |  |   |
++---+  |  +---+
+  ^    |       
+  |-----       `
+	verifyMap(t, mermaid, expectedMap)
+}
+
+func TestBackReferenceFromChild(t *testing.T) {
+	mermaid :=
+		`graph LR
+A --> B --> C --> A`
+	expectedMap :=
+		`+---+     +---+     +---+
+|   |     |   |     |   |
+| A |<--->| B |--|--| C |
+|   |  |  |   |  |  |   |
++---+  |  +---+  |  +---+
+       |         |       
+       |----------       `
+	verifyMap(t, mermaid, expectedMap)
+}
+
+func TestPreserveOrderOfDefinition(t *testing.T) {
+	mermaid :=
+		`graph LR
+A
+B
+B --> A
+A --> A
+B --> C
+C --> A`
+	expectedMap :=
+		`+---+     +---+
+|   |     |   |
+| A |<----| C |
+|   |  |  |   |
++---+  |  +---+
+  ^    |    ^  
+  |    |    |  
+  |-----    |  
+  |         |  
+  |         |  
++---+       |  
+|   |       |  
+| B |-------|  
+|   |          
++---+          `
+	verifyMap(t, mermaid, expectedMap)
+}
