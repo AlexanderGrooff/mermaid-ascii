@@ -105,6 +105,9 @@ func (g *graph) isFreeInGrid(c gridCoord) bool {
 }
 
 func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) {
+	if len(e.path) == 0 {
+		return
+	}
 	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, e.path)
 	dLabel := g.drawArrowLabel(e)
 	dPath, linesDrawn := g.drawPath(e.path)

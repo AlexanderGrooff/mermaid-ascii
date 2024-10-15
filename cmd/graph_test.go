@@ -361,3 +361,29 @@ A & B`
 +---+`
 	verifyMap(t, mermaid, expectedMap)
 }
+
+func TestSelfReference(t *testing.T) {
+	mermaid :=
+		`graph LR
+A & A`
+	expectedMap :=
+		`+---+
+|   |
+| A |
+|   |
++---+`
+	verifyMap(t, mermaid, expectedMap)
+}
+
+func TestSelfReferenceWithEdge(t *testing.T) {
+	mermaid :=
+		`graph LR
+A & A --> B`
+	expectedMap :=
+		`+---+     +---+
+|   |     |   |
+| A |---->| B |
+|   |     |   |
++---+     +---+`
+	verifyMap(t, mermaid, expectedMap)
+}

@@ -209,7 +209,8 @@ func (g *graph) getChildren(n *node) []*node {
 func (g *graph) getParents(n *node) []*node {
 	parents := []*node{}
 	for _, edge := range g.edges {
-		if edge.to.name == n.name {
+		// Don't add the node itself as a parent
+		if edge.to.name == n.name && edge.from.name != n.name {
 			parents = append(parents, edge.from)
 		}
 	}

@@ -19,10 +19,20 @@ type edge struct {
 func (g *graph) determinePath(e *edge) {
 	// Get both paths and use least amount of steps
 	var preferredPath, alternativePath []gridCoord
+	var from, to gridCoord
 	var err error
 	preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir := determineStartAndEndDir(e)
-	from := e.from.gridCoord.Direction(preferredDir)
-	to := e.to.gridCoord.Direction(preferredOppositeDir)
+
+	if e.from == e.to {
+		// TODO: handle self-referential nodes
+		e.startDir = preferredDir
+		e.endDir = preferredOppositeDir
+		e.path = []gridCoord{}
+		return
+	} else {
+		from = e.from.gridCoord.Direction(preferredDir)
+		to = e.to.gridCoord.Direction(preferredOppositeDir)
+	}
 	log.Debugf("Determining preferred path from %v (direction %v) to %v (direction %v)", *e.from, preferredDir, *e.to, preferredOppositeDir)
 
 	// Get preferred path
