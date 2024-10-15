@@ -97,18 +97,27 @@ func (g *graph) createMapping() {
 
 	// TODO: should the mapping be bottom-to-top instead of top-to-bottom?
 	// Set root nodes to level 0
+	nodesFound := make(map[string]bool)
+	rootNodes := []*node{}
 	for _, n := range g.nodes {
-		if len(g.getParents(n)) == 0 {
-			var mappingCoord *gridCoord
-			if graphDirection == "LR" {
-				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: 0, y: highestPositionPerLevel[0]})
-			} else {
-				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: highestPositionPerLevel[0], y: 0})
-			}
-			logrus.Debugf("Setting mapping coord for rootnode %s to %v", n.name, mappingCoord)
-			g.nodes[n.index].gridCoord = mappingCoord
-			highestPositionPerLevel[0] = highestPositionPerLevel[0] + 4
+		if _, ok := nodesFound[n.name]; !ok {
+			rootNodes = append(rootNodes, n)
 		}
+		nodesFound[n.name] = true
+		for _, child := range g.getChildren(n) {
+			nodesFound[child.name] = true
+		}
+	}
+	for _, n := range rootNodes {
+		var mappingCoord *gridCoord
+		if graphDirection == "LR" {
+			mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: 0, y: highestPositionPerLevel[0]})
+		} else {
+			mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: highestPositionPerLevel[0], y: 0})
+		}
+		logrus.Debugf("Setting mapping coord for rootnode %s to %v", n.name, mappingCoord)
+		g.nodes[n.index].gridCoord = mappingCoord
+		highestPositionPerLevel[0] = highestPositionPerLevel[0] + 4
 	}
 
 	for _, n := range g.nodes {
@@ -205,17 +214,6 @@ func (g *graph) getChildren(n *node) []*node {
 		}
 	}
 	return children
-}
-
-func (g *graph) getParents(n *node) []*node {
-	parents := []*node{}
-	for _, edge := range g.edges {
-		// Don't add the node itself as a parent
-		if edge.to.name == n.name && edge.from.name != n.name {
-			parents = append(parents, edge.from)
-		}
-	}
-	return parents
 }
 
 func (g *graph) gridToDrawingCoord(c gridCoord, dir *direction) drawingCoord {
