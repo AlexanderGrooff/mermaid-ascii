@@ -17,7 +17,7 @@
         packages.default = pkgs.buildGoModule {
           name = "mermaid-ascii";
           src = ./.;
-          vendorHash = " sha256-Lnksoj7vx3T1lJfJRuGJHqKMvwra7t7TGn8NwjEkMMI=";
+          vendorHash = "sha256-Lnksoj7vx3T1lJfJRuGJHqKMvwra7t7TGn8NwjEkMMI=";
         };
       }
     );
