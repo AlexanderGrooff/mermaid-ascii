@@ -98,7 +98,8 @@ func (g *graph) getPath(from gridCoord, to gridCoord) ([]gridCoord, error) {
 }
 
 func (g *graph) isFreeInGrid(c gridCoord) bool {
-	if c.x < 0 || c.y < 0 || c.x >= len(g.columnWidth) || c.y >= len(g.rowHeight) {
+	// We'll fix it later if we overshoot the grid size
+	if c.x < 0 || c.y < 0 {
 		return false
 	}
 	return g.grid[c] == nil

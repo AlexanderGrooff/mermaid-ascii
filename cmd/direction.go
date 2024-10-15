@@ -45,7 +45,17 @@ func (c drawingCoord) Direction(dir direction) drawingCoord {
 	return drawingCoord{x: c.x + dir.x, y: c.y + dir.y}
 }
 
+func selfReferenceDirection(e *edge) (direction, direction, direction, direction) {
+	if graphDirection == "LR" {
+		return Right, Down, Down, Right
+	}
+	return Down, Right, Right, Down
+}
+
 func determineStartAndEndDir(e *edge) (direction, direction, direction, direction) {
+	if e.from == e.to {
+		return selfReferenceDirection(e)
+	}
 	d := determineDirection(genericCoord(*e.from.gridCoord), genericCoord(*e.to.gridCoord))
 	var preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir direction
 	// LR: prefer vertical over horizontal
