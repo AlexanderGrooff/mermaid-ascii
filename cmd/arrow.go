@@ -105,17 +105,16 @@ func (g *graph) isFreeInGrid(c gridCoord) bool {
 	return g.grid[c] == nil
 }
 
-func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) {
+func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) (*drawing, *drawing, *drawing, *drawing) {
 	if len(e.path) == 0 {
-		return
+		return nil, nil, nil, nil
 	}
 	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, e.path)
 	dLabel := g.drawArrowLabel(e)
 	dPath, linesDrawn := g.drawPath(e.path)
 	dHead := g.drawArrowHead(linesDrawn[len(linesDrawn)-1])
-	g.drawing = mergeDrawings(g.drawing, dPath, drawingCoord{0, 0})
-	g.drawing = mergeDrawings(g.drawing, dHead, drawingCoord{0, 0})
-	g.drawing = mergeDrawings(g.drawing, dLabel, drawingCoord{0, 0})
+	dCorners := g.drawCorners(e.path)
+	return dPath, dHead, dCorners, dLabel
 }
 
 func mergePath(path []gridCoord) []gridCoord {
@@ -195,6 +194,19 @@ func (g *graph) drawArrowHead(line []drawingCoord) *drawing {
 		d[lastPos.x][lastPos.y] = "+"
 	}
 	return &d
+}
+
+func (g *graph) drawCorners(path []gridCoord) *drawing {
+	d := copyCanvas(g.drawing)
+	for idx, coord := range path {
+		// Skip the first and last step
+		if idx == 0 || idx == len(path)-1 {
+			continue
+		}
+		drawingCoord := g.gridToDrawingCoord(coord, nil)
+		(*d)[drawingCoord.x][drawingCoord.y] = "+"
+	}
+	return d
 }
 
 func (g *graph) drawArrowLabel(e *edge) *drawing {

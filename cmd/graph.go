@@ -176,9 +176,23 @@ func (g *graph) draw() *drawing {
 			g.drawNode(node)
 		}
 	}
+	lineDrawings := []*drawing{}
+	cornerDrawings := []*drawing{}
+	arrowHeadDrawings := []*drawing{}
+	labelDrawings := []*drawing{}
 	for _, edge := range g.edges {
-		g.drawEdge(edge)
+		line, corners, arrowHead, label := g.drawEdge(edge)
+		lineDrawings = append(lineDrawings, line)
+		cornerDrawings = append(cornerDrawings, corners)
+		arrowHeadDrawings = append(arrowHeadDrawings, arrowHead)
+		labelDrawings = append(labelDrawings, label)
 	}
+
+	// Draw in order
+	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, lineDrawings...)
+	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, cornerDrawings...)
+	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, arrowHeadDrawings...)
+	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, labelDrawings...)
 	return g.drawing
 }
 

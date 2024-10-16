@@ -111,7 +111,7 @@ A --> C`
   |            
   |       +---+
   |       |   |
-  ------->| C |
+  +------>| C |
           |   |
           +---+`
 	verifyMap(t, mermaid, expectedMap)
@@ -138,7 +138,7 @@ D --> C`
   |         v         |  
   |       +---+       |  
   |       |   |       |  
-  ------->| C |<-------  
+  +------>| C |<------+  
           |   |          
           +---+          `
 	verifyMap(t, mermaid, expectedMap)
@@ -165,7 +165,7 @@ C --> D`
   |         v         |  
   |       +---+       |  
   |       |   |       |  
-  ------->| C |-------|  
+  +------>| C |-------+  
           |   |          
           +---+          `
 	verifyMap(t, mermaid, expectedMap)
@@ -189,7 +189,7 @@ ABC --> CDEFGHI`
    |                   
    |        +---------+
    |        |         |
-   -------->| CDEFGHI |
+   +------->| CDEFGHI |
             |         |
             +---------+`
 	verifyMap(t, mermaid, expectedMap)
@@ -287,7 +287,7 @@ A & B --> C`
             |  
 +---+       |  
 |   |       |  
-| B |-------|  
+| B |-------+  
 |   |          
 +---+          `
 	verifyMap(t, mermaid, expectedMap)
@@ -310,7 +310,7 @@ A --> B & C`
   |            
   |       +---+
   |       |   |
-  ------->| C |
+  +------>| C |
           |   |
           +---+`
 	verifyMap(t, mermaid, expectedMap)
@@ -323,17 +323,17 @@ A & B --> C & D`
 	expectedMap :=
 		`+---+     +---+
 |   |     |   |
-| A |---->| C |
+| A |--+->| C |
 |   |  |  |   |
 +---+  |  +---+
   |    |       
   |    |       
-  -----|       
+  +----+       
   |    |       
   |    |       
 +---+  |  +---+
 |   |  |  |   |
-| B |---->| D |
+| B |--+->| D |
 |   |     |   |
 +---+     +---+`
 	verifyMap(t, mermaid, expectedMap)
@@ -369,11 +369,11 @@ A --> A`
 	expectedMap :=
 		`+---+  
 |   |  
-| A |-|
+| A |-+
 |   | |
 +---+ |
   ^   |
-  |----`
+  +---+`
 	verifyMap(t, mermaid, expectedMap)
 }
 
@@ -384,11 +384,11 @@ A --> A & B`
 	expectedMap :=
 		`+---+     +---+
 |   |     |   |
-| A |---->| B |
+| A |--+->| B |
 |   |  |  |   |
 +---+  |  +---+
   ^    |       
-  |-----       `
+  +----+       `
 	verifyMap(t, mermaid, expectedMap)
 }
 
@@ -399,11 +399,11 @@ A --> B --> C --> A`
 	expectedMap :=
 		`+---+     +---+     +---+
 |   |     |   |     |   |
-| A |<--->| B |--|--| C |
+| A |<-+->| B |--+->| C |
 |   |  |  |   |  |  |   |
 +---+  |  +---+  |  +---+
        |         |       
-       |----------       `
+       +---------+       `
 	verifyMap(t, mermaid, expectedMap)
 }
 
@@ -419,17 +419,17 @@ C --> A`
 	expectedMap :=
 		`+---+     +---+
 |   |     |   |
-| A |<----| C |
+| A |<-+--| C |
 |   |  |  |   |
 +---+  |  +---+
   ^    |    ^  
   |    |    |  
-  |-----    |  
+  +----+    |  
   |         |  
   |         |  
 +---+       |  
 |   |       |  
-| B |-------|  
+| B |-------+  
 |   |          
 +---+          `
 	verifyMap(t, mermaid, expectedMap)
