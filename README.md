@@ -301,7 +301,7 @@ The baseline components for Mermaid work, but there are a lot of things that are
 ### Syntax support
 
 - [x] Labelled edges (like `A -->|label| B`)
-- [x] Graph directions like `graph LR` and `graph TB`
+- [x] Graph directions like `graph LR` and `graph TD`
 - [x] `classDef` and `class`
 - [x] `A & B`
 - [x] Multiple arrows on one line (like `A --> B --> C`)
