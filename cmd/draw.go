@@ -17,15 +17,15 @@ type styleClass struct {
 
 func (g *graph) drawNode(n *node) {
 	log.Debug("Drawing node ", n.name, " at ", *n.drawingCoord)
-	m := mergeDrawings(g.drawing, n.drawing, *n.drawingCoord)
+	m := mergeDrawings(g.drawing, *n.drawingCoord, n.drawing)
 	g.drawing = m
 }
 
-func (g *graph) drawEdge(e *edge) {
+func (g *graph) drawEdge(e *edge) (*drawing, *drawing, *drawing, *drawing) {
 	from := e.from.gridCoord.Direction(e.startDir)
 	to := e.to.gridCoord.Direction(e.endDir)
 	log.Debugf("Drawing edge between %v (direction %v) and %v (direction %v)", *e.from, e.startDir, *e.to, e.endDir)
-	g.drawArrow(from, to, e)
+	return g.drawArrow(from, to, e)
 }
 
 func (d *drawing) drawText(start drawingCoord, text string) {
@@ -165,7 +165,7 @@ func wrapTextInColor(text, c, styleType string) string {
 func (d *drawing) increaseSize(x int, y int) {
 	currSizeX, currSizeY := getDrawingSize(d)
 	drawingWithNewSize := mkDrawing(Max(x, currSizeX), Max(y, currSizeY))
-	*d = *mergeDrawings(drawingWithNewSize, d, drawingCoord{0, 0})
+	*d = *mergeDrawings(drawingWithNewSize, drawingCoord{0, 0}, d)
 }
 
 func (g *graph) setDrawingSizeToGridConstraints() {
@@ -182,27 +182,39 @@ func (g *graph) setDrawingSizeToGridConstraints() {
 	g.drawing.increaseSize(maxX-1, maxY-1)
 }
 
-func mergeDrawings(d1 *drawing, d2 *drawing, mergeCoord drawingCoord) *drawing {
-	maxX1, maxY1 := getDrawingSize(d1)
-	maxX2, maxY2 := getDrawingSize(d2)
-	maxX := Max(maxX1, maxX2+mergeCoord.x)
-	maxY := Max(maxY1, maxY2+mergeCoord.y)
-	mergedDrawing := mkDrawing(maxX, maxY)
-	// Copy d1
-	for x := 0; x <= maxX1; x++ {
-		for y := 0; y <= maxY1; y++ {
-			(*mergedDrawing)[x][y] = (*d1)[x][y]
-		}
+func mergeDrawings(baseDrawing *drawing, mergeCoord drawingCoord, drawings ...*drawing) *drawing {
+	// Find the maximum dimensions
+	maxX, maxY := getDrawingSize(baseDrawing)
+	for _, d := range drawings {
+		dX, dY := getDrawingSize(d)
+		maxX = Max(maxX, dX+mergeCoord.x)
+		maxY = Max(maxY, dY+mergeCoord.y)
 	}
-	// Copy d2 with offset
-	for x := 0; x <= maxX2; x++ {
-		for y := 0; y <= maxY2; y++ {
-			c := (*d2)[x][y]
-			if c != " " {
-				(*mergedDrawing)[x+mergeCoord.x][y+mergeCoord.y] = (*d2)[x][y]
+
+	// Create a new merged drawing with the maximum dimensions
+	mergedDrawing := mkDrawing(maxX, maxY)
+
+	// Copy the base drawing
+	for x := 0; x <= maxX; x++ {
+		for y := 0; y <= maxY; y++ {
+			if x < len(*baseDrawing) && y < len((*baseDrawing)[0]) {
+				(*mergedDrawing)[x][y] = (*baseDrawing)[x][y]
 			}
 		}
 	}
+
+	// Merge all other drawings
+	for _, d := range drawings {
+		for x := 0; x < len(*d); x++ {
+			for y := 0; y < len((*d)[0]); y++ {
+				c := (*d)[x][y]
+				if c != " " {
+					(*mergedDrawing)[x+mergeCoord.x][y+mergeCoord.y] = c
+				}
+			}
+		}
+	}
+
 	return mergedDrawing
 }
 
@@ -278,7 +290,7 @@ func (d drawing) debugDrawingWrapper() *drawing {
 		debugDrawing[0][y+1] = fmt.Sprintf("%2d", y)
 	}
 
-	return mergeDrawings(&debugDrawing, &d, drawingCoord{1, 1})
+	return mergeDrawings(&debugDrawing, drawingCoord{1, 1}, &d)
 }
 
 func (d drawing) debugCoordWrapper(g graph) *drawing {
@@ -301,5 +313,5 @@ func (d drawing) debugCoordWrapper(g graph) *drawing {
 		currY += h
 	}
 
-	return mergeDrawings(&debugDrawing, &d, drawingCoord{1, 1})
+	return mergeDrawings(&debugDrawing, drawingCoord{1, 1}, &d)
 }
