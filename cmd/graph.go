@@ -179,12 +179,14 @@ func (g *graph) draw() *drawing {
 	lineDrawings := []*drawing{}
 	cornerDrawings := []*drawing{}
 	arrowHeadDrawings := []*drawing{}
+	boxStartDrawings := []*drawing{}
 	labelDrawings := []*drawing{}
 	for _, edge := range g.edges {
-		line, corners, arrowHead, label := g.drawEdge(edge)
+		line, boxStart, arrowHead, corners, label := g.drawEdge(edge)
 		lineDrawings = append(lineDrawings, line)
 		cornerDrawings = append(cornerDrawings, corners)
 		arrowHeadDrawings = append(arrowHeadDrawings, arrowHead)
+		boxStartDrawings = append(boxStartDrawings, boxStart)
 		labelDrawings = append(labelDrawings, label)
 	}
 
@@ -192,6 +194,7 @@ func (g *graph) draw() *drawing {
 	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, lineDrawings...)
 	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, cornerDrawings...)
 	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, arrowHeadDrawings...)
+	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, boxStartDrawings...)
 	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, labelDrawings...)
 	return g.drawing
 }
