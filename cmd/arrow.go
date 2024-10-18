@@ -173,6 +173,11 @@ func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord) *drawin
 	from := firstLine[0]
 	dir := determineDirection(genericCoord(path[0]), genericCoord(path[1]))
 	log.Debugf("Drawing box start at %v with direction %v for line %v", from, dir, path)
+
+	if !useExtendedChars {
+		return &d
+	}
+
 	switch dir {
 	case Up:
 		d[from.x][from.y+1] = "┴"
@@ -188,30 +193,48 @@ func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord) *drawin
 
 func (g *graph) drawArrowHead(line []drawingCoord) *drawing {
 	d := *(copyCanvas(g.drawing))
-	// Determine the direction of the arrow for the last step
 	from := line[0]
 	lastPos := line[len(line)-1]
 	dir := determineDirection(genericCoord(from), genericCoord(lastPos))
-	switch dir {
-	case Up:
-		d[lastPos.x][lastPos.y] = "▲"
-	case Down:
-		d[lastPos.x][lastPos.y] = "▼"
-	case Left:
-		d[lastPos.x][lastPos.y] = "◄"
-	case Right:
-		d[lastPos.x][lastPos.y] = "►"
-	case UpperRight:
-		d[lastPos.x][lastPos.y] = "◥"
-	case UpperLeft:
-		d[lastPos.x][lastPos.y] = "◤"
-	case LowerRight:
-		d[lastPos.x][lastPos.y] = "◢"
-	case LowerLeft:
-		d[lastPos.x][lastPos.y] = "◣"
-	default:
-		d[lastPos.x][lastPos.y] = "●"
+
+	var char string
+	if useExtendedChars {
+		switch dir {
+		case Up:
+			char = "▲"
+		case Down:
+			char = "▼"
+		case Left:
+			char = "◄"
+		case Right:
+			char = "►"
+		case UpperRight:
+			char = "◥"
+		case UpperLeft:
+			char = "◤"
+		case LowerRight:
+			char = "◢"
+		case LowerLeft:
+			char = "◣"
+		default:
+			char = "●"
+		}
+	} else {
+		switch dir {
+		case Up:
+			char = "^"
+		case Down:
+			char = "v"
+		case Left:
+			char = "<"
+		case Right:
+			char = ">"
+		default:
+			char = "*"
+		}
 	}
+
+	d[lastPos.x][lastPos.y] = char
 	return &d
 }
 
@@ -224,22 +247,25 @@ func (g *graph) drawCorners(path []gridCoord) *drawing {
 		}
 		drawingCoord := g.gridToDrawingCoord(coord, nil)
 
-		// Determine the direction from the previous to the current coordinate
 		prevDir := determineDirection(genericCoord(path[idx-1]), genericCoord(coord))
-		// Determine the direction from the current to the next coordinate
 		nextDir := determineDirection(genericCoord(coord), genericCoord(path[idx+1]))
 
-		// Choose the appropriate corner character based on the directions
-		corner := "+"
-		switch {
-		case (prevDir == Right && nextDir == Down) || (prevDir == Up && nextDir == Left):
-			corner = "┐"
-		case (prevDir == Right && nextDir == Up) || (prevDir == Down && nextDir == Left):
-			corner = "┘"
-		case (prevDir == Left && nextDir == Down) || (prevDir == Up && nextDir == Right):
-			corner = "┌"
-		case (prevDir == Left && nextDir == Up) || (prevDir == Down && nextDir == Right):
-			corner = "└"
+		var corner string
+		if useExtendedChars {
+			switch {
+			case (prevDir == Right && nextDir == Down) || (prevDir == Up && nextDir == Left):
+				corner = "┐"
+			case (prevDir == Right && nextDir == Up) || (prevDir == Down && nextDir == Left):
+				corner = "┘"
+			case (prevDir == Left && nextDir == Down) || (prevDir == Up && nextDir == Right):
+				corner = "┌"
+			case (prevDir == Left && nextDir == Up) || (prevDir == Down && nextDir == Right):
+				corner = "└"
+			default:
+				corner = "+"
+			}
+		} else {
+			corner = "+"
 		}
 
 		(*d)[drawingCoord.x][drawingCoord.y] = corner

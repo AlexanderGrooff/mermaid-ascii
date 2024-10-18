@@ -47,7 +47,6 @@ func mkGraph(data *orderedmap.OrderedMap[string, []textEdge]) graph {
 	g.columnWidth = make(map[int]int)
 	g.rowHeight = make(map[int]int)
 	g.styleClasses = make(map[string]styleClass)
-
 	index := 0
 	for el := data.Front(); el != nil; el = el.Next() {
 		nodeName := el.Key

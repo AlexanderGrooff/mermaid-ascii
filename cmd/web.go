@@ -99,10 +99,12 @@ func setupRouter() *gin.Engine {
 				log.Warnf("Invalid yPadding value: %s", yPadding)
 			}
 		}
+		useExtendedCharsData := c.PostForm("useExtendedChars")
+		useExtendedChars = useExtendedCharsData != ""
 		log.Debugf("Received input %s", c.Request.PostForm.Encode())
 
 		// Create a cache key using the input parameters
-		cacheKey := mermaidString + xPadding + yPadding
+		cacheKey := mermaidString + "x" + xPadding + "y" + yPadding + "e" + useExtendedCharsData
 
 		// Check if the result is already in the cache
 		resultCache.RLock()
