@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"io"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -26,14 +27,30 @@ var rootCmd = &cobra.Command{
 		} else {
 			log.SetLevel(log.InfoLevel)
 		}
-		mermaid, err := os.ReadFile(cmd.Flag("file").Value.String())
-		if err != nil {
-			log.Fatal("Failed to parse mermaid file: ", err)
-			return
+
+		var mermaid []byte
+		var err error
+
+		filePath := cmd.Flag("file").Value.String()
+		if filePath == "" || filePath == "-" {
+			// Read from stdin
+			mermaid, err = io.ReadAll(os.Stdin)
+			if err != nil {
+				log.Fatal("Failed to read from stdin: ", err)
+				return
+			}
+		} else {
+			// Read from file
+			mermaid, err = os.ReadFile(filePath)
+			if err != nil {
+				log.Fatal("Failed to read mermaid file: ", err)
+				return
+			}
 		}
+
 		properties, err := mermaidFileToMap(string(mermaid), "cli")
 		if err != nil {
-			log.Fatal("Failed to parse mermaid file: ", err)
+			log.Fatal("Failed to parse mermaid input: ", err)
 		}
 		drawMap(properties)
 	},
@@ -62,5 +79,5 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().StringP("file", "f", "", "Mermaid file to parse")
+	rootCmd.Flags().StringP("file", "f", "", "Mermaid file to parse (use '-' for stdin)")
 }

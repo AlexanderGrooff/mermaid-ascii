@@ -162,6 +162,42 @@ $ mermaid-ascii -f ./test.mermaid
 |         |          
 +---------+          
 
+# Read from stdin
+$ cat test.mermaid | mermaid-ascii
++---+     +---+     +---+
+|   |     |   |     |   |
+| A |---->| B |---->| D |
+|   |     |   |     |   |
++---+     +---+     +---+
+  |         |         |
+  |         |         |
+  |         |         |
+  |         |         |
+  |         v         |
+  |       +---+       |
+  |       |   |       |
+  ------->| C |<-------
+          |   |
+          +---+
+
+# Extended characters
+$ cat test.mermaid | mermaid-ascii -e
+┌───┐     ┌───┐     ┌───┐
+│   │     │   │     │   │
+│ A ├────►│ B ├────►│ D │
+│   │     │   │     │   │
+└─┬─┘     └─┬─┘     └─┬─┘
+  │         │         │  
+  │         │         │  
+  │         │         │  
+  │         │         │  
+  │         ▼         │  
+  │       ┌───┐       │  
+  │       │   │       │  
+  └──────►│ C │◄──────┘  
+          │   │          
+          └───┘          
+
 $ mermaid-ascii --help
 Generate ASCII diagrams from mermaid code.
 

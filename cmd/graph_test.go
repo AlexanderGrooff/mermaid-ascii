@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -54,86 +55,36 @@ func verifyMap(t *testing.T, testCaseFile string) {
 	}
 }
 
-func TestSingleNode(t *testing.T) {
-	verifyMap(t, "testdata/single_node.txt")
+func TestASCII(t *testing.T) {
+	useExtendedChars = false
+	dir := "testdata/ascii"
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("Failed to read directory %s: %v", dir, err)
+	}
+
+	for _, file := range files {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".txt") {
+			t.Run(file.Name(), func(t *testing.T) {
+				verifyMap(t, filepath.Join(dir, file.Name()))
+			})
+		}
+	}
 }
 
-func TestSingleNodeLongerName(t *testing.T) {
-	verifyMap(t, "testdata/single_node_longer_name.txt")
-}
+func TestExtendedChars(t *testing.T) {
+	useExtendedChars = true
+	dir := "testdata/extended-chars"
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("Failed to read directory %s: %v", dir, err)
+	}
 
-func TestTwoSingleRootNodes(t *testing.T) {
-	verifyMap(t, "testdata/two_single_root_nodes.txt")
-}
-
-func TestTwoNodesLinked(t *testing.T) {
-	verifyMap(t, "testdata/two_nodes_linked.txt")
-}
-
-func TestTwoNodesLongerNames(t *testing.T) {
-	verifyMap(t, "testdata/two_nodes_longer_names.txt")
-}
-
-func TestTwoLayerSingleGraph(t *testing.T) {
-	verifyMap(t, "testdata/two_layer_single_graph.txt")
-}
-
-func TestBacklinkFromTop(t *testing.T) {
-	verifyMap(t, "testdata/backlink_from_top.txt")
-}
-
-func TestBacklinkFromBottom(t *testing.T) {
-	verifyMap(t, "testdata/backlink_from_bottom.txt")
-}
-
-func TestTwoLayerSingleGraphLongerNames(t *testing.T) {
-	verifyMap(t, "testdata/two_layer_single_graph_longer_names.txt")
-}
-
-func TestThreeNodes(t *testing.T) {
-	verifyMap(t, "testdata/three_nodes.txt")
-}
-
-func TestThreeNodesSingleLine(t *testing.T) {
-	verifyMap(t, "testdata/three_nodes_single_line.txt")
-}
-
-func TestTwoRootNodes(t *testing.T) {
-	verifyMap(t, "testdata/two_root_nodes.txt")
-}
-
-func TestTwoRootNodesLongerNames(t *testing.T) {
-	verifyMap(t, "testdata/two_root_nodes_longer_names.txt")
-}
-
-func TestAmpersandLHS(t *testing.T) {
-	verifyMap(t, "testdata/ampersand_lhs.txt")
-}
-
-func TestAmpersandRHS(t *testing.T) {
-	verifyMap(t, "testdata/ampersand_rhs.txt")
-}
-
-func TestAmpersandLHSAndRHS(t *testing.T) {
-	verifyMap(t, "testdata/ampersand_lhs_and_rhs.txt")
-}
-
-func TestAmpersandWithoutEdge(t *testing.T) {
-	verifyMap(t, "testdata/ampersand_without_edge.txt")
-}
-
-func TestSelfReference(t *testing.T) {
-	verifyMap(t, "testdata/self_reference.txt")
-}
-
-func TestSelfReferenceWithEdge(t *testing.T) {
-	verifyMap(t, "testdata/self_reference_with_edge.txt")
-}
-
-func TestBackReferenceFromChild(t *testing.T) {
-	verifyMap(t, "testdata/back_reference_from_child.txt")
-}
-
-func TestPreserveOrderOfDefinition(t *testing.T) {
-	verifyMap(t, "testdata/preserve_order_of_definition.txt")
+	for _, file := range files {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".txt") {
+			t.Run(file.Name(), func(t *testing.T) {
+				verifyMap(t, filepath.Join(dir, file.Name()))
+			})
+		}
+	}
 }
