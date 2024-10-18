@@ -60,7 +60,7 @@ func (d *drawing) drawLine(from drawingCoord, to drawingCoord, offsetFrom int, o
 	direction := determineDirection(genericCoord(from), genericCoord(to))
 	drawnCoords := make([]drawingCoord, 0)
 	log.Debug("Drawing line from ", from, " to ", to, " direction: ", direction, " offsetFrom: ", offsetFrom, " offsetTo: ", offsetTo)
-	if useExtendedChars {
+	if !useAscii {
 		switch direction {
 		case Up:
 			for y := from.y - offsetFrom; y >= to.y-offsetTo; y-- {
@@ -179,7 +179,7 @@ func drawBox(n *node, g graph) *drawing {
 	to := drawingCoord{w, h}
 	boxDrawing := *(mkDrawing(Max(from.x, to.x), Max(from.y, to.y)))
 	log.Debug("Drawing box from ", from, " to ", to)
-	if useExtendedChars {
+	if !useAscii {
 		// Draw top border
 		for x := from.x + 1; x < to.x; x++ {
 			boxDrawing[x][from.y] = "─" // Horizontal line
@@ -322,7 +322,7 @@ func mergeDrawings(baseDrawing *drawing, mergeCoord drawingCoord, drawings ...*d
 				c := (*d)[x][y]
 				if c != " " {
 					currentChar := (*mergedDrawing)[x+mergeCoord.x][y+mergeCoord.y]
-					if useExtendedChars && isJunctionChar(c) && isJunctionChar(currentChar) {
+					if !useAscii && isJunctionChar(c) && isJunctionChar(currentChar) {
 						(*mergedDrawing)[x+mergeCoord.x][y+mergeCoord.y] = mergeJunctions(currentChar, c)
 					} else {
 						(*mergedDrawing)[x+mergeCoord.x][y+mergeCoord.y] = c

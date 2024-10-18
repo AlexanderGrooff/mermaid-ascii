@@ -56,7 +56,7 @@ func verifyMap(t *testing.T, testCaseFile string) {
 }
 
 func TestASCII(t *testing.T) {
-	useExtendedChars = false
+	useAscii = true
 	dir := "testdata/ascii"
 	files, err := os.ReadDir(dir)
 	if err != nil {
@@ -73,7 +73,7 @@ func TestASCII(t *testing.T) {
 }
 
 func TestExtendedChars(t *testing.T) {
-	useExtendedChars = true
+	useAscii = false
 	dir := "testdata/extended-chars"
 	files, err := os.ReadDir(dir)
 	if err != nil {

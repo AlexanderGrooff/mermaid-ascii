@@ -100,7 +100,7 @@ func setupRouter() *gin.Engine {
 			}
 		}
 		useExtendedCharsData := c.PostForm("useExtendedChars")
-		useExtendedChars = useExtendedCharsData != ""
+		useAscii = useExtendedCharsData == ""
 		log.Debugf("Received input %s", c.Request.PostForm.Encode())
 
 		// Create a cache key using the input parameters
