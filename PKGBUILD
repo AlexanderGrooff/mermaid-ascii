@@ -1,5 +1,5 @@
 pkgname='mermaid-ascii'
-pkgver=0.5.1
+pkgver=0.6.0
 pkgrel=1
 pkgdesc='Render Mermaid ASCII in textual form'
 arch=(x86_64)
