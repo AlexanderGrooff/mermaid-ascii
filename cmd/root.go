@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"io"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -14,6 +15,7 @@ var boxBorderPadding = 1
 var paddingBetweenX = 5
 var paddingBetweenY = 5
 var graphDirection = "LR"
+var useAscii = false
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -25,14 +27,30 @@ var rootCmd = &cobra.Command{
 		} else {
 			log.SetLevel(log.InfoLevel)
 		}
-		mermaid, err := os.ReadFile(cmd.Flag("file").Value.String())
-		if err != nil {
-			log.Fatal("Failed to parse mermaid file: ", err)
-			return
+
+		var mermaid []byte
+		var err error
+
+		filePath := cmd.Flag("file").Value.String()
+		if filePath == "" || filePath == "-" {
+			// Read from stdin
+			mermaid, err = io.ReadAll(os.Stdin)
+			if err != nil {
+				log.Fatal("Failed to read from stdin: ", err)
+				return
+			}
+		} else {
+			// Read from file
+			mermaid, err = os.ReadFile(filePath)
+			if err != nil {
+				log.Fatal("Failed to read mermaid file: ", err)
+				return
+			}
 		}
+
 		properties, err := mermaidFileToMap(string(mermaid), "cli")
 		if err != nil {
-			log.Fatal("Failed to parse mermaid file: ", err)
+			log.Fatal("Failed to parse mermaid input: ", err)
 		}
 		drawMap(properties)
 	},
@@ -53,6 +71,7 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Verbose output")
+	rootCmd.PersistentFlags().BoolVarP(&useAscii, "ascii", "a", false, "Don't use extended character set")
 	rootCmd.PersistentFlags().BoolVarP(&Coords, "coords", "c", false, "Show coordinates")
 	rootCmd.PersistentFlags().IntVarP(&paddingBetweenX, "paddingX", "x", paddingBetweenX, "Horizontal space between nodes")
 	rootCmd.PersistentFlags().IntVarP(&paddingBetweenY, "paddingY", "y", paddingBetweenY, "Vertical space between nodes")
@@ -60,5 +79,5 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().StringP("file", "f", "", "Mermaid file to parse")
+	rootCmd.Flags().StringP("file", "f", "", "Mermaid file to parse (use '-' for stdin)")
 }

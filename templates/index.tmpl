@@ -157,6 +157,16 @@
                         oninput="updateSliderValue(this)"
                     >
                 </div>
+                <div class="slider-container">
+                    <div class="slider-label-container">
+                        <label for="useExtendedChars">Use extended characters:</label>
+                    </div>
+                    <input
+                        type="checkbox" id="useExtendedChars" name="useExtendedChars" checked
+                        hx-post="/generate"
+                        hx-trigger="change"
+                    >
+                </div>
                 <button
                     hx-post="/generate"
                 >Generate</button>

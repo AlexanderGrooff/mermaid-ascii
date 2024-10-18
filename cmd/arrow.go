@@ -105,16 +105,17 @@ func (g *graph) isFreeInGrid(c gridCoord) bool {
 	return g.grid[c] == nil
 }
 
-func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) (*drawing, *drawing, *drawing, *drawing) {
+func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) (*drawing, *drawing, *drawing, *drawing, *drawing) {
 	if len(e.path) == 0 {
-		return nil, nil, nil, nil
+		return nil, nil, nil, nil, nil
 	}
 	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, e.path)
 	dLabel := g.drawArrowLabel(e)
 	dPath, linesDrawn := g.drawPath(e.path)
-	dHead := g.drawArrowHead(linesDrawn[len(linesDrawn)-1])
+	dBoxStart := g.drawBoxStart(e.path, linesDrawn[0])
+	dArrowHead := g.drawArrowHead(linesDrawn[len(linesDrawn)-1])
 	dCorners := g.drawCorners(e.path)
-	return dPath, dHead, dCorners, dLabel
+	return dPath, dBoxStart, dArrowHead, dCorners, dLabel
 }
 
 func mergePath(path []gridCoord) []gridCoord {
@@ -160,39 +161,80 @@ func (g *graph) drawPath(path []gridCoord) (*drawing, [][]drawingCoord) {
 			// Don't cross the node border
 			linesDrawn = append(linesDrawn, d.drawLine(previousDrawingCoord, nextDrawingCoord, 1, -1))
 		} else {
-			linesDrawn = append(linesDrawn, d.drawLine(previousDrawingCoord, nextDrawingCoord, 0, -1))
+			linesDrawn = append(linesDrawn, d.drawLine(previousDrawingCoord, nextDrawingCoord, 1, -1))
 		}
 		previousCoord = nextCoord
 	}
 	return d, linesDrawn
 }
 
+func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord) *drawing {
+	d := *(copyCanvas(g.drawing))
+	from := firstLine[0]
+	dir := determineDirection(genericCoord(path[0]), genericCoord(path[1]))
+	log.Debugf("Drawing box start at %v with direction %v for line %v", from, dir, path)
+
+	if useAscii {
+		return &d
+	}
+
+	switch dir {
+	case Up:
+		d[from.x][from.y+1] = "┴"
+	case Down:
+		d[from.x][from.y-1] = "┬"
+	case Left:
+		d[from.x+1][from.y] = "┤"
+	case Right:
+		d[from.x-1][from.y] = "├"
+	}
+	return &d
+}
+
 func (g *graph) drawArrowHead(line []drawingCoord) *drawing {
 	d := *(copyCanvas(g.drawing))
-	// Determine the direction of the arrow for the last step
 	from := line[0]
 	lastPos := line[len(line)-1]
 	dir := determineDirection(genericCoord(from), genericCoord(lastPos))
-	switch dir {
-	case Up:
-		d[lastPos.x][lastPos.y] = "^"
-	case Down:
-		d[lastPos.x][lastPos.y] = "v"
-	case Left:
-		d[lastPos.x][lastPos.y] = "<"
-	case Right:
-		d[lastPos.x][lastPos.y] = ">"
-	case UpperRight:
-		d[lastPos.x][lastPos.y] = "┐"
-	case UpperLeft:
-		d[lastPos.x][lastPos.y] = "┌"
-	case LowerRight:
-		d[lastPos.x][lastPos.y] = "┘"
-	case LowerLeft:
-		d[lastPos.x][lastPos.y] = "└"
-	default:
-		d[lastPos.x][lastPos.y] = "+"
+
+	var char string
+	if !useAscii {
+		switch dir {
+		case Up:
+			char = "▲"
+		case Down:
+			char = "▼"
+		case Left:
+			char = "◄"
+		case Right:
+			char = "►"
+		case UpperRight:
+			char = "◥"
+		case UpperLeft:
+			char = "◤"
+		case LowerRight:
+			char = "◢"
+		case LowerLeft:
+			char = "◣"
+		default:
+			char = "●"
+		}
+	} else {
+		switch dir {
+		case Up:
+			char = "^"
+		case Down:
+			char = "v"
+		case Left:
+			char = "<"
+		case Right:
+			char = ">"
+		default:
+			char = "*"
+		}
 	}
+
+	d[lastPos.x][lastPos.y] = char
 	return &d
 }
 
@@ -204,7 +246,29 @@ func (g *graph) drawCorners(path []gridCoord) *drawing {
 			continue
 		}
 		drawingCoord := g.gridToDrawingCoord(coord, nil)
-		(*d)[drawingCoord.x][drawingCoord.y] = "+"
+
+		prevDir := determineDirection(genericCoord(path[idx-1]), genericCoord(coord))
+		nextDir := determineDirection(genericCoord(coord), genericCoord(path[idx+1]))
+
+		var corner string
+		if !useAscii {
+			switch {
+			case (prevDir == Right && nextDir == Down) || (prevDir == Up && nextDir == Left):
+				corner = "┐"
+			case (prevDir == Right && nextDir == Up) || (prevDir == Down && nextDir == Left):
+				corner = "┘"
+			case (prevDir == Left && nextDir == Down) || (prevDir == Up && nextDir == Right):
+				corner = "┌"
+			case (prevDir == Left && nextDir == Up) || (prevDir == Down && nextDir == Right):
+				corner = "└"
+			default:
+				corner = "+"
+			}
+		} else {
+			corner = "+"
+		}
+
+		(*d)[drawingCoord.x][drawingCoord.y] = corner
 	}
 	return d
 }
