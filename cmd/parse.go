@@ -28,12 +28,15 @@ type textEdge struct {
 }
 
 func parseNode(line string) textNode {
+	// Trim any whitespace from the line that might be left after comment removal
+	trimmedLine := strings.TrimSpace(line)
+	
 	nodeWithClass, _ := regexp.Compile(`^(.+):::(.+)$`)
 
-	if match := nodeWithClass.FindStringSubmatch(line); match != nil {
-		return textNode{match[1], match[2]}
+	if match := nodeWithClass.FindStringSubmatch(trimmedLine); match != nil {
+		return textNode{strings.TrimSpace(match[1]), strings.TrimSpace(match[2])}
 	} else {
-		return textNode{line, ""}
+		return textNode{trimmedLine, ""}
 	}
 }
 
@@ -182,9 +185,9 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 			continue
 		}
 		
-		// Remove inline comments (anything after %%)
+		// Remove inline comments (anything after %%) and trim resulting whitespace
 		if idx := strings.Index(line, "%%"); idx != -1 {
-			line = line[:idx]
+			line = strings.TrimSpace(line[:idx])
 		}
 		
 		// Skip empty lines after comment removal
