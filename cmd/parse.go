@@ -28,12 +28,15 @@ type textEdge struct {
 }
 
 func parseNode(line string) textNode {
+	// Trim any whitespace from the line that might be left after comment removal
+	trimmedLine := strings.TrimSpace(line)
+	
 	nodeWithClass, _ := regexp.Compile(`^(.+):::(.+)$`)
 
-	if match := nodeWithClass.FindStringSubmatch(line); match != nil {
-		return textNode{match[1], match[2]}
+	if match := nodeWithClass.FindStringSubmatch(trimmedLine); match != nil {
+		return textNode{strings.TrimSpace(match[1]), strings.TrimSpace(match[2])}
 	} else {
-		return textNode{line, ""}
+		return textNode{trimmedLine, ""}
 	}
 }
 
@@ -167,7 +170,32 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 	// Allow split on both \n and the actual string "\n" for curl compatibility
 	newlinePattern := regexp.MustCompile(`\n|\\n`)
-	lines := newlinePattern.Split(string(mermaid), -1)
+	rawLines := newlinePattern.Split(string(mermaid), -1)
+	
+	// Process lines to remove comments
+	lines := []string{}
+	for _, line := range rawLines {
+		// Stop processing at "---" separator (used in test files)
+		if line == "---" {
+			break
+		}
+		
+		// Skip lines that start with %% (comment lines)
+		if strings.HasPrefix(strings.TrimSpace(line), "%%") {
+			continue
+		}
+		
+		// Remove inline comments (anything after %%) and trim resulting whitespace
+		if idx := strings.Index(line, "%%"); idx != -1 {
+			line = strings.TrimSpace(line[:idx])
+		}
+		
+		// Skip empty lines after comment removal
+		if len(strings.TrimSpace(line)) > 0 {
+			lines = append(lines, line)
+		}
+	}
+	
 	data := orderedmap.NewOrderedMap[string, []textEdge]()
 	styleClasses := make(map[string]styleClass)
 	properties := graphProperties{data, &styleClasses, "", styleType}
