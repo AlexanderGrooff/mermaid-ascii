@@ -115,7 +115,42 @@ func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) (*drawing, *dra
 	dBoxStart := g.drawBoxStart(e.path, linesDrawn[0])
 	dArrowHead := g.drawArrowHead(linesDrawn[len(linesDrawn)-1])
 	dCorners := g.drawCorners(e.path)
+
+	// Apply yOffset to drawing coordinates for bidirectional arrows
+	if e.yOffset != 0 {
+		log.Debugf("Applying yOffset %d to arrow drawing components", e.yOffset)
+		dPath = g.applyYOffsetToDrawing(dPath, e.yOffset)
+		dBoxStart = g.applyYOffsetToDrawing(dBoxStart, e.yOffset)
+		dArrowHead = g.applyYOffsetToDrawing(dArrowHead, e.yOffset)
+		dCorners = g.applyYOffsetToDrawing(dCorners, e.yOffset)
+		dLabel = g.applyYOffsetToDrawing(dLabel, e.yOffset)
+	}
+
 	return dPath, dBoxStart, dArrowHead, dCorners, dLabel
+}
+
+// applyYOffsetToDrawing applies a vertical offset to all drawing coordinates in a drawing
+func (g *graph) applyYOffsetToDrawing(d *drawing, yOffset int) *drawing {
+	if d == nil || yOffset == 0 {
+		return d
+	}
+
+	// Create a copy of the drawing with offset coordinates
+	maxX, maxY := getDrawingSize(d)
+	offsetDrawing := mkDrawing(maxX, maxY)
+
+	for x := 0; x < maxX; x++ {
+		for y := 0; y < maxY; y++ {
+			if (*d)[x][y] != " " {
+				newY := y + yOffset
+				if newY >= 0 && newY < len((*offsetDrawing)[x])-1 {
+					(*offsetDrawing)[x][newY] = (*d)[x][y]
+				}
+			}
+		}
+	}
+
+	return offsetDrawing
 }
 
 func mergePath(path []gridCoord) []gridCoord {

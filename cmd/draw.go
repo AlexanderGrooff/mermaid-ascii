@@ -42,7 +42,8 @@ func (g *graph) drawNode(n *node) {
 func (g *graph) drawEdge(e *edge) (*drawing, *drawing, *drawing, *drawing, *drawing) {
 	from := e.from.gridCoord.Direction(e.startDir)
 	to := e.to.gridCoord.Direction(e.endDir)
-	log.Debugf("Drawing edge between %v (direction %v) and %v (direction %v)", *e.from, e.startDir, *e.to, e.endDir)
+	
+	log.Debugf("Drawing edge between %v (direction %v) and %v (direction %v) with yOffset %d", *e.from, e.startDir, *e.to, e.endDir, e.yOffset)
 	return g.drawArrow(from, to, e)
 }
 

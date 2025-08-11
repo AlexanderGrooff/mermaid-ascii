@@ -14,6 +14,7 @@ type edge struct {
 	labelLine []gridCoord
 	startDir  direction
 	endDir    direction
+	yOffset   int // Vertical offset for bidirectional arrows
 }
 
 func (g *graph) determinePath(e *edge) {
@@ -113,4 +114,83 @@ func (g graph) calculateLineWidth(line []gridCoord) int {
 		totalSize += g.columnWidth[c.x]
 	}
 	return totalSize
+}
+
+// findBidirectionalEdge finds the corresponding reverse edge for a given edge
+func (g *graph) findBidirectionalEdge(e *edge) *edge {
+	for _, other := range g.edges {
+		if other != e && other.from == e.to && other.to == e.from {
+			return other
+		}
+	}
+	return nil
+}
+
+// isBidirectionalEdge checks if this edge is part of a bidirectional pair
+func (g *graph) isBidirectionalEdge(e *edge) bool {
+	return g.findBidirectionalEdge(e) != nil
+}
+
+// determineBidirectionalPath determines paths for bidirectional edges with vertical offset
+func (g *graph) determineBidirectionalPath(e *edge, isFirstOfPair bool) {
+	// Get both paths and use least amount of steps
+	var preferredPath, alternativePath []gridCoord
+	var from, to gridCoord
+	var err error
+	preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir := determineStartAndEndDir(e)
+
+	// Store the drawing-level yOffset in the edge for later use during drawing
+	// Apply offset at drawing coordinate level for precise positioning
+	if isFirstOfPair {
+		e.yOffset = -1 // Upper arrow - 1 pixel above middle
+	} else {
+		e.yOffset = 1  // Lower arrow - 1 pixel below middle
+	}
+
+	// Calculate paths normally without any grid-level offset
+	from = e.from.gridCoord.Direction(preferredDir)
+	to = e.to.gridCoord.Direction(preferredOppositeDir)
+
+	log.Debugf("Determining bidirectional path from %v (direction %v) to %v (direction %v) with offset %d", *e.from, preferredDir, *e.to, preferredOppositeDir, e.yOffset)
+
+	// Get preferred path
+	preferredPath, err = g.getPath(from, to)
+	if err != nil {
+		fmt.Printf("Error getting path from %v to %v: %v", from, to, err)
+		// This is a big assumption, but if we can't get the preferred path, we assume the alternative path is better
+		e.startDir = alternativeDir
+		e.endDir = alternativeOppositeDir
+		e.path = alternativePath
+		return
+	}
+	preferredPath = mergePath(preferredPath)
+
+	// Alternative path (no grid-level offset needed, offset applied at drawing level)
+	from = e.from.gridCoord.Direction(alternativeDir)
+	to = e.to.gridCoord.Direction(alternativeOppositeDir)
+
+	log.Debugf("Determining alternative bidirectional path from %v (direction %v) to %v (direction %v) with offset %d", *e.from, alternativeDir, *e.to, alternativeOppositeDir, e.yOffset)
+
+	alternativePath, err = g.getPath(from, to)
+	if err != nil {
+		fmt.Printf("Error getting path from %v to %v: %v", from, to, err)
+		e.startDir = preferredDir
+		e.endDir = preferredOppositeDir
+		e.path = preferredPath
+	}
+	alternativePath = mergePath(alternativePath)
+
+	nrStepsPreferred := len(preferredPath)
+	nrStepsAlternative := len(alternativePath)
+	if nrStepsPreferred <= nrStepsAlternative {
+		log.Debugf("Using preferred bidirectional path with %v steps instead of alternative path with %v steps", nrStepsPreferred, nrStepsAlternative)
+		e.startDir = preferredDir
+		e.endDir = preferredOppositeDir
+		e.path = preferredPath
+	} else {
+		log.Debugf("Using alternative bidirectional path with %v steps instead of alternative path with %v steps", nrStepsAlternative, nrStepsPreferred)
+		e.startDir = alternativeDir
+		e.endDir = alternativeOppositeDir
+		e.path = alternativePath
+	}
 }

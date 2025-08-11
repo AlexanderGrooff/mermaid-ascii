@@ -151,10 +151,49 @@ func (g *graph) createMapping() {
 		g.setColumnWidth(n)
 	}
 
+	// Track processed edges to avoid double-processing bidirectional pairs
+	processedEdges := make(map[*edge]bool)
+	
 	for _, e := range g.edges {
-		g.determinePath(e)
-		g.increaseGridSizeForPath(e.path)
-		g.determineLabelLine(e)
+		// Skip if this edge was already processed as part of a bidirectional pair
+		if processedEdges[e] {
+			continue
+		}
+		
+		if g.isBidirectionalEdge(e) {
+			// Process bidirectional pair
+			reverseEdge := g.findBidirectionalEdge(e)
+			
+			// Determine which edge should be on top based on node names for consistency
+			var firstEdge, secondEdge *edge
+			if e.from.name < e.to.name {
+				firstEdge = e
+				secondEdge = reverseEdge
+			} else {
+				firstEdge = reverseEdge
+				secondEdge = e
+			}
+			
+			// Process first edge (upper arrow)
+			g.determineBidirectionalPath(firstEdge, true)
+			g.increaseGridSizeForPath(firstEdge.path)
+			g.determineLabelLine(firstEdge)
+			
+			// Process second edge (lower arrow)
+			g.determineBidirectionalPath(secondEdge, false)
+			g.increaseGridSizeForPath(secondEdge.path)
+			g.determineLabelLine(secondEdge)
+			
+			// Mark both edges as processed
+			processedEdges[firstEdge] = true
+			processedEdges[secondEdge] = true
+		} else {
+			// Process normal edge
+			g.determinePath(e)
+			g.increaseGridSizeForPath(e.path)
+			g.determineLabelLine(e)
+			processedEdges[e] = true
+		}
 	}
 
 	// ! Last point before we manipulate the drawing !
