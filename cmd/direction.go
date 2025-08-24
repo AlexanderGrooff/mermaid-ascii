@@ -58,9 +58,21 @@ func determineStartAndEndDir(e *edge) (direction, direction, direction, directio
 	}
 	d := determineDirection(genericCoord(*e.from.gridCoord), genericCoord(*e.to.gridCoord))
 	var preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir direction
+
+	// Check if this is a backwards flowing edge
+	isBackwards := false
+	if graphDirection == "LR" {
+		// In LR mode, backwards flow is when edge goes from right to left (Left direction)
+		isBackwards = (d == Left || d == UpperLeft || d == LowerLeft)
+	} else { // TD mode
+		// In TD mode, backwards flow is when edge goes from bottom to top (Up direction)
+		isBackwards = (d == Up || d == UpperLeft || d == UpperRight)
+	}
+
 	// LR: prefer vertical over horizontal
 	// TD: prefer horizontal over vertical
 	// TODO: This causes some squirmy lines if the corner spot is already occupied.
+	// For backwards edges, use special start positions: Down in LR mode, Right in TD mode
 	switch d {
 	case LowerRight:
 		if graphDirection == "LR" {
@@ -88,8 +100,9 @@ func determineStartAndEndDir(e *edge) (direction, direction, direction, directio
 		}
 	case LowerLeft:
 		if graphDirection == "LR" {
+			// Backwards flow in LR mode - start from Down, arrive at Down
 			preferredDir = Down
-			preferredOppositeDir = Right
+			preferredOppositeDir = Down // Edge goes to bottom of destination
 			alternativeDir = Left
 			alternativeOppositeDir = Up
 		} else {
@@ -100,22 +113,46 @@ func determineStartAndEndDir(e *edge) (direction, direction, direction, directio
 		}
 	case UpperLeft:
 		if graphDirection == "LR" {
-			preferredDir = Up
-			preferredOppositeDir = Right
+			// Backwards flow in LR mode - start from Down, arrive at Down
+			preferredDir = Down
+			preferredOppositeDir = Down // Edge goes to bottom of destination
 			alternativeDir = Left
 			alternativeOppositeDir = Down
 		} else {
-			preferredDir = Left
-			preferredOppositeDir = Down
+			// Backwards flow in TD mode - start from Right, arrive at Right
+			preferredDir = Right
+			preferredOppositeDir = Right // Edge goes to right of destination
 			alternativeDir = Up
 			alternativeOppositeDir = Right
 		}
 	default:
-		preferredDir = d
-		preferredOppositeDir = preferredDir.getOpposite()
-		// TODO: just return null and don't calculate alternative path
-		alternativeDir = d
-		alternativeOppositeDir = preferredOppositeDir
+		// Handle direct backwards flow cases
+		if isBackwards {
+			if graphDirection == "LR" && d == Left {
+				// Direct left flow in LR mode - start from Down, arrive at Down
+				preferredDir = Down
+				preferredOppositeDir = Down // Edge goes to bottom of destination
+				alternativeDir = Left
+				alternativeOppositeDir = Right
+			} else if graphDirection == "TD" && d == Up {
+				// Direct up flow in TD mode - start from Right, arrive at Right
+				preferredDir = Right
+				preferredOppositeDir = Right // Edge goes to right of destination
+				alternativeDir = Up
+				alternativeOppositeDir = Down
+			} else {
+				preferredDir = d
+				preferredOppositeDir = preferredDir.getOpposite()
+				alternativeDir = d
+				alternativeOppositeDir = preferredOppositeDir
+			}
+		} else {
+			preferredDir = d
+			preferredOppositeDir = preferredDir.getOpposite()
+			// TODO: just return null and don't calculate alternative path
+			alternativeDir = d
+			alternativeOppositeDir = preferredOppositeDir
+		}
 	}
 	return preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir
 }
