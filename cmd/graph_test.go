@@ -4,22 +4,35 @@ import (
 	"bufio"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
 )
 
-func readTestCase(filePath string) (string, string, error) {
+type testCase struct {
+	mermaid  string
+	expected string
+	paddingX int
+	paddingY int
+}
+
+func readTestCase(filePath string) (testCase, error) {
+	tc := testCase{paddingX: 5, paddingY: 5}
+
 	file, err := os.Open(filePath)
 	if err != nil {
-		return "", "", err
+		return tc, err
 	}
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
 	var mermaid, expectedMap strings.Builder
 	inMermaid := true
+	mermaidStarted := false
+	paddingRegex := regexp.MustCompile(`^(?i)(padding[xy])\s*=\s*(\d+)\s*$`)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -28,28 +41,51 @@ func readTestCase(filePath string) (string, string, error) {
 			continue
 		}
 		if inMermaid {
+			trimmed := strings.TrimSpace(line)
+			if !mermaidStarted {
+				if trimmed == "" {
+					continue
+				}
+				if match := paddingRegex.FindStringSubmatch(trimmed); match != nil {
+					paddingValue, convErr := strconv.Atoi(match[2])
+					if convErr != nil {
+						return tc, convErr
+					}
+					if strings.EqualFold(match[1], "paddingX") {
+						tc.paddingX = paddingValue
+					} else {
+						tc.paddingY = paddingValue
+					}
+					continue
+				}
+			}
+			mermaidStarted = true
 			mermaid.WriteString(line + "\n")
 		} else {
 			expectedMap.WriteString(line + "\n")
 		}
 	}
 
-	return mermaid.String(), strings.TrimSuffix(expectedMap.String(), "\n"), scanner.Err()
+	tc.mermaid = mermaid.String()
+	tc.expected = strings.TrimSuffix(expectedMap.String(), "\n")
+	return tc, scanner.Err()
 }
 
 func verifyMap(t *testing.T, testCaseFile string) {
-	mermaid, expectedMap, err := readTestCase(testCaseFile)
+	tc, err := readTestCase(testCaseFile)
 	if err != nil {
 		t.Fatalf("Failed to read test case file: %v", err)
 	}
 
-	properties, err := mermaidFileToMap(mermaid, "cli")
+	properties, err := mermaidFileToMap(tc.mermaid, "cli")
 	if err != nil {
 		log.Fatal("Failed to parse mermaid: ", err)
 	}
+	properties.paddingX = tc.paddingX
+	properties.paddingY = tc.paddingY
 	actualMap := drawMap(properties)
-	if expectedMap != actualMap {
-		expectedWithSpaces := strings.ReplaceAll(expectedMap, " ", "·")
+	if tc.expected != actualMap {
+		expectedWithSpaces := strings.ReplaceAll(tc.expected, " ", "·")
 		actualWithSpaces := strings.ReplaceAll(actualMap, " ", "·")
 		t.Errorf("Map didn't match actual map\nExpected:\n%v\nActual:\n%v", expectedWithSpaces, actualWithSpaces)
 	}

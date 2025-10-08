@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/elliotchance/orderedmap/v2"
@@ -14,6 +15,8 @@ type graphProperties struct {
 	styleClasses   *map[string]styleClass
 	graphDirection string
 	styleType      string
+	paddingX       int
+	paddingY       int
 }
 
 type textNode struct {
@@ -30,7 +33,7 @@ type textEdge struct {
 func parseNode(line string) textNode {
 	// Trim any whitespace from the line that might be left after comment removal
 	trimmedLine := strings.TrimSpace(line)
-	
+
 	nodeWithClass, _ := regexp.Compile(`^(.+):::(.+)$`)
 
 	if match := nodeWithClass.FindStringSubmatch(trimmedLine); match != nil {
@@ -171,7 +174,7 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 	// Allow split on both \n and the actual string "\n" for curl compatibility
 	newlinePattern := regexp.MustCompile(`\n|\\n`)
 	rawLines := newlinePattern.Split(string(mermaid), -1)
-	
+
 	// Process lines to remove comments
 	lines := []string{}
 	for _, line := range rawLines {
@@ -179,26 +182,61 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 		if line == "---" {
 			break
 		}
-		
+
 		// Skip lines that start with %% (comment lines)
 		if strings.HasPrefix(strings.TrimSpace(line), "%%") {
 			continue
 		}
-		
+
 		// Remove inline comments (anything after %%) and trim resulting whitespace
 		if idx := strings.Index(line, "%%"); idx != -1 {
 			line = strings.TrimSpace(line[:idx])
 		}
-		
+
 		// Skip empty lines after comment removal
 		if len(strings.TrimSpace(line)) > 0 {
 			lines = append(lines, line)
 		}
 	}
-	
+
 	data := orderedmap.NewOrderedMap[string, []textEdge]()
 	styleClasses := make(map[string]styleClass)
-	properties := graphProperties{data, &styleClasses, "", styleType}
+	properties := graphProperties{
+		data:           data,
+		styleClasses:   &styleClasses,
+		graphDirection: "",
+		styleType:      styleType,
+		paddingX:       paddingBetweenX,
+		paddingY:       paddingBetweenY,
+	}
+
+	// Pick up optional padding directives before the graph definition
+	paddingRegex := regexp.MustCompile(`^(?i)padding([xy])\s*=\s*(\d+)$`)
+	for len(lines) > 0 {
+		trimmed := strings.TrimSpace(lines[0])
+		if trimmed == "" {
+			lines = lines[1:]
+			continue
+		}
+		if match := paddingRegex.FindStringSubmatch(trimmed); match != nil {
+			paddingValue, err := strconv.Atoi(match[2])
+			if err != nil {
+				return &properties, err
+			}
+			if strings.EqualFold(match[1], "x") {
+				properties.paddingX = paddingValue
+			} else {
+				properties.paddingY = paddingValue
+			}
+			lines = lines[1:]
+			continue
+		}
+		break
+	}
+
+	if len(lines) == 0 {
+		return &properties, errors.New("missing graph definition")
+	}
 
 	// First line should either say "graph TD" or "graph LR"
 	switch lines[0] {

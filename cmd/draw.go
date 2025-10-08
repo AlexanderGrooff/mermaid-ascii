@@ -153,6 +153,8 @@ func (d *drawing) drawLine(from drawingCoord, to drawingCoord, offsetFrom int, o
 func drawMap(properties *graphProperties) string {
 	g := mkGraph(properties.data)
 	g.setStyleClasses(properties)
+	g.paddingX = properties.paddingX
+	g.paddingY = properties.paddingY
 	g.createMapping()
 	d := g.draw()
 	if Coords {

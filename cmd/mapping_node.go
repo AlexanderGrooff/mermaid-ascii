@@ -55,20 +55,20 @@ func (g *graph) setColumnWidth(n *node) {
 
 	// Set padding before node
 	if n.gridCoord.x > 0 {
-		g.columnWidth[n.gridCoord.x-1] = paddingBetweenX // TODO: x2?
+		g.columnWidth[n.gridCoord.x-1] = g.paddingX // TODO: x2?
 	}
 	if n.gridCoord.y > 0 {
-		g.rowHeight[n.gridCoord.y-1] = paddingBetweenY // TODO: x2?
+		g.rowHeight[n.gridCoord.y-1] = g.paddingY // TODO: x2?
 	}
 }
 
 func (g *graph) increaseGridSizeForPath(path []gridCoord) {
 	for _, c := range path {
 		if _, exists := g.columnWidth[c.x]; !exists {
-			g.columnWidth[c.x] = paddingBetweenX / 2
+			g.columnWidth[c.x] = g.paddingX / 2
 		}
 		if _, exists := g.rowHeight[c.y]; !exists {
-			g.rowHeight[c.y] = paddingBetweenY / 2
+			g.rowHeight[c.y] = g.paddingY / 2
 		}
 	}
 }

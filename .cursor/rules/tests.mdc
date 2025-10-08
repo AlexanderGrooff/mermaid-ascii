@@ -1,0 +1,23 @@
+---
+alwaysApply: true
+---
+For **every change you make**, ensure that you add tests for the new functionality. Test coverage is non-negotiable!
+Run tests locally by running `go test ./...` in the root directory. This is fast, and should be done regularly.
+
+Tests are added through the `testdata/ascii` directory. The file name should be the name of the test case, and the file should contain the mermaid code to test.
+The first section of the file should be the mermaid code to test, and the second section should be the expected output.
+The sections are separated by a line that contains only `---`.
+
+For example, if you add a new feature that allows you to add a comment to a node, you should add a new file to the `testdata/ascii` directory called `comments.txt` with the following content:
+
+```mermaid
+graph LR
+A --> B
+%% This is a comment
+---
++---+      +---+
+|   |      |   |
+| A | ---> | B |
+|   |      |   |
++---+      +---+
+```
