@@ -126,11 +126,11 @@
     <h1>Mermaid ASCII <small style="font-size: 0.5em; color: #888;">v{{ .Version }}</small></h1>
     <div class="container">
         <div class="column">
-            <form id="input" hx-post="/generate" hx-target="#result"
+            <form id="input" hx-post="/" hx-target="#result"
                 hx-trigger="click from:.example-buttons">
                 <textarea
                     name="mermaid" placeholder="graph LR"
-                    hx-post="/generate"
+                    hx-post="/"
                     hx-trigger="keyup changed delay:200ms, changed"
                 ></textarea>
                 <div class="slider-container">
@@ -140,7 +140,7 @@
                     </div>
                     <input
                         type="range" id="xPadding" name="xPadding" min="3" max="10" value="5"
-                        hx-post="/generate"
+                        hx-post="/"
                         hx-trigger="change delay:200ms"
                         oninput="updateSliderValue(this)"
                     >
@@ -152,7 +152,7 @@
                     </div>
                     <input
                         type="range" id="yPadding" name="yPadding" min="3" max="10" value="3"
-                        hx-post="/generate"
+                        hx-post="/"
                         hx-trigger="change delay:200ms"
                         oninput="updateSliderValue(this)"
                     >
@@ -163,12 +163,12 @@
                     </div>
                     <input
                         type="checkbox" id="useExtendedChars" name="useExtendedChars" checked
-                        hx-post="/generate"
+                        hx-post="/"
                         hx-trigger="change"
                     >
                 </div>
                 <button
-                    hx-post="/generate"
+                    hx-post="/"
                 >Generate</button>
             </form>
             <div class="example-buttons">
@@ -186,7 +186,7 @@
                     wait 2s
                     put 'Copy' into me
                 ">Copy</button>
-                <pre><code>curl https://mermaid-ascii.art/generate -d mermaid="graph LR\nABC --> DEF"</code></pre>
+                <pre><code>curl https://mermaid-ascii.art -d mermaid="graph LR\nABC --> DEF"</code></pre>
             </div>
             <h2>Run Golang in CLI</h2>
             <div class="code-block">

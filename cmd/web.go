@@ -79,66 +79,71 @@ func setupRouter() *gin.Engine {
 		})
 	})
 
-	r.POST("/generate", func(c *gin.Context) {
-		mermaidString := c.PostForm("mermaid")
-		// Parse xPadding and yPadding as integers
-		xPadding := c.PostForm("xPadding")
-		if xPadding != "" {
-			if padding, err := strconv.Atoi(xPadding); err == nil {
-				paddingBetweenX = padding
-			} else {
-				log.Warnf("Invalid xPadding value: %s", xPadding)
-			}
-		}
+	r.POST("/", renderMermaid)
 
-		yPadding := c.PostForm("yPadding")
-		if yPadding != "" {
-			if padding, err := strconv.Atoi(yPadding); err == nil {
-				paddingBetweenY = padding
-			} else {
-				log.Warnf("Invalid yPadding value: %s", yPadding)
-			}
-		}
-		useExtendedCharsData := c.PostForm("useExtendedChars")
-		useAscii = useExtendedCharsData == ""
-		log.Debugf("Received input %s", c.Request.PostForm.Encode())
-
-		// Create a cache key using the input parameters
-		cacheKey := mermaidString + "x" + xPadding + "y" + yPadding + "e" + useExtendedCharsData
-
-		// Check if the result is already in the cache
-		resultCache.RLock()
-		entry, found := resultCache.m[cacheKey]
-		resultCache.RUnlock()
-
-		if found {
-			log.Infof("Cache hit for key: %s", cacheKey)
-			c.String(http.StatusOK, entry.value)
-			return
-		}
-
-		// If not in cache or expired, generate the map
-		result := generate_map(mermaidString)
-
-		// Store the result in the cache
-		resultCache.Lock()
-		if len(resultCache.m) >= maxCacheSize {
-			log.Infof("Cache is full, removing oldest entry")
-			// Remove a random entry if cache is full
-			for k := range resultCache.m {
-				delete(resultCache.m, k)
-				break
-			}
-		}
-		resultCache.m[cacheKey] = cacheEntry{
-			value: result,
-		}
-		resultCache.Unlock()
-
-		c.String(http.StatusOK, result)
-	})
+	// Backwards compatibility
+	r.POST("/generate", renderMermaid)
 
 	return r
+}
+
+func renderMermaid(c *gin.Context) {
+	mermaidString := c.PostForm("mermaid")
+	// Parse xPadding and yPadding as integers
+	xPadding := c.PostForm("xPadding")
+	if xPadding != "" {
+		if padding, err := strconv.Atoi(xPadding); err == nil {
+			paddingBetweenX = padding
+		} else {
+			log.Warnf("Invalid xPadding value: %s", xPadding)
+		}
+	}
+
+	yPadding := c.PostForm("yPadding")
+	if yPadding != "" {
+		if padding, err := strconv.Atoi(yPadding); err == nil {
+			paddingBetweenY = padding
+		} else {
+			log.Warnf("Invalid yPadding value: %s", yPadding)
+		}
+	}
+	useExtendedCharsData := c.PostForm("useExtendedChars")
+	useAscii = useExtendedCharsData == ""
+	log.Debugf("Received input %s", c.Request.PostForm.Encode())
+
+	// Create a cache key using the input parameters
+	cacheKey := mermaidString + "x" + xPadding + "y" + yPadding + "e" + useExtendedCharsData
+
+	// Check if the result is already in the cache
+	resultCache.RLock()
+	entry, found := resultCache.m[cacheKey]
+	resultCache.RUnlock()
+
+	if found {
+		log.Infof("Cache hit for key: %s", cacheKey)
+		c.String(http.StatusOK, entry.value)
+		return
+	}
+
+	// If not in cache or expired, generate the map
+	result := generate_map(mermaidString)
+
+	// Store the result in the cache
+	resultCache.Lock()
+	if len(resultCache.m) >= maxCacheSize {
+		log.Infof("Cache is full, removing oldest entry")
+		// Remove a random entry if cache is full
+		for k := range resultCache.m {
+			delete(resultCache.m, k)
+			break
+		}
+	}
+	resultCache.m[cacheKey] = cacheEntry{
+		value: result,
+	}
+	resultCache.Unlock()
+
+	c.String(http.StatusOK, result)
 }
 
 func generate_map(input string) string {
