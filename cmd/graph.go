@@ -248,6 +248,133 @@ func (g *graph) calculateSubgraphBoundingBoxes() {
 	for _, sg := range g.subgraphs {
 		g.calculateSubgraphBoundingBox(sg)
 	}
+
+	// Ensure minimum spacing between subgraphs
+	g.ensureSubgraphSpacing()
+}
+
+func (g *graph) isNodeInAnySubgraph(n *node) bool {
+	for _, sg := range g.subgraphs {
+		for _, sgNode := range sg.nodes {
+			if sgNode == n {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (g *graph) getNodeSubgraph(n *node) *subgraph {
+	for _, sg := range g.subgraphs {
+		for _, sgNode := range sg.nodes {
+			if sgNode == n {
+				return sg
+			}
+		}
+	}
+	return nil
+}
+
+func (g *graph) hasIncomingEdgeFromOutsideSubgraph(n *node) bool {
+	nodeSubgraph := g.getNodeSubgraph(n)
+	if nodeSubgraph == nil {
+		return false // Node not in any subgraph
+	}
+
+	// Check if any edge targets this node from outside its subgraph
+	hasExternalEdge := false
+	for _, edge := range g.edges {
+		if edge.to == n {
+			sourceSubgraph := g.getNodeSubgraph(edge.from)
+			// If source is not in the same subgraph (or any subgraph), it's from outside
+			if sourceSubgraph != nodeSubgraph {
+				hasExternalEdge = true
+				break
+			}
+		}
+	}
+
+	if !hasExternalEdge {
+		return false
+	}
+
+	// Only apply overhead if this is the topmost node in the subgraph with external edges
+	// (has the lowest Y coordinate among nodes with external edges)
+	for _, otherNode := range nodeSubgraph.nodes {
+		if otherNode == n || otherNode.gridCoord == nil {
+			continue
+		}
+		// Check if otherNode also has external edges and is at a lower Y
+		otherHasExternal := false
+		for _, edge := range g.edges {
+			if edge.to == otherNode {
+				sourceSubgraph := g.getNodeSubgraph(edge.from)
+				if sourceSubgraph != nodeSubgraph {
+					otherHasExternal = true
+					break
+				}
+			}
+		}
+		if otherHasExternal && otherNode.gridCoord.y < n.gridCoord.y {
+			// There's another node higher up that has external edges
+			return false
+		}
+	}
+
+	return true
+}
+
+func (g *graph) ensureSubgraphSpacing() {
+	const minSpacing = 1 // Minimum lines between subgraphs
+
+	// Only check root-level subgraphs (those without parents)
+	rootSubgraphs := []*subgraph{}
+	for _, sg := range g.subgraphs {
+		if sg.parent == nil && len(sg.nodes) > 0 {
+			rootSubgraphs = append(rootSubgraphs, sg)
+		}
+	}
+
+	// Check each pair of root subgraphs for overlaps
+	for i := 0; i < len(rootSubgraphs); i++ {
+		for j := i + 1; j < len(rootSubgraphs); j++ {
+			sg1 := rootSubgraphs[i]
+			sg2 := rootSubgraphs[j]
+
+			// Check if they overlap or are too close
+			// Vertical overlap check (for TD layout)
+			if sg1.minX < sg2.maxX && sg1.maxX > sg2.minX {
+				// They share the same X space, check Y spacing
+				if sg1.maxY >= sg2.minY-minSpacing && sg1.minY < sg2.minY {
+					// sg1 is above sg2 and too close, extend sg2 upward to create space
+					newMinY := sg1.maxY + minSpacing + 1
+					log.Debugf("Extending subgraph %s minY to %d (from %d) to add spacing from %s", sg2.name, newMinY, sg2.minY, sg1.name)
+					sg2.minY = newMinY
+				} else if sg2.maxY >= sg1.minY-minSpacing && sg2.minY < sg1.minY {
+					// sg2 is above sg1 and too close, extend sg1 upward to create space
+					newMinY := sg2.maxY + minSpacing + 1
+					log.Debugf("Extending subgraph %s minY to %d (from %d) to add spacing from %s", sg1.name, newMinY, sg1.minY, sg2.name)
+					sg1.minY = newMinY
+				}
+			}
+
+			// Horizontal overlap check (for LR layout)
+			if sg1.minY < sg2.maxY && sg1.maxY > sg2.minY {
+				// They share the same Y space, check X spacing
+				if sg1.maxX >= sg2.minX-minSpacing && sg1.minX < sg2.minX {
+					// sg1 is left of sg2 and too close, extend sg2 leftward to create space
+					newMinX := sg1.maxX + minSpacing + 1
+					log.Debugf("Extending subgraph %s minX to %d (from %d) to add spacing from %s", sg2.name, newMinX, sg2.minX, sg1.name)
+					sg2.minX = newMinX
+				} else if sg2.maxX >= sg1.minX-minSpacing && sg2.minX < sg1.minX {
+					// sg2 is left of sg1 and too close, extend sg1 leftward to create space
+					newMinX := sg2.maxX + minSpacing + 1
+					log.Debugf("Extending subgraph %s minX to %d (from %d) to add spacing from %s", sg1.name, newMinX, sg1.minX, sg2.name)
+					sg1.minX = newMinX
+				}
+			}
+		}
+	}
 }
 
 func (g *graph) calculateSubgraphBoundingBox(sg *subgraph) {
@@ -273,7 +400,9 @@ func (g *graph) calculateSubgraphBoundingBox(sg *subgraph) {
 	}
 
 	// Then include all direct nodes
+	log.Debugf("Calculating bounding box for subgraph %s with %d nodes", sg.name, len(sg.nodes))
 	for _, node := range sg.nodes {
+		log.Debugf("  Node %s at drawing coord: %v", node.name, node.drawingCoord)
 		if node.drawingCoord == nil || node.drawing == nil {
 			continue
 		}
@@ -292,8 +421,9 @@ func (g *graph) calculateSubgraphBoundingBox(sg *subgraph) {
 
 	// Add padding (allow negative coordinates, we'll offset later)
 	const subgraphPadding = 2
+	const subgraphLabelSpace = 2 // Extra space for label at top
 	sg.minX = minX - subgraphPadding
-	sg.minY = minY - subgraphPadding - 2 // Extra space for label at top
+	sg.minY = minY - subgraphPadding - subgraphLabelSpace
 	sg.maxX = maxX + subgraphPadding
 	sg.maxY = maxY + subgraphPadding
 
