@@ -111,9 +111,9 @@ func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) (*drawing, *dra
 	}
 	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, e.path)
 	dLabel := g.drawArrowLabel(e)
-	dPath, linesDrawn := g.drawPath(e.path)
+	dPath, linesDrawn, lineDirs := g.drawPath(e.path)
 	dBoxStart := g.drawBoxStart(e.path, linesDrawn[0])
-	dArrowHead := g.drawArrowHead(linesDrawn[len(linesDrawn)-1])
+	dArrowHead := g.drawArrowHead(linesDrawn[len(linesDrawn)-1], lineDirs[len(lineDirs)-1])
 	dCorners := g.drawCorners(e.path)
 	return dPath, dBoxStart, dArrowHead, dCorners, dLabel
 }
@@ -145,27 +145,31 @@ func mergePath(path []gridCoord) []gridCoord {
 	return newPath
 }
 
-func (g *graph) drawPath(path []gridCoord) (*drawing, [][]drawingCoord) {
+func (g *graph) drawPath(path []gridCoord) (*drawing, [][]drawingCoord, []direction) {
 	d := copyCanvas(g.drawing)
 	previousCoord := path[0]
 	linesDrawn := make([][]drawingCoord, 0)
+	lineDirs := make([]direction, 0)
 	var previousDrawingCoord drawingCoord
-	for idx, nextCoord := range path[1:] {
+	for _, nextCoord := range path[1:] {
 		previousDrawingCoord = g.gridToDrawingCoord(previousCoord, nil)
 		nextDrawingCoord := g.gridToDrawingCoord(nextCoord, nil)
 		if previousDrawingCoord.Equals(nextDrawingCoord) {
 			log.Debugf("Skipping drawing identical line on %v", nextCoord)
 			continue
 		}
-		if idx == 0 {
-			// Don't cross the node border
-			linesDrawn = append(linesDrawn, d.drawLine(previousDrawingCoord, nextDrawingCoord, 1, -1))
-		} else {
-			linesDrawn = append(linesDrawn, d.drawLine(previousDrawingCoord, nextDrawingCoord, 1, -1))
+		dir := determineDirection(genericCoord(previousCoord), genericCoord(nextCoord))
+		s := d.drawLine(previousDrawingCoord, nextDrawingCoord, 1, -1)
+		if len(s) == 0 {
+			// drawLine may return no coords if offsets collapse the line. Use at least one point so arrow and junction logic
+			// can still infer a direction.
+			s = append(s, previousDrawingCoord)
 		}
+		linesDrawn = append(linesDrawn, s)
+		lineDirs = append(lineDirs, dir)
 		previousCoord = nextCoord
 	}
-	return d, linesDrawn
+	return d, linesDrawn, lineDirs
 }
 
 func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord) *drawing {
@@ -191,11 +195,17 @@ func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord) *drawin
 	return &d
 }
 
-func (g *graph) drawArrowHead(line []drawingCoord) *drawing {
+func (g *graph) drawArrowHead(line []drawingCoord, fallback direction) *drawing {
 	d := *(copyCanvas(g.drawing))
+	if len(line) == 0 {
+		return &d
+	}
 	from := line[0]
 	lastPos := line[len(line)-1]
 	dir := determineDirection(genericCoord(from), genericCoord(lastPos))
+	if len(line) == 1 || dir == Middle {
+		dir = fallback
+	}
 
 	var char string
 	if !useAscii {
@@ -217,7 +227,26 @@ func (g *graph) drawArrowHead(line []drawingCoord) *drawing {
 		case LowerLeft:
 			char = "◣"
 		default:
-			char = "●"
+			switch fallback {
+			case Up:
+				char = "▲"
+			case Down:
+				char = "▼"
+			case Left:
+				char = "◄"
+			case Right:
+				char = "►"
+			case UpperRight:
+				char = "◥"
+			case UpperLeft:
+				char = "◤"
+			case LowerRight:
+				char = "◢"
+			case LowerLeft:
+				char = "◣"
+			default:
+				char = "●"
+			}
 		}
 	} else {
 		switch dir {
@@ -230,7 +259,18 @@ func (g *graph) drawArrowHead(line []drawingCoord) *drawing {
 		case Right:
 			char = ">"
 		default:
-			char = "*"
+			switch fallback {
+			case Up:
+				char = "^"
+			case Down:
+				char = "v"
+			case Left:
+				char = "<"
+			case Right:
+				char = ">"
+			default:
+				char = "*"
+			}
 		}
 	}
 
