@@ -17,6 +17,7 @@ type graphProperties struct {
 	styleType      string
 	paddingX       int
 	paddingY       int
+	subgraphs      []*textSubgraph
 }
 
 type textNode struct {
@@ -28,6 +29,13 @@ type textEdge struct {
 	parent textNode
 	child  textNode
 	label  string
+}
+
+type textSubgraph struct {
+	name     string
+	nodes    []string
+	parent   *textSubgraph
+	children []*textSubgraph
 }
 
 func parseNode(line string) textNode {
@@ -208,6 +216,7 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 		styleType:      styleType,
 		paddingX:       paddingBetweenX,
 		paddingY:       paddingBetweenY,
+		subgraphs:      []*textSubgraph{},
 	}
 
 	// Pick up optional padding directives before the graph definition
@@ -249,17 +258,90 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 	}
 	lines = lines[1:]
 
+	// Track subgraph context using a stack
+	subgraphStack := []*textSubgraph{}
+	subgraphRegex := regexp.MustCompile(`^\s*subgraph\s+(.+)$`)
+	endRegex := regexp.MustCompile(`^\s*end\s*$`)
+
+	// Track existing nodes before each line to detect new ones
+	existingNodes := make(map[string]bool)
+
 	// Iterate over the lines
 	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+
+		// Check for subgraph start
+		if match := subgraphRegex.FindStringSubmatch(trimmedLine); match != nil {
+			subgraphName := strings.TrimSpace(match[1])
+			newSubgraph := &textSubgraph{
+				name:     subgraphName,
+				nodes:    []string{},
+				children: []*textSubgraph{},
+			}
+
+			// Set parent relationship if we're nested
+			if len(subgraphStack) > 0 {
+				parent := subgraphStack[len(subgraphStack)-1]
+				newSubgraph.parent = parent
+				parent.children = append(parent.children, newSubgraph)
+			}
+
+			subgraphStack = append(subgraphStack, newSubgraph)
+			properties.subgraphs = append(properties.subgraphs, newSubgraph)
+			log.Debugf("Started subgraph %s", subgraphName)
+			continue
+		}
+
+		// Check for subgraph end
+		if endRegex.MatchString(trimmedLine) {
+			if len(subgraphStack) > 0 {
+				closedSubgraph := subgraphStack[len(subgraphStack)-1]
+				subgraphStack = subgraphStack[:len(subgraphStack)-1]
+				log.Debugf("Ended subgraph %s", closedSubgraph.name)
+			}
+			continue
+		}
+
+		// Remember nodes before parsing this line
+		existingNodes = make(map[string]bool)
+		for el := data.Front(); el != nil; el = el.Next() {
+			existingNodes[el.Key] = true
+		}
+
+		// Parse nodes and edges normally
 		nodes, err := properties.parseString(line)
 		if err != nil {
 			log.Debugf("Parsing remaining text to node %v", line)
 			node := parseNode(line)
 			addNode(node, properties.data)
 		} else {
-			// Ensure all nodes are in the map, even if they don't have an edge
+			// Ensure all returned nodes are in the map
 			for _, node := range nodes {
 				addNode(node, properties.data)
+			}
+		}
+
+		// Add all new nodes to current subgraph(s)
+		if len(subgraphStack) > 0 {
+			for el := data.Front(); el != nil; el = el.Next() {
+				nodeName := el.Key
+				// If this is a new node (wasn't in existingNodes), add it to subgraph
+				if !existingNodes[nodeName] {
+					for _, sg := range subgraphStack {
+						// Check if node is not already in the subgraph
+						found := false
+						for _, n := range sg.nodes {
+							if n == nodeName {
+								found = true
+								break
+							}
+						}
+						if !found {
+							sg.nodes = append(sg.nodes, nodeName)
+							log.Debugf("Added node %s to subgraph %s", nodeName, sg.name)
+						}
+					}
+				}
 			}
 		}
 	}
