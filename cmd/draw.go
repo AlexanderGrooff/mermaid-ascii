@@ -155,6 +155,7 @@ func drawMap(properties *graphProperties) string {
 	g.setStyleClasses(properties)
 	g.paddingX = properties.paddingX
 	g.paddingY = properties.paddingY
+	g.setSubgraphs(properties.subgraphs)
 	g.createMapping()
 	d := g.draw()
 	if Coords {
@@ -234,6 +235,102 @@ func drawBox(n *node, g graph) *drawing {
 	}
 
 	return &boxDrawing
+}
+
+func drawSubgraph(sg *subgraph, g graph) *drawing {
+	// Calculate dimensions
+	width := sg.maxX - sg.minX
+	height := sg.maxY - sg.minY
+
+	if width <= 0 || height <= 0 {
+		return mkDrawing(0, 0)
+	}
+
+	from := drawingCoord{0, 0}
+	to := drawingCoord{width, height}
+	subgraphDrawing := *(mkDrawing(width, height))
+
+	log.Debugf("Drawing subgraph %s from (%d,%d) to (%d,%d)", sg.name, from.x, from.y, to.x, to.y)
+
+	if !useAscii {
+		// Draw top border
+		for x := from.x + 1; x < to.x; x++ {
+			subgraphDrawing[x][from.y] = "─"
+		}
+		// Draw bottom border
+		for x := from.x + 1; x < to.x; x++ {
+			subgraphDrawing[x][to.y] = "─"
+		}
+		// Draw left border
+		for y := from.y + 1; y < to.y; y++ {
+			subgraphDrawing[from.x][y] = "│"
+		}
+		// Draw right border
+		for y := from.y + 1; y < to.y; y++ {
+			subgraphDrawing[to.x][y] = "│"
+		}
+		// Draw corners
+		subgraphDrawing[from.x][from.y] = "┌"
+		subgraphDrawing[to.x][from.y] = "┐"
+		subgraphDrawing[from.x][to.y] = "└"
+		subgraphDrawing[to.x][to.y] = "┘"
+	} else {
+		// Draw top border
+		for x := from.x + 1; x < to.x; x++ {
+			subgraphDrawing[x][from.y] = "-"
+		}
+		// Draw bottom border
+		for x := from.x + 1; x < to.x; x++ {
+			subgraphDrawing[x][to.y] = "-"
+		}
+		// Draw left border
+		for y := from.y + 1; y < to.y; y++ {
+			subgraphDrawing[from.x][y] = "|"
+		}
+		// Draw right border
+		for y := from.y + 1; y < to.y; y++ {
+			subgraphDrawing[to.x][y] = "|"
+		}
+		// Draw corners
+		subgraphDrawing[from.x][from.y] = "+"
+		subgraphDrawing[to.x][from.y] = "+"
+		subgraphDrawing[from.x][to.y] = "+"
+		subgraphDrawing[to.x][to.y] = "+"
+	}
+
+	// NOTE: Label is now drawn separately in drawSubgraphLabel to prevent arrows from overwriting it
+
+	return &subgraphDrawing
+}
+
+func drawSubgraphLabel(sg *subgraph, g graph) (*drawing, drawingCoord) {
+	// Calculate dimensions
+	width := sg.maxX - sg.minX
+	height := sg.maxY - sg.minY
+
+	if width <= 0 || height <= 0 {
+		return mkDrawing(0, 0), drawingCoord{0, 0}
+	}
+
+	from := drawingCoord{0, 0}
+	to := drawingCoord{width, height}
+	labelDrawing := *(mkDrawing(width, height))
+
+	// Draw label centered at top
+	labelY := from.y + 1
+	labelX := from.x + width/2 - len(sg.name)/2
+	if labelX < from.x+1 {
+		labelX = from.x + 1
+	}
+	for i, char := range sg.name {
+		if labelX+i < to.x {
+			labelDrawing[labelX+i][labelY] = string(char)
+		}
+	}
+
+	// Return label drawing and its offset position
+	offset := drawingCoord{sg.minX, sg.minY}
+	return &labelDrawing, offset
 }
 
 func wrapTextInColor(text, c, styleType string) string {

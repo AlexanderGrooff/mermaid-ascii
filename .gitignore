@@ -1,6 +1,8 @@
 # Dev artifacts
 .direnv
 *.mermaid
+/tmp
+.playwright-mcp
 
 # Editor
 .idea

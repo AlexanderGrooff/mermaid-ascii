@@ -60,6 +60,7 @@
         }
         #result {
             min-height: 300px;
+            white-space: pre-wrap;
         }
         .copy-button {
             position: absolute;
@@ -115,7 +116,18 @@
             document.querySelector('textarea[name="mermaid"]').value = example;
         }
 
-        document.addEventListener('DOMContentLoaded', initializeSliderValues);
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSliderValues();
+            
+            // Fix for preserving leading whitespace in HTMX responses
+            document.body.addEventListener('htmx:beforeSwap', function(evt) {
+                if (evt.detail.target.id === 'result-code') {
+                    evt.detail.shouldSwap = true;
+                    evt.detail.target.textContent = evt.detail.xhr.responseText;
+                    evt.preventDefault();
+                }
+            });
+        });
     </script>
 </head>
 <body>
@@ -126,7 +138,7 @@
     <h1>Mermaid ASCII <small style="font-size: 0.5em; color: #888;">v{{ .Version }}</small></h1>
     <div class="container">
         <div class="column">
-            <form id="input" hx-post="/" hx-target="#result"
+            <form id="input" hx-post="/" hx-target="#result-code" hx-swap="textContent"
                 hx-trigger="click from:.example-buttons">
                 <textarea
                     name="mermaid" placeholder="graph LR"
@@ -172,7 +184,7 @@
                 >Generate</button>
             </form>
             <div class="example-buttons">
-                <button type="button" onclick="setExample('graph LR\nA --> B & C\nB --> C & D\nD --> C')" style="background-color: green; color: white;">Example 1: simple graph</button>
+                <button type="button" onclick="setExample('graph LR\nsubgraph Frontend\n    UI --> API\nend\nsubgraph Backend\n    API --> Database\n    API --> Cache\nend')" style="background-color: green; color: white;">Example 1: nested subgraphs</button>
                 <button type="button" onclick="setExample('graph TD\nA -->|labelled arrow| B\nA --> Example2')" style="background-color: teal; color: white;">Example 2: labelled arrow</button>
                 <button type="button" onclick="setExample('graph LR\nclassDef examplecolor color:#ff00ff\nA --> B\nA --> ColorText:::examplecolor\nB --> D\nColorText --> D')" style="background-color: blue; color: white;">Example 3: styled text</button>
             </div>
@@ -209,7 +221,7 @@ go run main.go -f test.mermaid</code></pre>
                 wait 2s
                 put 'Copy' into me
             ">Copy</button>
-            <pre id="result" class="code-block"><!-- Result content goes here --></pre>
+            <pre id="result" class="code-block"><code id="result-code"><!-- Result content goes here --></code></pre>
         </div>
     </div>
 </body>

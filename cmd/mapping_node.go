@@ -58,7 +58,20 @@ func (g *graph) setColumnWidth(n *node) {
 		g.columnWidth[n.gridCoord.x-1] = g.paddingX // TODO: x2?
 	}
 	if n.gridCoord.y > 0 {
-		g.rowHeight[n.gridCoord.y-1] = g.paddingY // TODO: x2?
+		basePadding := g.paddingY
+
+		// Add extra padding if node is in a subgraph AND has incoming edges from outside
+		// This accounts for subgraph visual overhead (border, label, padding)
+		// and allows arrows to continue as | for longer before becoming arrow heads
+		if g.hasIncomingEdgeFromOutsideSubgraph(n) {
+			const subgraphOverhead = 4
+			basePadding += subgraphOverhead
+			log.Debugf("Adding subgraph overhead of %d to rowHeight before node %s", subgraphOverhead, n.name)
+		}
+
+		// Use Max to preserve the largest padding requirement for this row
+		// (multiple nodes may share the same Y coordinate)
+		g.rowHeight[n.gridCoord.y-1] = Max(g.rowHeight[n.gridCoord.y-1], basePadding)
 	}
 }
 
