@@ -175,16 +175,69 @@ func (g *graph) createMapping() {
 			nodesFound[child.name] = true
 		}
 	}
+
+	// Check if we have a mix of external and subgraph root nodes with edges in subgraphs
+	// This indicates we should separate them visually in LR layout
+	hasExternalRoots := false
+	hasSubgraphRootsWithEdges := false
 	for _, n := range rootNodes {
+		if g.isNodeInAnySubgraph(n) {
+			// Check if this node or any node in its subgraph has children
+			if len(g.getChildren(n)) > 0 {
+				hasSubgraphRootsWithEdges = true
+			}
+		} else {
+			hasExternalRoots = true
+		}
+	}
+
+	// Separate root nodes by whether they're in subgraphs, but only if we have both types
+	// AND there are edges in subgraphs (indicating intentional layout structure)
+	shouldSeparate := graphDirection == "LR" && hasExternalRoots && hasSubgraphRootsWithEdges
+
+	externalRootNodes := []*node{}
+	subgraphRootNodes := []*node{}
+	if shouldSeparate {
+		for _, n := range rootNodes {
+			if g.isNodeInAnySubgraph(n) {
+				subgraphRootNodes = append(subgraphRootNodes, n)
+			} else {
+				externalRootNodes = append(externalRootNodes, n)
+			}
+		}
+	} else {
+		// Treat all root nodes the same
+		externalRootNodes = rootNodes
+	}
+
+	// Place external root nodes first at level 0
+	for _, n := range externalRootNodes {
 		var mappingCoord *gridCoord
 		if graphDirection == "LR" {
 			mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: 0, y: highestPositionPerLevel[0]})
 		} else {
 			mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: highestPositionPerLevel[0], y: 0})
 		}
-		log.Debugf("Setting mapping coord for rootnode %s to %v", n.name, mappingCoord)
+		log.Debugf("Setting mapping coord for external rootnode %s to %v", n.name, mappingCoord)
 		g.nodes[n.index].gridCoord = mappingCoord
 		highestPositionPerLevel[0] = highestPositionPerLevel[0] + 4
+	}
+
+	// Place subgraph root nodes at level 4 (one level to the right/down of external nodes)
+	// This creates visual separation between external nodes and subgraphs
+	if shouldSeparate && len(subgraphRootNodes) > 0 {
+		subgraphLevel := 4
+		for _, n := range subgraphRootNodes {
+			var mappingCoord *gridCoord
+			if graphDirection == "LR" {
+				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: subgraphLevel, y: highestPositionPerLevel[subgraphLevel]})
+			} else {
+				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: highestPositionPerLevel[subgraphLevel], y: subgraphLevel})
+			}
+			log.Debugf("Setting mapping coord for subgraph rootnode %s to %v", n.name, mappingCoord)
+			g.nodes[n.index].gridCoord = mappingCoord
+			highestPositionPerLevel[subgraphLevel] = highestPositionPerLevel[subgraphLevel] + 4
+		}
 	}
 
 	for _, n := range g.nodes {

@@ -13,7 +13,22 @@
       system: let
         pkgs = import nixpkgs {inherit system;};
       in {
-        devShells.default = alex.devShells.${system}.go;
+        devShells.default = pkgs.mkShell {
+          nativeBuildInputs = [
+            pkgs.go_1_23
+            pkgs.pre-commit
+            pkgs.golangci-lint
+
+            # Add other Go tools or dependencies here if needed, e.g.:
+            pkgs.gopls
+            pkgs.delve
+            pkgs.goreleaser
+            pkgs.air
+          ];
+
+          # Disable hardening for cgo
+          hardeningDisable = [ "all" ];
+        };
         packages.default = pkgs.buildGoModule {
           name = "mermaid-ascii";
           src = ./.;

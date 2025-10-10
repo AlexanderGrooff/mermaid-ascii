@@ -16,3 +16,6 @@ clean:
 .PHONY: uninstall
 uninstall:
 	$(RM) $(PREFIX)/mermaid-ascii
+
+dev:
+	air

@@ -60,6 +60,7 @@
         }
         #result {
             min-height: 300px;
+            white-space: pre-wrap;
         }
         .copy-button {
             position: absolute;
@@ -115,7 +116,18 @@
             document.querySelector('textarea[name="mermaid"]').value = example;
         }
 
-        document.addEventListener('DOMContentLoaded', initializeSliderValues);
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSliderValues();
+            
+            // Fix for preserving leading whitespace in HTMX responses
+            document.body.addEventListener('htmx:beforeSwap', function(evt) {
+                if (evt.detail.target.id === 'result-code') {
+                    evt.detail.shouldSwap = true;
+                    evt.detail.target.textContent = evt.detail.xhr.responseText;
+                    evt.preventDefault();
+                }
+            });
+        });
     </script>
 </head>
 <body>
@@ -126,7 +138,7 @@
     <h1>Mermaid ASCII <small style="font-size: 0.5em; color: #888;">v{{ .Version }}</small></h1>
     <div class="container">
         <div class="column">
-            <form id="input" hx-post="/" hx-target="#result"
+            <form id="input" hx-post="/" hx-target="#result-code" hx-swap="textContent"
                 hx-trigger="click from:.example-buttons">
                 <textarea
                     name="mermaid" placeholder="graph LR"
@@ -209,7 +221,7 @@ go run main.go -f test.mermaid</code></pre>
                 wait 2s
                 put 'Copy' into me
             ">Copy</button>
-            <pre id="result" class="code-block"><!-- Result content goes here --></pre>
+            <pre id="result" class="code-block"><code id="result-code"><!-- Result content goes here --></code></pre>
         </div>
     </div>
 </body>

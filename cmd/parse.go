@@ -263,9 +263,6 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 	subgraphRegex := regexp.MustCompile(`^\s*subgraph\s+(.+)$`)
 	endRegex := regexp.MustCompile(`^\s*end\s*$`)
 
-	// Track existing nodes before each line to detect new ones
-	existingNodes := make(map[string]bool)
-
 	// Iterate over the lines
 	for _, line := range lines {
 		trimmedLine := strings.TrimSpace(line)
@@ -303,7 +300,7 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 		}
 
 		// Remember nodes before parsing this line
-		existingNodes = make(map[string]bool)
+		existingNodes := make(map[string]bool)
 		for el := data.Front(); el != nil; el = el.Next() {
 			existingNodes[el.Key] = true
 		}

@@ -1,0 +1,30 @@
+# Air configuration for mermaid-ascii web server live reloads
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o tmp/mermaid-ascii ./"
+bin = "tmp/mermaid-ascii web"
+full_bin = ""
+include_ext = ["go", "tmpl", "html"]
+exclude_dir = ["tmp", "testdata", "vendor"]
+exclude_file = []
+exclude_regex = []
+include_dir = [".", "cmd", "templates"]
+delay = 1000
+kill_delay = 500
+send_interrupt = false
+stop_on_error = true
+
+[log]
+time = false
+
+[color]
+main = "white"
+watcher = "cyan"
+build = "yellow"
+runner = "green"
+
+[misc]
+clean_on_exit = false
