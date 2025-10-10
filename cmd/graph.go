@@ -400,9 +400,7 @@ func (g *graph) calculateSubgraphBoundingBox(sg *subgraph) {
 	}
 
 	// Then include all direct nodes
-	log.Debugf("Calculating bounding box for subgraph %s with %d nodes", sg.name, len(sg.nodes))
 	for _, node := range sg.nodes {
-		log.Debugf("  Node %s at drawing coord: %v", node.name, node.drawingCoord)
 		if node.drawingCoord == nil || node.drawing == nil {
 			continue
 		}
@@ -504,6 +502,10 @@ func (g *graph) draw() *drawing {
 	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, arrowHeadDrawings...)
 	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, boxStartDrawings...)
 	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, labelDrawings...)
+
+	// Draw subgraph labels LAST so they don't get overwritten by arrows
+	g.drawSubgraphLabels()
+
 	return g.drawing
 }
 
@@ -517,6 +519,18 @@ func (g *graph) drawSubgraphs() {
 		// Position the drawing at the subgraph's min coordinates
 		offset := drawingCoord{sg.minX, sg.minY}
 		g.drawing = mergeDrawings(g.drawing, offset, sgDrawing)
+	}
+}
+
+func (g *graph) drawSubgraphLabels() {
+	// Draw labels for all subgraphs
+	// No need to sort - labels can be drawn in any order since they don't overlap
+	for _, sg := range g.subgraphs {
+		if len(sg.nodes) == 0 {
+			continue
+		}
+		labelDrawing, offset := drawSubgraphLabel(sg, *g)
+		g.drawing = mergeDrawings(g.drawing, offset, labelDrawing)
 	}
 }
 

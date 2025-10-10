@@ -298,6 +298,24 @@ func drawSubgraph(sg *subgraph, g graph) *drawing {
 		subgraphDrawing[to.x][to.y] = "+"
 	}
 
+	// NOTE: Label is now drawn separately in drawSubgraphLabel to prevent arrows from overwriting it
+
+	return &subgraphDrawing
+}
+
+func drawSubgraphLabel(sg *subgraph, g graph) (*drawing, drawingCoord) {
+	// Calculate dimensions
+	width := sg.maxX - sg.minX
+	height := sg.maxY - sg.minY
+
+	if width <= 0 || height <= 0 {
+		return mkDrawing(0, 0), drawingCoord{0, 0}
+	}
+
+	from := drawingCoord{0, 0}
+	to := drawingCoord{width, height}
+	labelDrawing := *(mkDrawing(width, height))
+
 	// Draw label centered at top
 	labelY := from.y + 1
 	labelX := from.x + width/2 - len(sg.name)/2
@@ -306,11 +324,13 @@ func drawSubgraph(sg *subgraph, g graph) *drawing {
 	}
 	for i, char := range sg.name {
 		if labelX+i < to.x {
-			subgraphDrawing[labelX+i][labelY] = string(char)
+			labelDrawing[labelX+i][labelY] = string(char)
 		}
 	}
 
-	return &subgraphDrawing
+	// Return label drawing and its offset position
+	offset := drawingCoord{sg.minX, sg.minY}
+	return &labelDrawing, offset
 }
 
 func wrapTextInColor(text, c, styleType string) string {
