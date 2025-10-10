@@ -120,11 +120,23 @@
             initializeSliderValues();
             
             // Fix for preserving leading whitespace in HTMX responses
+            // We need to handle both colored text (HTML) and preserve whitespace
             document.body.addEventListener('htmx:beforeSwap', function(evt) {
                 if (evt.detail.target.id === 'result-code') {
-                    evt.detail.shouldSwap = true;
-                    evt.detail.target.textContent = evt.detail.xhr.responseText;
+                    // Don't use default swap behavior
                     evt.preventDefault();
+                    
+                    // Get the response and escape it, then restore the span tags for colors
+                    let content = evt.detail.xhr.responseText;
+                    
+                    // Check if the content has HTML color spans
+                    if (content.includes('<span')) {
+                        // For colored content, use innerHTML but the pre/code block should preserve whitespace
+                        evt.detail.target.innerHTML = content;
+                    } else {
+                        // For plain text, use textContent to preserve everything exactly
+                        evt.detail.target.textContent = content;
+                    }
                 }
             });
         });
@@ -138,7 +150,7 @@
     <h1>Mermaid ASCII <small style="font-size: 0.5em; color: #888;">v{{ .Version }}</small></h1>
     <div class="container">
         <div class="column">
-            <form id="input" hx-post="/" hx-target="#result-code" hx-swap="textContent"
+            <form id="input" hx-post="/" hx-target="#result-code" hx-swap="innerHTML"
                 hx-trigger="click from:.example-buttons">
                 <textarea
                     name="mermaid" placeholder="graph LR"
