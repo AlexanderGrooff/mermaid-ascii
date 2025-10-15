@@ -1,21 +1,25 @@
 PREFIX ?= /usr/local/bin
+pkgname ?= mermaid-ascii
 
-mermaid-ascii: cmd/*.go
-	go build
+build/$(pkgname): cmd/*.go | build/
+	go build -o $@
 
 .PHONY: install
-install: $(PREFIX)/mermaid-ascii
+install: $(PREFIX)/$(pkgname)
 
-$(PREFIX)/mermaid-ascii: mermaid-ascii | $(PREFIX)
+$(PREFIX)/$(pkgname): build/$(pkgname) | $(PREFIX)
 	install -m 755 $< $@
+
+%/:
+	mkdir -p $@
 
 .PHONY: clean
 clean:
-	$(RM) mermaid-ascii
+	$(RM) -r build
 
 .PHONY: uninstall
 uninstall:
-	$(RM) $(PREFIX)/mermaid-ascii
+	$(RM) $(PREFIX)/$(pkgname)
 
 dev:
 	air
