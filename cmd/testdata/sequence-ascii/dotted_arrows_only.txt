@@ -1,0 +1,10 @@
+sequenceDiagram
+    Alice-->>Bob: Response
+---
++-------+     +-----+
+| Alice |     | Bob |
++---+---+     +--+--+
+    |            |
+    | Response   |
+    +...........>|
+    |            |

@@ -1,0 +1,20 @@
+sequenceDiagram
+    participant Client
+    participant Server
+    Client->>Server: Request
+    Server-->>Client: Response
+    Client->>Server: Acknowledge
+---
+┌────────┐     ┌────────┐
+│ Client │     │ Server │
+└────┬───┘     └────┬───┘
+     │              │
+     │ Request      │
+     ├─────────────►│
+     │              │
+     │ Response     │
+     │◄┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+     │              │
+     │ Acknowledge  │
+     ├─────────────►│
+     │              │

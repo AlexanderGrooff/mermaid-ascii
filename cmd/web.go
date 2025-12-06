@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"fmt"
 	"net/http"
 	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/AlexanderGrooff/mermaid-ascii/internal/diagram"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"
@@ -108,7 +110,7 @@ func renderMermaid(c *gin.Context) {
 		}
 	}
 	useExtendedCharsData := c.PostForm("useExtendedChars")
-	useAscii = useExtendedCharsData == ""
+	useAsciiMode := useExtendedCharsData == ""
 	log.Debugf("Received input %s", c.Request.PostForm.Encode())
 
 	// Create a cache key using the input parameters
@@ -125,8 +127,24 @@ func renderMermaid(c *gin.Context) {
 		return
 	}
 
-	// If not in cache or expired, generate the map
-	result := generate_map(mermaidString)
+	// Create render configuration
+	config, err := diagram.NewWebConfig(
+		useAsciiMode,
+		boxBorderPadding,
+		paddingBetweenX,
+		paddingBetweenY,
+	)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid configuration: %v", err)})
+		return
+	}
+	config.Verbose = Verbose // Allow verbose logging in web mode if enabled
+	result, err := RenderDiagram(mermaidString, config)
+	if err != nil {
+		log.Errorf("Rendering failed: %v", err)
+		c.String(http.StatusBadRequest, fmt.Sprintf("Failed to render diagram: %v", err))
+		return
+	}
 
 	// Store the result in the cache
 	resultCache.Lock()
@@ -144,13 +162,4 @@ func renderMermaid(c *gin.Context) {
 	resultCache.Unlock()
 
 	c.String(http.StatusOK, result)
-}
-
-func generate_map(input string) string {
-	properties, err := mermaidFileToMap(input, "html")
-	if err != nil {
-		return "Failed to parse mermaid file"
-	}
-
-	return drawMap(properties)
 }

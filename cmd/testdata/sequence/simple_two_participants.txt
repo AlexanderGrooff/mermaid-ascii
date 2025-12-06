@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant A
+    participant B
+    A->>B: Hello
+---
+┌───┐     ┌───┐
+│ A │     │ B │
+└─┬─┘     └─┬─┘
+  │         │
+  │ Hello   │
+  ├────────►│
+  │         │

@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"os"
 
+	"github.com/AlexanderGrooff/mermaid-ascii/internal/diagram"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -48,11 +50,26 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		properties, err := mermaidFileToMap(string(mermaid), "cli")
+		// Create render configuration from flags
+		config, err := diagram.NewCLIConfig(
+			useAscii,
+			Coords,
+			Verbose,
+			boxBorderPadding,
+			paddingBetweenX,
+			paddingBetweenY,
+			graphDirection,
+		)
 		if err != nil {
-			log.Fatal("Failed to parse mermaid input: ", err)
+			log.Fatalf("Invalid configuration: %v", err)
 		}
-		drawMap(properties)
+
+		// Render diagram (automatically detects type)
+		output, err := RenderDiagram(string(mermaid), config)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Print(output)
 	},
 }
 
