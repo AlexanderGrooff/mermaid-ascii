@@ -1,0 +1,26 @@
+sequenceDiagram
+    participant A
+    participant B
+    participant C
+    participant D
+    A->>B: Msg1
+    B->>C: Msg2
+    C->>D: Msg3
+    D-->>A: Response
+---
+┌───┐     ┌───┐     ┌───┐     ┌───┐
+│ A │     │ B │     │ C │     │ D │
+└─┬─┘     └─┬─┘     └─┬─┘     └─┬─┘
+  │         │         │         │
+  │ Msg1    │         │         │
+  ├────────►│         │         │
+  │         │         │         │
+  │         │ Msg2    │         │
+  │         ├────────►│         │
+  │         │         │         │
+  │         │         │ Msg3    │
+  │         │         ├────────►│
+  │         │         │         │
+  │ Response│         │         │
+  │◄┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+  │         │         │         │

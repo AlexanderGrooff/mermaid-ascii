@@ -34,5 +34,21 @@ clean:
 uninstall:
 	$(RM) $(targets)
 
+.PHONY: test
+test:
+	go test ./... -v
+
+.PHONY: docker-build
+docker-build:
+	docker build -t mermaid-ascii:latest .
+
+.PHONY: docker-test
+docker-test:
+	docker build --target test -t mermaid-ascii:test -f Dockerfile.test .
+
+.PHONY: docker-run
+docker-run:
+	docker run -i mermaid-ascii:latest
+
 dev:
 	air

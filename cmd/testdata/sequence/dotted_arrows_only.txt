@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant A
+    participant B
+    A-->>B: Return value
+---
+┌───┐     ┌───┐
+│ A │     │ B │
+└─┬─┘     └─┬─┘
+  │         │
+  │ Return value
+  ├┈┈┈┈┈┈┈┈►│
+  │         │

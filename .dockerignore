@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+mermaid-ascii
+build/
+*.tar.gz
+
+# Documentation
+README.md
+LICENSE
+docs/
+*.md
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Nix files
+flake.nix
+flake.lock
+
+# Other package files
+PKGBUILD
+scripts/
+
+# Test artifacts
+*.test
+coverage.out
+
+
+

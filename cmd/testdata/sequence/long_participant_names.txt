@@ -1,0 +1,25 @@
+sequenceDiagram
+    participant UserInterface
+    participant BackendAPI
+    participant DatabaseServer
+    UserInterface->>BackendAPI: Send Request
+    BackendAPI->>DatabaseServer: Query Data
+    DatabaseServer-->>BackendAPI: Return Results
+    BackendAPI-->>UserInterface: Send Response
+---
+┌───────────────┐     ┌────────────┐     ┌────────────────┐
+│ UserInterface │     │ BackendAPI │     │ DatabaseServer │
+└───────┬───────┘     └──────┬─────┘     └────────┬───────┘
+        │                    │                    │
+        │ Send Request       │                    │
+        ├───────────────────►│                    │
+        │                    │                    │
+        │                    │ Query Data         │
+        │                    ├───────────────────►│
+        │                    │                    │
+        │                    │ Return Results     │
+        │                    │◄┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+        │                    │                    │
+        │ Send Response      │                    │
+        │◄┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┤                    │
+        │                    │                    │

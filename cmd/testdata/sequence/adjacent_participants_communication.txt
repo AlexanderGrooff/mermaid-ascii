@@ -1,0 +1,21 @@
+sequenceDiagram
+    participant A
+    participant B
+    participant C
+    A->>B: First
+    B->>C: Second
+    A->>C: Direct
+---
+┌───┐     ┌───┐     ┌───┐
+│ A │     │ B │     │ C │
+└─┬─┘     └─┬─┘     └─┬─┘
+  │         │         │
+  │ First   │         │
+  ├────────►│         │
+  │         │         │
+  │         │ Second  │
+  │         ├────────►│
+  │         │         │
+  │ Direct  │         │
+  ├──────────────────►│
+  │         │         │

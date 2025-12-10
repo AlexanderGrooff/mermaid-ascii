@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant A
+    participant B
+    A->>A: Self call
+    A->>B: Then to B
+---
+┌───┐     ┌───┐
+│ A │     │ B │
+└─┬─┘     └─┬─┘
+  │         │
+  │ Self call      
+  ├──┐      │
+  │  │      │
+  │◄─┘      │
+  │         │
+  │ Then to B
+  ├────────►│
+  │         │

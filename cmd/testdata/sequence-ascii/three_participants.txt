@@ -1,0 +1,18 @@
+sequenceDiagram
+    Alice->>Bob: Step 1
+    Bob->>Charlie: Step 2
+    Charlie-->>Alice: Done
+---
++-------+     +-----+     +---------+
+| Alice |     | Bob |     | Charlie |
++---+---+     +--+--+     +----+----+
+    |            |             |
+    | Step 1     |             |
+    +----------->|             |
+    |            |             |
+    |            | Step 2      |
+    |            +------------>|
+    |            |             |
+    | Done       |             |
+    |<.........................+
+    |            |             |

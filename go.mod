@@ -1,11 +1,12 @@
 module github.com/AlexanderGrooff/mermaid-ascii
 
-go 1.19
+go 1.21
 
 require (
 	github.com/elliotchance/orderedmap/v2 v2.2.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/gookit/color v1.5.4
+	github.com/mattn/go-runewidth v0.0.19
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
 )
@@ -13,6 +14,7 @@ require (
 require (
 	github.com/bytedance/sonic v1.11.6 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
+	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect

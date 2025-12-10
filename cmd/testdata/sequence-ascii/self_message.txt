@@ -1,0 +1,12 @@
+sequenceDiagram
+    Alice->>Alice: Think
+---
++-------+
+| Alice |
++---+---+
+    |
+    | Think
+    +--+
+    |  |
+    |<-+
+    |

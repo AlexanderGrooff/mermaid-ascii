@@ -198,6 +198,150 @@ $ cat test.mermaid | mermaid-ascii --ascii
           |   |
           +---+
 
+# Using Docker
+$ docker build -t mermaid-ascii .
+$ echo 'sequenceDiagram
+Alice->>Bob: Hello
+Bob-->>Alice: Hi' | docker run -i mermaid-ascii -f -
+┌───────┐     ┌─────┐
+│ Alice │     │ Bob │
+└───┬───┘     └──┬──┘
+    │            │
+    │ Hello      │
+    ├───────────►│
+    │            │
+    │ Hi         │
+    │◄┈┈┈┈┈┈┈┈┈┈┈┤
+    │            │
+
+# Graph diagrams work too
+$ echo 'graph LR
+A-->B-->C' | docker run -i mermaid-ascii -f -
+┌───┐     ┌───┐     ┌───┐
+│   │     │   │     │   │
+│ A ├────►│ B ├────►│ C │
+│   │     │   │     │   │
+└───┘     └───┘     └───┘
+
+# Run web interface
+$ docker run -p 3001:3001 mermaid-ascii web --port 3001
+# Then visit http://localhost:3001
+```
+
+### Sequence Diagrams
+
+Sequence diagrams are also fully supported! They visualize message flows between participants over time.
+
+```bash
+# Simple sequence diagram
+$ cat sequence.mermaid
+sequenceDiagram
+Alice->>Bob: Hello Bob!
+Bob-->>Alice: Hi Alice!
+$ mermaid-ascii -f sequence.mermaid
+┌───────┐     ┌─────┐
+│ Alice │     │ Bob │
+└───┬───┘     └──┬──┘
+    │            │
+    │ Hello Bob! │
+    ├───────────►│
+    │            │
+    │ Hi Alice!  │
+    │◄┈┈┈┈┈┈┈┈┈┈┈┤
+    │            │
+
+# Solid arrows (->>) and dotted arrows (-->>)
+$ cat sequence.mermaid
+sequenceDiagram
+Client->>Server: Request
+Server-->>Client: Response
+$ mermaid-ascii -f sequence.mermaid
+┌────────┐     ┌────────┐
+│ Client │     │ Server │
+└───┬────┘     └───┬────┘
+    │              │
+    │   Request    │
+    ├─────────────►│
+    │              │
+    │   Response   │
+    │◄┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+    │              │
+
+# Multiple participants
+$ cat sequence.mermaid
+sequenceDiagram
+Alice->>Bob: Hello!
+Bob->>Charlie: Forward message
+Charlie-->>Alice: Got it!
+$ mermaid-ascii -f sequence.mermaid
+┌───────┐     ┌─────┐     ┌─────────┐
+│ Alice │     │ Bob │     │ Charlie │
+└───┬───┘     └──┬──┘     └────┬────┘
+    │            │              │
+    │   Hello!   │              │
+    ├───────────►│              │
+    │            │              │
+    │            │ Forward message
+    │            ├─────────────►│
+    │            │              │
+    │         Got it!           │
+    │◄┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┤
+    │            │              │
+
+# Self-messages
+$ cat sequence.mermaid
+sequenceDiagram
+Alice->>Alice: Think
+Alice->>Bob: Hello
+$ mermaid-ascii -f sequence.mermaid
+┌───────┐     ┌─────┐
+│ Alice │     │ Bob │
+└───┬───┘     └──┬──┘
+    │            │
+    │ Think      │
+    ├──┐         │
+    │  │         │
+    │◄─┘         │
+    │            │
+    │ Hello      │
+    ├───────────►│
+    │            │
+
+# Explicit participant declarations with aliases
+$ cat sequence.mermaid
+sequenceDiagram
+participant A as Alice
+participant B as Bob
+A->>B: Message from Alice
+B-->>A: Reply to Alice
+$ mermaid-ascii -f sequence.mermaid
+┌───────┐     ┌─────┐
+│ Alice │     │ Bob │
+└───┬───┘     └──┬──┘
+    │            │
+    │ Message from Alice
+    ├───────────►│
+    │            │
+    │ Reply to Alice
+    │◄┈┈┈┈┈┈┈┈┈┈┈┤
+    │            │
+
+# ASCII mode for sequence diagrams
+$ cat sequence.mermaid | mermaid-ascii --ascii
++-------+     +-----+
+| Alice |     | Bob |
++---+---+     +--+--+
+    |            |
+    | Hello Bob! |
+    +----------->|
+    |            |
+    | Hi Alice!  |
+    |<...........+
+    |            |
+
+```
+
+```bash
 $ mermaid-ascii --help
 Generate ASCII diagrams from mermaid code.
 
@@ -360,6 +504,31 @@ $ mermaid-ascii -f ./test.mermaid --coords
 
 Note that with `--coords` enabled, the grid-coords shown show the starting location of the coord, not the center of the coord. This is why `(1,0)` is next to `(0,0)` instead of in the center of the `A` node.
 
+## Supported Diagram Types
+
+### Graphs / Flowcharts ✅
+- [x] Graph directions (`graph LR` and `graph TD`)
+- [x] Labelled edges (like `A -->|label| B`)
+- [x] Multiple arrows on one line (like `A --> B --> C`)
+- [x] `A & B` syntax
+- [x] `classDef` and `class` for colored output
+- [x] Prevent arrows overlapping nodes
+- [ ] `subgraph` support
+- [ ] Shapes other than rectangles
+- [ ] Diagonal arrows
+
+### Sequence Diagrams ✅
+- [x] Basic message syntax (`A->>B: message`)
+- [x] Solid arrows (`->>`) and dotted arrows (`-->>`)
+- [x] Self-messages (`A->>A: think`)
+- [x] Participant declarations (`participant Alice`)
+- [x] Participant aliases (`participant A as Alice`)
+- [x] Unicode support (emojis, CJK characters, etc.)
+- [x] Both ASCII and Unicode rendering modes
+- [ ] Activation boxes
+- [ ] Notes (`Note left of Alice: text`)
+- [ ] Loops, alt, opt blocks
+
 ## TODOs
 
 The baseline components for Mermaid work, but there are a lot of things that are not supported yet. Here's a list of things that are not yet supported:
@@ -381,3 +550,13 @@ The baseline components for Mermaid work, but there are a lot of things that are
 - [ ] Diagonal arrows
 - [ ] Place nodes in a more compact way
 - [ ] Prevent rendering more than X characters wide (like default 80 for terminal width)
+
+### Sequence Diagram Improvements
+
+- [ ] Activation boxes (activate/deactivate)
+- [ ] Notes (`Note left of Alice: text`)
+- [ ] Loops, alt, opt, and par blocks
+
+### General
+
+- [ ] Support for more diagram types (class diagrams, state diagrams, etc.)
