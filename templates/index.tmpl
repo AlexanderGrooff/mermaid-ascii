@@ -199,6 +199,7 @@
                 <button type="button" onclick="setExample('graph LR\nsubgraph Frontend\n    UI --> API\nend\nsubgraph Backend\n    API --> Database\n    API --> Cache\nend')" style="background-color: green; color: white;">Example 1: nested subgraphs</button>
                 <button type="button" onclick="setExample('graph TD\nA -->|labelled arrow| B\nA --> Example2')" style="background-color: teal; color: white;">Example 2: labelled arrow</button>
                 <button type="button" onclick="setExample('graph LR\nclassDef examplecolor color:#ff00ff\nA --> B\nA --> ColorText:::examplecolor\nB --> D\nColorText --> D')" style="background-color: blue; color: white;">Example 3: styled text</button>
+                <button type="button" onclick="setExample('sequenceDiagram\n    participant A\n    participant B\n    participant C\n    A->>B: First\n    B->>C: Second\n    A->>C: Direct')" style="background-color: purple; color: white;">Example 4: sequence diagram</button>
             </div>
             <hr>
             <p>There are alternative forms of generating mermaid graphs in ASCII using this same Git repository.</p>
