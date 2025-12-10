@@ -35,7 +35,7 @@ type styleClass struct {
 
 func (g *graph) drawNode(n *node) {
 	log.Debug("Drawing node ", n.name, " at ", *n.drawingCoord)
-	m := mergeDrawings(g.drawing, *n.drawingCoord, n.drawing)
+	m := mergeDrawings(g.drawing, *n.drawingCoord, g.useAscii, n.drawing)
 	g.drawing = m
 }
 
@@ -55,7 +55,7 @@ func (d *drawing) drawText(start drawingCoord, text string) {
 	}
 }
 
-func (d *drawing) drawLine(from drawingCoord, to drawingCoord, offsetFrom int, offsetTo int) []drawingCoord {
+func (d *drawing) drawLine(from drawingCoord, to drawingCoord, offsetFrom int, offsetTo int, useAscii bool) []drawingCoord {
 	// Offset determines how far from the actual coord the line should start/stop.
 	direction := determineDirection(genericCoord(from), genericCoord(to))
 	drawnCoords := make([]drawingCoord, 0)
@@ -150,11 +150,12 @@ func (d *drawing) drawLine(from drawingCoord, to drawingCoord, offsetFrom int, o
 	return drawnCoords
 }
 
-func drawMap(properties *graphProperties) string {
+func drawMap(properties *graphProperties, useAscii bool) string {
 	g := mkGraph(properties.data)
 	g.setStyleClasses(properties)
 	g.paddingX = properties.paddingX
 	g.paddingY = properties.paddingY
+	g.useAscii = useAscii
 	g.setSubgraphs(properties.subgraphs)
 	g.createMapping()
 	d := g.draw()
@@ -182,7 +183,7 @@ func drawBox(n *node, g graph) *drawing {
 	to := drawingCoord{w, h}
 	boxDrawing := *(mkDrawing(Max(from.x, to.x), Max(from.y, to.y)))
 	log.Debug("Drawing box from ", from, " to ", to)
-	if !useAscii {
+	if !g.useAscii {
 		// Draw top border
 		for x := from.x + 1; x < to.x; x++ {
 			boxDrawing[x][from.y] = "─" // Horizontal line
@@ -252,7 +253,7 @@ func drawSubgraph(sg *subgraph, g graph) *drawing {
 
 	log.Debugf("Drawing subgraph %s from (%d,%d) to (%d,%d)", sg.name, from.x, from.y, to.x, to.y)
 
-	if !useAscii {
+	if !g.useAscii {
 		// Draw top border
 		for x := from.x + 1; x < to.x; x++ {
 			subgraphDrawing[x][from.y] = "─"
@@ -351,7 +352,7 @@ func wrapTextInColor(text, c, styleType string) string {
 func (d *drawing) increaseSize(x int, y int) {
 	currSizeX, currSizeY := getDrawingSize(d)
 	drawingWithNewSize := mkDrawing(Max(x, currSizeX), Max(y, currSizeY))
-	*d = *mergeDrawings(drawingWithNewSize, drawingCoord{0, 0}, d)
+	*d = *mergeDrawings(drawingWithNewSize, drawingCoord{0, 0}, false, d)
 }
 
 func (g *graph) setDrawingSizeToGridConstraints() {
@@ -393,7 +394,7 @@ func mergeJunctions(c1, c2 string) string {
 	return c1
 }
 
-func mergeDrawings(baseDrawing *drawing, mergeCoord drawingCoord, drawings ...*drawing) *drawing {
+func mergeDrawings(baseDrawing *drawing, mergeCoord drawingCoord, useAscii bool, drawings ...*drawing) *drawing {
 	// Find the maximum dimensions
 	maxX, maxY := getDrawingSize(baseDrawing)
 	for _, d := range drawings {
@@ -515,7 +516,7 @@ func (d drawing) debugDrawingWrapper() *drawing {
 		debugDrawing[0][y+1] = fmt.Sprintf("%2d", y)
 	}
 
-	return mergeDrawings(&debugDrawing, drawingCoord{1, 1}, &d)
+	return mergeDrawings(&debugDrawing, drawingCoord{1, 1}, false, &d)
 }
 
 func (d drawing) debugCoordWrapper(g graph) *drawing {
@@ -538,5 +539,5 @@ func (d drawing) debugCoordWrapper(g graph) *drawing {
 		currY += h
 	}
 
-	return mergeDrawings(&debugDrawing, drawingCoord{1, 1}, &d)
+	return mergeDrawings(&debugDrawing, drawingCoord{1, 1}, g.useAscii, &d)
 }

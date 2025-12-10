@@ -84,7 +84,7 @@ func (gd *GraphDiagram) Render(config *diagram.Config) (string, error) {
 	}
 	gd.properties.styleType = styleType
 
-	return drawMap(gd.properties), nil
+	return drawMap(gd.properties, config.UseAscii), nil
 }
 
 func (gd *GraphDiagram) Type() string {
