@@ -265,7 +265,8 @@ textarea::placeholder {
     border-radius: var(--radius-sm);
     font-family: 'Roboto Mono', monospace;
     font-size: 0.9rem;
-    white-space: pre-wrap;
+    white-space: pre;
+    line-height: 1;
     overflow: auto;
     color: var(--text-primary);
 }
