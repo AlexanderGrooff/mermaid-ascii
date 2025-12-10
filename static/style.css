@@ -233,17 +233,23 @@ textarea {
     padding: 15px;
     border: 2px solid var(--border-color);
     border-radius: var(--radius-sm);
-    background-color: var(--bg-secondary);
+    background-color: var(--bg-primary);
     color: var(--text-primary);
     font-family: 'Roboto Mono', monospace;
     font-size: 0.95rem;
     resize: vertical;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    cursor: text;
 }
 
 textarea:focus {
     outline: none;
     border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+textarea::placeholder {
+    color: var(--text-secondary);
 }
 
 textarea::placeholder {
@@ -260,7 +266,7 @@ textarea::placeholder {
     width: 100%;
     height: 100%;
     padding: 15px;
-    background-color: var(--bg-secondary);
+    background-color: var(--bg-tertiary);
     border: 2px solid var(--border-color);
     border-radius: var(--radius-sm);
     font-family: 'Roboto Mono', monospace;
@@ -269,6 +275,8 @@ textarea::placeholder {
     line-height: 1;
     overflow: auto;
     color: var(--text-primary);
+    cursor: default;
+    user-select: text;
 }
 
 .copy-button {
