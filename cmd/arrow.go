@@ -159,7 +159,7 @@ func (g *graph) drawPath(path []gridCoord) (*drawing, [][]drawingCoord, []direct
 			continue
 		}
 		dir := determineDirection(genericCoord(previousCoord), genericCoord(nextCoord))
-		s := d.drawLine(previousDrawingCoord, nextDrawingCoord, 1, -1)
+		s := g.drawLine(d, previousDrawingCoord, nextDrawingCoord, 1, -1)
 		if len(s) == 0 {
 			// drawLine may return no coords if offsets collapse the line. Use at least one point so arrow and junction logic
 			// can still infer a direction.
@@ -178,7 +178,7 @@ func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord) *drawin
 	dir := determineDirection(genericCoord(path[0]), genericCoord(path[1]))
 	log.Debugf("Drawing box start at %v with direction %v for line %v", from, dir, path)
 
-	if useAscii {
+	if g.useAscii {
 		return &d
 	}
 
@@ -208,7 +208,7 @@ func (g *graph) drawArrowHead(line []drawingCoord, fallback direction) *drawing 
 	}
 
 	var char string
-	if !useAscii {
+	if !g.useAscii {
 		switch dir {
 		case Up:
 			char = "▲"
@@ -291,7 +291,7 @@ func (g *graph) drawCorners(path []gridCoord) *drawing {
 		nextDir := determineDirection(genericCoord(coord), genericCoord(path[idx+1]))
 
 		var corner string
-		if !useAscii {
+		if !g.useAscii {
 			switch {
 			case (prevDir == Right && nextDir == Down) || (prevDir == Up && nextDir == Left):
 				corner = "┐"

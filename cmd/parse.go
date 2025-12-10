@@ -18,6 +18,7 @@ type graphProperties struct {
 	paddingX       int
 	paddingY       int
 	subgraphs      []*textSubgraph
+	useAscii       bool
 }
 
 type textNode struct {

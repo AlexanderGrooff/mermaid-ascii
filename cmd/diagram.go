@@ -83,6 +83,7 @@ func (gd *GraphDiagram) Render(config *diagram.Config) (string, error) {
 		styleType = "cli"
 	}
 	gd.properties.styleType = styleType
+	gd.properties.useAscii = config.UseAscii
 
 	return drawMap(gd.properties), nil
 }
