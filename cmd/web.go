@@ -75,6 +75,7 @@ func setupRouter() *gin.Engine {
 	r := gin.Default()
 
 	r.LoadHTMLGlob("templates/*")
+	r.Static("/static", "./static")
 	r.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.tmpl", gin.H{
 			"Version": getGitVersion(),
