@@ -23,7 +23,8 @@ func verifyMap(t *testing.T, testCaseFile string, useAscii bool) {
 	}
 	properties.paddingX = tc.PaddingX
 	properties.paddingY = tc.PaddingY
-	actualMap := drawMap(properties, useAscii)
+	properties.useAscii = useAscii
+	actualMap := drawMap(properties)
 	if tc.Expected != actualMap {
 		expectedWithSpaces := testutil.VisualizeWhitespace(tc.Expected)
 		actualWithSpaces := testutil.VisualizeWhitespace(actualMap)

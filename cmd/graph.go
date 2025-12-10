@@ -551,11 +551,11 @@ func (g *graph) draw() *drawing {
 	}
 
 	// Draw in order
-	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, g.useAscii, lineDrawings...)
-	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, g.useAscii, cornerDrawings...)
-	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, g.useAscii, arrowHeadDrawings...)
-	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, g.useAscii, boxStartDrawings...)
-	g.drawing = mergeDrawings(g.drawing, drawingCoord{0, 0}, g.useAscii, labelDrawings...)
+	g.drawing = g.mergeDrawings(g.drawing, drawingCoord{0, 0}, lineDrawings...)
+	g.drawing = g.mergeDrawings(g.drawing, drawingCoord{0, 0}, cornerDrawings...)
+	g.drawing = g.mergeDrawings(g.drawing, drawingCoord{0, 0}, arrowHeadDrawings...)
+	g.drawing = g.mergeDrawings(g.drawing, drawingCoord{0, 0}, boxStartDrawings...)
+	g.drawing = g.mergeDrawings(g.drawing, drawingCoord{0, 0}, labelDrawings...)
 
 	// Draw subgraph labels LAST so they don't get overwritten by arrows
 	g.drawSubgraphLabels()
@@ -572,7 +572,7 @@ func (g *graph) drawSubgraphs() {
 		sgDrawing := drawSubgraph(sg, *g)
 		// Position the drawing at the subgraph's min coordinates
 		offset := drawingCoord{sg.minX, sg.minY}
-		g.drawing = mergeDrawings(g.drawing, offset, g.useAscii, sgDrawing)
+		g.drawing = g.mergeDrawings(g.drawing, offset, sgDrawing)
 	}
 }
 
@@ -584,7 +584,7 @@ func (g *graph) drawSubgraphLabels() {
 			continue
 		}
 		labelDrawing, offset := drawSubgraphLabel(sg, *g)
-		g.drawing = mergeDrawings(g.drawing, offset, g.useAscii, labelDrawing)
+		g.drawing = g.mergeDrawings(g.drawing, offset, labelDrawing)
 	}
 }
 

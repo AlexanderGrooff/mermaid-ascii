@@ -159,7 +159,7 @@ func (g *graph) drawPath(path []gridCoord) (*drawing, [][]drawingCoord, []direct
 			continue
 		}
 		dir := determineDirection(genericCoord(previousCoord), genericCoord(nextCoord))
-		s := d.drawLine(previousDrawingCoord, nextDrawingCoord, 1, -1, g.useAscii)
+		s := g.drawLine(d, previousDrawingCoord, nextDrawingCoord, 1, -1)
 		if len(s) == 0 {
 			// drawLine may return no coords if offsets collapse the line. Use at least one point so arrow and junction logic
 			// can still infer a direction.
