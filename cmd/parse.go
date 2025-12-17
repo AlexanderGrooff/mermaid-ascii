@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -252,10 +253,10 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 	switch lines[0] {
 	case "graph LR", "flowchart LR":
 		graphDirection = "LR"
-	case "graph TD", "flowchart TD":
+	case "graph TD", "flowchart TD", "graph TB", "flowchart TB":
 		graphDirection = "TD"
 	default:
-		return &properties, errors.New("first line should define the graph")
+		return &properties, fmt.Errorf("unsupported graph type '%s'. Supported types: graph TD, graph TB, graph LR, flowchart TD, flowchart TB, flowchart LR", lines[0])
 	}
 	lines = lines[1:]
 
