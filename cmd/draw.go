@@ -164,7 +164,6 @@ func drawMap(properties *graphProperties) string {
 		d = d.debugCoordWrapper(g)
 	}
 	s := drawingToString(d)
-	fmt.Println(s)
 	return s
 }
 
