@@ -20,12 +20,16 @@ var (
 
 	// messageRegex matches messages: [From]->>[To]: [Label]
 	messageRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([^\s\->]+))\s*(-->>|->>)\s*(?:"([^"]+)"|([^\s\->]+))\s*:\s*(.*)$`)
+
+	// autonumberRegex matches the autonumber directive
+	autonumberRegex = regexp.MustCompile(`^\s*autonumber\s*$`)
 )
 
 // SequenceDiagram represents a parsed sequence diagram.
 type SequenceDiagram struct {
 	Participants []*Participant
 	Messages     []*Message
+	Autonumber   bool
 }
 
 type Participant struct {
@@ -39,6 +43,7 @@ type Message struct {
 	To        *Participant
 	Label     string
 	ArrowType ArrowType
+	Number    int // Message number when autonumber is enabled (0 means no number)
 }
 
 type ArrowType int
@@ -91,12 +96,19 @@ func Parse(input string) (*SequenceDiagram, error) {
 	sd := &SequenceDiagram{
 		Participants: []*Participant{},
 		Messages:     []*Message{},
+		Autonumber:   false,
 	}
 	participantMap := make(map[string]*Participant)
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
+			continue
+		}
+
+		// Check for autonumber directive
+		if autonumberRegex.MatchString(trimmed) {
+			sd.Autonumber = true
 			continue
 		}
 
@@ -180,11 +192,17 @@ func (sd *SequenceDiagram) parseMessage(line string, participants map[string]*Pa
 		aType = SolidArrow
 	}
 
+	msgNumber := 0
+	if sd.Autonumber {
+		msgNumber = len(sd.Messages) + 1
+	}
+
 	msg := &Message{
 		From:      from,
 		To:        to,
 		Label:     label,
 		ArrowType: aType,
+		Number:    msgNumber,
 	}
 	sd.Messages = append(sd.Messages, msg)
 	return true, nil
