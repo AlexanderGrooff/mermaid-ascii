@@ -25,6 +25,7 @@ func TestSequenceDiagramRendering(t *testing.T) {
 	// Test files - stored in sequence/ directory (Unicode expected output)
 	testFiles := []string{
 		"adjacent_participants_communication.txt",
+		"autonumber.txt",
 		"bidirectional_messages.txt",
 		"dotted_arrows_only.txt",
 		"four_participants.txt",
@@ -50,9 +51,10 @@ func TestSequenceDiagramRendering_ASCII(t *testing.T) {
 	testDataPath := filepath.Join(getTestDataPath(), "sequence-ascii")
 
 	goldenFiles := []string{
-		"simple_two_participants.txt",
+		"autonumber.txt",
 		"dotted_arrows_only.txt",
 		"self_message.txt",
+		"simple_two_participants.txt",
 		"three_participants.txt",
 	}
 
@@ -70,6 +72,7 @@ func TestSequenceDiagramRendering_ASCIISmokeTest(t *testing.T) {
 
 	testFiles := []string{
 		"adjacent_participants_communication.txt",
+		"autonumber.txt",
 		"bidirectional_messages.txt",
 		"dotted_arrows_only.txt",
 		"four_participants.txt",

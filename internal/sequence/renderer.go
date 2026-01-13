@@ -160,9 +160,14 @@ func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string
 	var lines []string
 	from, to := layout.participantCenters[msg.From.Index], layout.participantCenters[msg.To.Index]
 
-	if msg.Label != "" {
+	label := msg.Label
+	if msg.Number > 0 {
+		label = fmt.Sprintf("%d. %s", msg.Number, msg.Label)
+	}
+
+	if label != "" {
 		start := min(from, to) + labelLeftMargin
-		labelWidth := runewidth.StringWidth(msg.Label)
+		labelWidth := runewidth.StringWidth(label)
 		w := max(layout.totalWidth, start+labelWidth) + labelBufferSpace
 		line := []rune(buildLifeline(layout, chars))
 		if len(line) < w {
@@ -174,7 +179,7 @@ func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string
 		}
 
 		col := start
-		for _, r := range msg.Label {
+		for _, r := range label {
 			if col < len(line) {
 				line[col] = r
 				col++
@@ -226,10 +231,15 @@ func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []st
 		return r
 	}
 
-	if msg.Label != "" {
+	label := msg.Label
+	if msg.Number > 0 {
+		label = fmt.Sprintf("%d. %s", msg.Number, msg.Label)
+	}
+
+	if label != "" {
 		line := ensureWidth(buildLifeline(layout, chars))
 		start := center + labelLeftMargin
-		labelWidth := runewidth.StringWidth(msg.Label)
+		labelWidth := runewidth.StringWidth(label)
 		needed := start + labelWidth + labelBufferSpace
 		if len(line) < needed {
 			pad := make([]rune, needed-len(line))
@@ -239,7 +249,7 @@ func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []st
 			line = append(line, pad...)
 		}
 		col := start
-		for _, c := range msg.Label {
+		for _, c := range label {
 			if col < len(line) {
 				line[col] = c
 				col++

@@ -1,0 +1,25 @@
+sequenceDiagram
+    autonumber
+    Alice->>Bob: Hello
+    Bob->>Bob: Think
+    Bob-->>Alice: Hi
+    Alice->>Bob: Bye
+---
++-------+     +-----+
+| Alice |     | Bob |
++---+---+     +--+--+
+    |            |
+    | 1. Hello   |
+    +----------->|
+    |            |
+    |            | 2. Think
+    |            +--+
+    |            |  |
+    |            |<-+
+    |            |
+    | 3. Hi      |
+    |<...........+
+    |            |
+    | 4. Bye     |
+    +----------->|
+    |            |
