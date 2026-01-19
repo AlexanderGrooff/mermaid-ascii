@@ -23,6 +23,13 @@ var (
 
 	// autonumberRegex matches the autonumber directive
 	autonumberRegex = regexp.MustCompile(`^\s*autonumber\s*$`)
+
+	// noteRegex matches note declarations:
+	//   Note over Actor: text
+	//   Note over Actor1,Actor2: text
+	//   Note left of Actor: text
+	//   Note right of Actor: text
+	noteRegex = regexp.MustCompile(`(?i)^\s*note\s+(over|left\s+of|right\s+of)\s+([^:]+):\s*(.*)$`)
 )
 
 // SequenceDiagram represents a parsed sequence diagram.
@@ -256,4 +263,54 @@ func (sd *SequenceDiagram) getParticipant(id string, participants map[string]*Pa
 	sd.Participants = append(sd.Participants, p)
 	participants[id] = p
 	return p
+}
+
+func (sd *SequenceDiagram) parseNote(line string, participants map[string]*Participant) (bool, error) {
+	match := noteRegex.FindStringSubmatch(line)
+	if match == nil {
+		return false, nil
+	}
+
+	posStr := strings.ToLower(match[1])
+	actorsStr := strings.TrimSpace(match[2])
+	text := strings.TrimSpace(match[3])
+
+	var position NotePosition
+	switch {
+	case posStr == "over":
+		position = NoteOver
+	case strings.Contains(posStr, "left"):
+		position = NoteLeftOf
+	case strings.Contains(posStr, "right"):
+		position = NoteRightOf
+	default:
+		return false, fmt.Errorf("unknown note position: %q", posStr)
+	}
+
+	// Parse actor(s) - comma separated for "over" with multiple actors
+	actorIDs := strings.Split(actorsStr, ",")
+	var actors []*Participant
+	for _, id := range actorIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		actors = append(actors, sd.getParticipant(id, participants))
+	}
+
+	if len(actors) == 0 {
+		return false, fmt.Errorf("note requires at least one actor")
+	}
+
+	if position != NoteOver && len(actors) > 1 {
+		return false, fmt.Errorf("note %s only supports one actor", position)
+	}
+
+	note := &Note{
+		Position: position,
+		Actors:   actors,
+		Text:     text,
+	}
+	sd.Elements = append(sd.Elements, note)
+	return true, nil
 }
