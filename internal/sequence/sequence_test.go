@@ -660,6 +660,62 @@ func TestRenderBlockLoop(t *testing.T) {
 	}
 }
 
+func TestRenderBlockAltElse(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		alt Success
+			A->>B: OK
+		else Error
+			A->>B: Fail
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "alt") {
+		t.Errorf("output should contain 'alt':\n%s", output)
+	}
+	if !strings.Contains(output, "Error") {
+		t.Errorf("output should contain 'Error' divider:\n%s", output)
+	}
+}
+
+func TestRenderBlockNested(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		loop Retry
+			opt Check
+				A->>B: Verify
+			end
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "loop") {
+		t.Errorf("output should contain 'loop':\n%s", output)
+	}
+	if !strings.Contains(output, "opt") {
+		t.Errorf("output should contain nested 'opt':\n%s", output)
+	}
+}
+
 func FuzzParseSequenceDiagram(f *testing.F) {
 	f.Add("sequenceDiagram\nA->>B: Hello")
 	f.Add("sequenceDiagram\nparticipant Alice\nAlice->>Bob: Hi")
