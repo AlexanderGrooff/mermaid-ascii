@@ -498,6 +498,75 @@ func renderNoteRightOf(note *Note, layout *diagramLayout, chars BoxChars) []stri
 	return lines
 }
 
+func calculateBlockContentWidth(block *Block, layout *diagramLayout) int {
+	maxWidth := 0
+
+	var checkElements func(elements []DiagramElement)
+	checkElements = func(elements []DiagramElement) {
+		for _, elem := range elements {
+			switch e := elem.(type) {
+			case *Message:
+				label := e.Label
+				if e.Number > 0 {
+					label = fmt.Sprintf("%d. %s", e.Number, e.Label)
+				}
+				if label != "" {
+					from := layout.participantCenters[e.From.Index]
+					to := layout.participantCenters[e.To.Index]
+					start := min(from, to) + labelLeftMargin
+					labelWidth := runewidth.StringWidth(label)
+					width := start + labelWidth + 2
+					if width > maxWidth {
+						maxWidth = width
+					}
+				}
+			case *Note:
+				textWidth := runewidth.StringWidth(e.Text)
+				var noteRight int
+				switch e.Position {
+				case NoteOver:
+					leftCenter := layout.participantCenters[e.Actors[0].Index]
+					rightCenter := layout.participantCenters[e.Actors[len(e.Actors)-1].Index]
+					if leftCenter > rightCenter {
+						leftCenter, rightCenter = rightCenter, leftCenter
+					}
+					spanCenter := (leftCenter + rightCenter) / 2
+					minBoxWidth := textWidth + 4
+					spanWidth := rightCenter - leftCenter + 4
+					boxWidth := spanWidth
+					if boxWidth < minBoxWidth {
+						boxWidth = minBoxWidth
+					}
+					noteRight = spanCenter + boxWidth/2 + 1
+				case NoteRightOf:
+					center := layout.participantCenters[e.Actors[0].Index]
+					noteRight = center + 2 + textWidth + 4
+				case NoteLeftOf:
+					noteRight = layout.participantCenters[e.Actors[0].Index]
+				}
+				if noteRight > maxWidth {
+					maxWidth = noteRight
+				}
+			case *Block:
+				nestedWidth := calculateBlockContentWidth(e, layout)
+				if nestedWidth > maxWidth {
+					maxWidth = nestedWidth
+				}
+			}
+		}
+	}
+
+	for _, section := range block.Sections {
+		sectionLabelWidth := runewidth.StringWidth(section.Label)
+		if sectionLabelWidth+4 > maxWidth {
+			maxWidth = sectionLabelWidth + 4
+		}
+		checkElements(section.Elements)
+	}
+
+	return maxWidth
+}
+
 func findBlockParticipantRange(block *Block) (minIdx, maxIdx int) {
 	minIdx = -1
 	maxIdx = -1
@@ -554,23 +623,29 @@ func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int)
 
 	minIdx, maxIdx := findBlockParticipantRange(block)
 	if minIdx == -1 || maxIdx == -1 {
-		return nil
+		minIdx = 0
+		maxIdx = len(layout.participantCenters) - 1
 	}
 
 	indent := depth * 2
 	leftCenter := layout.participantCenters[minIdx]
 	rightCenter := layout.participantCenters[maxIdx]
 
-	boxLeft := leftCenter - 3 - indent
+	boxLeft := leftCenter - 3 + indent
 	if boxLeft < 0 {
 		boxLeft = 0
 	}
-	boxRight := rightCenter + 3
+	boxRight := rightCenter + 3 - indent
 
 	headerLabel := fmt.Sprintf("%s %s", block.Type, block.Label)
 	labelWidth := runewidth.StringWidth(headerLabel)
 	if boxRight-boxLeft < labelWidth+4 {
 		boxRight = boxLeft + labelWidth + 4
+	}
+
+	contentWidth := calculateBlockContentWidth(block, layout)
+	if contentWidth > boxRight {
+		boxRight = contentWidth
 	}
 
 	ensureWidth := boxRight + 1
@@ -616,15 +691,15 @@ func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int)
 	lines = append(lines, strings.TrimRight(string(headerLine), " "))
 
 	sepLine := makeLine()
-	sepLine[boxLeft] = chars.Vertical
+	sepLine[boxLeft] = chars.TeeRight
 	for i := boxLeft + 1; i < boxRight; i++ {
 		if sepLine[i] == chars.Vertical {
-			// keep lifeline
+			sepLine[i] = chars.Cross
 		} else {
 			sepLine[i] = chars.Horizontal
 		}
 	}
-	sepLine[boxRight] = chars.Vertical
+	sepLine[boxRight] = chars.TeeLeft
 	lines = append(lines, strings.TrimRight(string(sepLine), " "))
 
 	for sectionIdx, section := range block.Sections {

@@ -1,0 +1,20 @@
+sequenceDiagram
+    participant A
+    participant B
+    loop Check status
+        A->>B: This is a very long message that should extend the block width
+    end
+---
+┌───┐     ┌───┐
+│ A │     │ B │
+└─┬─┘     └─┬─┘
+  │         │
+┌─┴─────────┴───────────────────────────────────────────────────────┐
+│ loop Check status                                                 │
+├─┼─────────┼───────────────────────────────────────────────────────┤
+│ │         │                                                       │
+│ │ This is a very long message that should extend the block width  │
+│ ├────────►│                                                       │
+│ │         │                                                       │
+└─┬─────────┬───────────────────────────────────────────────────────┘
+  │         │

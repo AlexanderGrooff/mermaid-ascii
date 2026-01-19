@@ -716,6 +716,151 @@ func TestRenderBlockNested(t *testing.T) {
 	}
 }
 
+func TestRenderBlockNestedIndentation(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		loop Outer
+			opt Inner
+				A->>B: Message
+			end
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	lines := strings.Split(output, "\n")
+
+	var outerTopLineIdx, innerTopLineIdx int
+	outerTopLineIdx, innerTopLineIdx = -1, -1
+
+	for i, line := range lines {
+		if strings.Contains(line, "loop Outer") {
+			outerTopLineIdx = i
+		}
+		if strings.Contains(line, "opt Inner") {
+			innerTopLineIdx = i
+		}
+	}
+
+	if outerTopLineIdx == -1 || innerTopLineIdx == -1 {
+		t.Fatalf("could not find block header lines in output:\n%s", output)
+	}
+
+	findTopLeftCorner := func(lineIdx int) int {
+		for i := lineIdx; i >= 0; i-- {
+			runes := []rune(lines[i])
+			for j, ch := range runes {
+				if ch == '┌' {
+					return j
+				}
+			}
+		}
+		return -1
+	}
+
+	findTopRightCorner := func(lineIdx int) int {
+		for i := lineIdx; i >= 0; i-- {
+			runes := []rune(lines[i])
+			for j := len(runes) - 1; j >= 0; j-- {
+				if runes[j] == '┐' {
+					return j
+				}
+			}
+		}
+		return -1
+	}
+
+	outerLeft := findTopLeftCorner(outerTopLineIdx)
+	innerLeft := findTopLeftCorner(innerTopLineIdx)
+
+	outerStartLine := -1
+	for i := outerTopLineIdx; i >= 0; i-- {
+		if strings.Contains(lines[i], "┌") && strings.Contains(lines[i], "┐") {
+			runes := []rune(lines[i])
+			for j := len(runes) - 1; j >= 0; j-- {
+				if runes[j] == '┐' {
+					outerStartLine = i
+					break
+				}
+			}
+			break
+		}
+	}
+	outerRight := findTopRightCorner(outerStartLine + 1)
+
+	innerStartLine := -1
+	for i := innerTopLineIdx; i >= 0; i-- {
+		runes := []rune(lines[i])
+		count := 0
+		for _, ch := range runes {
+			if ch == '┌' {
+				count++
+			}
+		}
+		if count >= 1 {
+			innerStartLine = i
+			break
+		}
+	}
+	runes := []rune(lines[innerStartLine])
+	innerRight := -1
+	for j := len(runes) - 1; j >= 0; j-- {
+		if runes[j] == '┐' {
+			innerRight = j
+			break
+		}
+	}
+
+	if outerLeft == -1 || innerLeft == -1 || outerRight == -1 || innerRight == -1 {
+		t.Fatalf("could not find block boundaries (outer: %d-%d, inner: %d-%d) in output:\n%s",
+			outerLeft, outerRight, innerLeft, innerRight, output)
+	}
+
+	if innerLeft <= outerLeft {
+		t.Errorf("inner block left edge (%d) should be greater than outer block left edge (%d) - inner block should be indented inward.\nOutput:\n%s", innerLeft, outerLeft, output)
+	}
+
+	if innerRight >= outerRight {
+		t.Errorf("inner block right edge (%d) should be less than outer block right edge (%d) - inner block should be contained within outer.\nOutput:\n%s", innerRight, outerRight, output)
+	}
+}
+
+func TestRenderBlockEmpty(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		loop Empty
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "loop Empty") {
+		t.Errorf("output should contain 'loop Empty' label:\n%s", output)
+	}
+	if !strings.Contains(output, "┌") || !strings.Contains(output, "┐") {
+		t.Errorf("output should contain block box corners:\n%s", output)
+	}
+	if !strings.Contains(output, "└") || !strings.Contains(output, "┘") {
+		t.Errorf("output should contain block box bottom corners:\n%s", output)
+	}
+}
+
 func FuzzParseSequenceDiagram(f *testing.F) {
 	f.Add("sequenceDiagram\nA->>B: Hello")
 	f.Add("sequenceDiagram\nparticipant Alice\nAlice->>Bob: Hi")
