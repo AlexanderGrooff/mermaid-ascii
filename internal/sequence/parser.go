@@ -29,6 +29,7 @@ var (
 type SequenceDiagram struct {
 	Participants []*Participant
 	Messages     []*Message
+	Elements     []DiagramElement // Ordered messages and notes
 	Autonumber   bool
 }
 
@@ -63,6 +64,40 @@ func (a ArrowType) String() string {
 		return fmt.Sprintf("ArrowType(%d)", a)
 	}
 }
+
+type NotePosition int
+
+const (
+	NoteOver NotePosition = iota
+	NoteLeftOf
+	NoteRightOf
+)
+
+func (n NotePosition) String() string {
+	switch n {
+	case NoteOver:
+		return "over"
+	case NoteLeftOf:
+		return "left of"
+	case NoteRightOf:
+		return "right of"
+	default:
+		return fmt.Sprintf("NotePosition(%d)", n)
+	}
+}
+
+type Note struct {
+	Position NotePosition
+	Actors   []*Participant
+	Text     string
+}
+
+type DiagramElement interface {
+	isElement()
+}
+
+func (*Message) isElement() {}
+func (*Note) isElement()    {}
 
 func IsSequenceDiagram(input string) bool {
 	lines := strings.Split(input, "\n")
