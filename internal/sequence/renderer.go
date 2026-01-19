@@ -112,15 +112,23 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 			string(chars.BottomRight)
 	}))
 
-	for _, msg := range sd.Messages {
+	for _, elem := range sd.Elements {
 		for i := 0; i < layout.messageSpacing; i++ {
 			lines = append(lines, buildLifeline(layout, chars))
 		}
 
-		if msg.From == msg.To {
-			lines = append(lines, renderSelfMessage(msg, layout, chars)...)
-		} else {
-			lines = append(lines, renderMessage(msg, layout, chars)...)
+		switch e := elem.(type) {
+		case *Message:
+			if e.From == e.To {
+				lines = append(lines, renderSelfMessage(e, layout, chars)...)
+			} else {
+				lines = append(lines, renderMessage(e, layout, chars)...)
+			}
+		case *Note:
+			noteLines := renderNote(e, layout, chars)
+			if noteLines != nil {
+				lines = append(lines, noteLines...)
+			}
 		}
 	}
 
@@ -211,6 +219,30 @@ func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string
 	}
 	lines = append(lines, strings.TrimRight(string(line), " "))
 	return lines
+}
+
+func renderNote(note *Note, layout *diagramLayout, chars BoxChars) []string {
+	switch note.Position {
+	case NoteOver:
+		return renderNoteOver(note, layout, chars)
+	case NoteLeftOf:
+		return renderNoteLeftOf(note, layout, chars)
+	case NoteRightOf:
+		return renderNoteRightOf(note, layout, chars)
+	}
+	return nil
+}
+
+func renderNoteOver(note *Note, layout *diagramLayout, chars BoxChars) []string {
+	return nil
+}
+
+func renderNoteLeftOf(note *Note, layout *diagramLayout, chars BoxChars) []string {
+	return nil
+}
+
+func renderNoteRightOf(note *Note, layout *diagramLayout, chars BoxChars) []string {
+	return nil
 }
 
 func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string {
