@@ -30,6 +30,15 @@ var (
 	//   Note left of Actor: text
 	//   Note right of Actor: text
 	noteRegex = regexp.MustCompile(`(?i)^\s*note\s+(over|left\s+of|right\s+of)\s+([^:]+):\s*(.*)$`)
+
+	// blockStartRegex matches block start: loop, alt, opt, par, critical, break, rect
+	blockStartRegex = regexp.MustCompile(`(?i)^\s*(loop|alt|opt|par|critical|break|rect)\s*(.*)$`)
+
+	// blockDividerRegex matches block dividers: else, and, option
+	blockDividerRegex = regexp.MustCompile(`(?i)^\s*(else|and|option)\s*(.*)$`)
+
+	// blockEndRegex matches block end
+	blockEndRegex = regexp.MustCompile(`(?i)^\s*end\s*$`)
 )
 
 // SequenceDiagram represents a parsed sequence diagram.
