@@ -631,6 +631,35 @@ func TestParseBlockNested(t *testing.T) {
 	}
 }
 
+func TestRenderBlockLoop(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		loop Every minute
+			A->>B: Ping
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "loop") {
+		t.Errorf("output should contain 'loop':\n%s", output)
+	}
+	if !strings.Contains(output, "Every minute") {
+		t.Errorf("output should contain label:\n%s", output)
+	}
+	if !strings.Contains(output, "Ping") {
+		t.Errorf("output should contain message:\n%s", output)
+	}
+}
+
 func FuzzParseSequenceDiagram(f *testing.F) {
 	f.Add("sequenceDiagram\nA->>B: Hello")
 	f.Add("sequenceDiagram\nparticipant Alice\nAlice->>Bob: Hi")

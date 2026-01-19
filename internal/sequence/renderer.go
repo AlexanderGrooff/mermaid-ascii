@@ -550,7 +550,174 @@ func findBlockParticipantRange(block *Block) (minIdx, maxIdx int) {
 }
 
 func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int) []string {
-	return nil
+	var lines []string
+
+	minIdx, maxIdx := findBlockParticipantRange(block)
+	if minIdx == -1 || maxIdx == -1 {
+		return nil
+	}
+
+	indent := depth * 2
+	leftCenter := layout.participantCenters[minIdx]
+	rightCenter := layout.participantCenters[maxIdx]
+
+	boxLeft := leftCenter - 3 - indent
+	if boxLeft < 0 {
+		boxLeft = 0
+	}
+	boxRight := rightCenter + 3
+
+	headerLabel := fmt.Sprintf("%s %s", block.Type, block.Label)
+	labelWidth := runewidth.StringWidth(headerLabel)
+	if boxRight-boxLeft < labelWidth+4 {
+		boxRight = boxLeft + labelWidth + 4
+	}
+
+	ensureWidth := boxRight + 1
+	if ensureWidth < layout.totalWidth {
+		ensureWidth = layout.totalWidth
+	}
+
+	makeLine := func() []rune {
+		line := make([]rune, ensureWidth+1)
+		for i := range line {
+			line[i] = ' '
+		}
+		for _, c := range layout.participantCenters {
+			if c < len(line) {
+				line[c] = chars.Vertical
+			}
+		}
+		return line
+	}
+
+	topLine := makeLine()
+	topLine[boxLeft] = chars.TopLeft
+	for i := boxLeft + 1; i < boxRight; i++ {
+		if topLine[i] == chars.Vertical {
+			topLine[i] = chars.TeeUp
+		} else {
+			topLine[i] = chars.Horizontal
+		}
+	}
+	topLine[boxRight] = chars.TopRight
+	lines = append(lines, strings.TrimRight(string(topLine), " "))
+
+	headerLine := makeLine()
+	headerLine[boxLeft] = chars.Vertical
+	headerLine[boxRight] = chars.Vertical
+	col := boxLeft + 2
+	for _, r := range headerLabel {
+		if col < boxRight {
+			headerLine[col] = r
+			col++
+		}
+	}
+	lines = append(lines, strings.TrimRight(string(headerLine), " "))
+
+	sepLine := makeLine()
+	sepLine[boxLeft] = chars.Vertical
+	for i := boxLeft + 1; i < boxRight; i++ {
+		if sepLine[i] == chars.Vertical {
+			// keep lifeline
+		} else {
+			sepLine[i] = chars.Horizontal
+		}
+	}
+	sepLine[boxRight] = chars.Vertical
+	lines = append(lines, strings.TrimRight(string(sepLine), " "))
+
+	for sectionIdx, section := range block.Sections {
+		if sectionIdx > 0 {
+			divLine := makeLine()
+			divLine[boxLeft] = chars.TeeRight
+			for i := boxLeft + 1; i < boxRight; i++ {
+				if divLine[i] == chars.Vertical {
+					divLine[i] = chars.Cross
+				} else {
+					divLine[i] = chars.Horizontal
+				}
+			}
+			divLine[boxRight] = chars.TeeLeft
+			lines = append(lines, strings.TrimRight(string(divLine), " "))
+
+			if section.Label != "" {
+				labelLine := makeLine()
+				labelLine[boxLeft] = chars.Vertical
+				labelLine[boxRight] = chars.Vertical
+				col := boxLeft + 2
+				for _, r := range section.Label {
+					if col < boxRight {
+						labelLine[col] = r
+						col++
+					}
+				}
+				lines = append(lines, strings.TrimRight(string(labelLine), " "))
+			}
+		}
+
+		for _, elem := range section.Elements {
+			spaceLine := makeLine()
+			spaceLine[boxLeft] = chars.Vertical
+			spaceLine[boxRight] = chars.Vertical
+			lines = append(lines, strings.TrimRight(string(spaceLine), " "))
+
+			switch e := elem.(type) {
+			case *Message:
+				msgLines := renderMessage(e, layout, chars)
+				for _, ml := range msgLines {
+					mlRunes := []rune(ml)
+					for len(mlRunes) <= ensureWidth {
+						mlRunes = append(mlRunes, ' ')
+					}
+					mlRunes[boxLeft] = chars.Vertical
+					mlRunes[boxRight] = chars.Vertical
+					lines = append(lines, strings.TrimRight(string(mlRunes), " "))
+				}
+			case *Note:
+				noteLines := renderNote(e, layout, chars)
+				for _, nl := range noteLines {
+					nlRunes := []rune(nl)
+					for len(nlRunes) <= ensureWidth {
+						nlRunes = append(nlRunes, ' ')
+					}
+					nlRunes[boxLeft] = chars.Vertical
+					nlRunes[boxRight] = chars.Vertical
+					lines = append(lines, strings.TrimRight(string(nlRunes), " "))
+				}
+			case *Block:
+				nestedLines := renderBlock(e, layout, chars, depth+1)
+				for _, nl := range nestedLines {
+					nlRunes := []rune(nl)
+					for len(nlRunes) <= ensureWidth {
+						nlRunes = append(nlRunes, ' ')
+					}
+					nlRunes[boxLeft] = chars.Vertical
+					nlRunes[boxRight] = chars.Vertical
+					lines = append(lines, strings.TrimRight(string(nlRunes), " "))
+				}
+			}
+		}
+	}
+
+	spaceLine := makeLine()
+	spaceLine[boxLeft] = chars.Vertical
+	spaceLine[boxRight] = chars.Vertical
+	lines = append(lines, strings.TrimRight(string(spaceLine), " "))
+
+	bottomLine := makeLine()
+	bottomLine[boxLeft] = chars.BottomLeft
+	for i := boxLeft + 1; i < boxRight; i++ {
+		if bottomLine[i] == chars.Vertical {
+			bottomLine[i] = chars.TeeDown
+		} else {
+			bottomLine[i] = chars.Horizontal
+		}
+	}
+	bottomLine[boxRight] = chars.BottomRight
+	lines = append(lines, strings.TrimRight(string(bottomLine), " "))
+
+	return lines
 }
 
 func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string {
