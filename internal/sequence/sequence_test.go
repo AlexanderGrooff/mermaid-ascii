@@ -295,6 +295,27 @@ func TestParseNoteOverMultipleActors(t *testing.T) {
 	}
 }
 
+func TestRenderNoteOver(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		Note over A: Test note`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "Test note") {
+		t.Errorf("output should contain note text:\n%s", output)
+	}
+}
+
 func TestParseNoteLeftRight(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -367,6 +388,48 @@ func TestParseNoteLeftRight(t *testing.T) {
 				t.Errorf("expected text %q, got %q", tt.wantText, note.Text)
 			}
 		})
+	}
+}
+
+func TestRenderNoteRightOf(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		Note right of B: Right note`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "Right note") {
+		t.Errorf("output should contain note text:\n%s", output)
+	}
+}
+
+func TestRenderNoteLeftOf(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		Note left of A: Left note`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "Left note") {
+		t.Errorf("output should contain note text:\n%s", output)
 	}
 }
 

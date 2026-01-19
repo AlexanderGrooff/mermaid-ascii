@@ -234,15 +234,264 @@ func renderNote(note *Note, layout *diagramLayout, chars BoxChars) []string {
 }
 
 func renderNoteOver(note *Note, layout *diagramLayout, chars BoxChars) []string {
-	return nil
+	var lines []string
+
+	leftActor := note.Actors[0]
+	rightActor := note.Actors[len(note.Actors)-1]
+
+	leftCenter := layout.participantCenters[leftActor.Index]
+	rightCenter := layout.participantCenters[rightActor.Index]
+
+	if leftCenter > rightCenter {
+		leftCenter, rightCenter = rightCenter, leftCenter
+	}
+
+	padding := 2
+	boxLeft := leftCenter - padding
+	if boxLeft < 0 {
+		boxLeft = 0
+	}
+	textWidth := runewidth.StringWidth(note.Text)
+	minBoxWidth := textWidth + 4
+	boxWidth := rightCenter - leftCenter + padding*2
+	if boxWidth < minBoxWidth {
+		boxWidth = minBoxWidth
+	}
+	boxRight := boxLeft + boxWidth
+
+	topLine := make([]rune, layout.totalWidth+boxWidth)
+	for i := range topLine {
+		topLine[i] = ' '
+	}
+	for _, c := range layout.participantCenters {
+		if c < len(topLine) {
+			if c >= boxLeft && c <= boxRight {
+				topLine[c] = chars.TeeUp
+			} else {
+				topLine[c] = chars.Vertical
+			}
+		}
+	}
+	topLine[boxLeft] = chars.TopLeft
+	for i := boxLeft + 1; i < boxRight; i++ {
+		if topLine[i] != chars.TeeUp {
+			topLine[i] = chars.Horizontal
+		}
+	}
+	topLine[boxRight] = chars.TopRight
+	lines = append(lines, strings.TrimRight(string(topLine), " "))
+
+	textLine := make([]rune, layout.totalWidth+boxWidth)
+	for i := range textLine {
+		textLine[i] = ' '
+	}
+	for _, c := range layout.participantCenters {
+		if c < len(textLine) && (c < boxLeft || c > boxRight) {
+			textLine[c] = chars.Vertical
+		}
+	}
+	textLine[boxLeft] = chars.Vertical
+	textLine[boxRight] = chars.Vertical
+	textStart := boxLeft + (boxWidth-textWidth)/2
+	col := textStart
+	for _, r := range note.Text {
+		if col < len(textLine) && col < boxRight {
+			textLine[col] = r
+			col++
+		}
+	}
+	lines = append(lines, strings.TrimRight(string(textLine), " "))
+
+	bottomLine := make([]rune, layout.totalWidth+boxWidth)
+	for i := range bottomLine {
+		bottomLine[i] = ' '
+	}
+	for _, c := range layout.participantCenters {
+		if c < len(bottomLine) {
+			if c >= boxLeft && c <= boxRight {
+				bottomLine[c] = chars.TeeDown
+			} else {
+				bottomLine[c] = chars.Vertical
+			}
+		}
+	}
+	bottomLine[boxLeft] = chars.BottomLeft
+	for i := boxLeft + 1; i < boxRight; i++ {
+		if bottomLine[i] != chars.TeeDown {
+			bottomLine[i] = chars.Horizontal
+		}
+	}
+	bottomLine[boxRight] = chars.BottomRight
+	lines = append(lines, strings.TrimRight(string(bottomLine), " "))
+
+	return lines
 }
 
 func renderNoteLeftOf(note *Note, layout *diagramLayout, chars BoxChars) []string {
-	return nil
+	var lines []string
+	actor := note.Actors[0]
+	center := layout.participantCenters[actor.Index]
+
+	textWidth := runewidth.StringWidth(note.Text)
+	boxWidth := textWidth + 4
+	boxRight := center - 2
+	boxLeft := boxRight - boxWidth
+
+	offset := 0
+	if boxLeft < 0 {
+		offset = -boxLeft
+		boxLeft = 0
+		boxRight += offset
+	}
+
+	ensureWidth := layout.totalWidth + 1
+	if boxRight >= ensureWidth {
+		ensureWidth = boxRight + 1
+	}
+
+	shiftedCenters := make([]int, len(layout.participantCenters))
+	for i, c := range layout.participantCenters {
+		shiftedCenters[i] = c + offset
+	}
+	shiftedCenter := center + offset
+
+	topLine := make([]rune, ensureWidth+offset)
+	for i := range topLine {
+		topLine[i] = ' '
+	}
+	for _, c := range shiftedCenters {
+		if c < len(topLine) {
+			topLine[c] = chars.Vertical
+		}
+	}
+	topLine[boxLeft] = chars.TopLeft
+	for i := boxLeft + 1; i < boxRight; i++ {
+		topLine[i] = chars.Horizontal
+	}
+	topLine[boxRight] = chars.TopRight
+	lines = append(lines, strings.TrimRight(string(topLine), " "))
+
+	textLine := make([]rune, ensureWidth+offset)
+	for i := range textLine {
+		textLine[i] = ' '
+	}
+	for _, c := range shiftedCenters {
+		if c < len(textLine) {
+			textLine[c] = chars.Vertical
+		}
+	}
+	textLine[boxLeft] = chars.Vertical
+	textLine[boxRight] = chars.TeeLeft
+	for i := boxRight + 1; i < shiftedCenter; i++ {
+		textLine[i] = chars.Horizontal
+	}
+	textLine[shiftedCenter] = chars.TeeLeft
+	textStart := boxLeft + 2
+	col := textStart
+	for _, r := range note.Text {
+		if col < boxRight {
+			textLine[col] = r
+			col++
+		}
+	}
+	lines = append(lines, strings.TrimRight(string(textLine), " "))
+
+	bottomLine := make([]rune, ensureWidth+offset)
+	for i := range bottomLine {
+		bottomLine[i] = ' '
+	}
+	for _, c := range shiftedCenters {
+		if c < len(bottomLine) {
+			bottomLine[c] = chars.Vertical
+		}
+	}
+	bottomLine[boxLeft] = chars.BottomLeft
+	for i := boxLeft + 1; i < boxRight; i++ {
+		bottomLine[i] = chars.Horizontal
+	}
+	bottomLine[boxRight] = chars.BottomRight
+	lines = append(lines, strings.TrimRight(string(bottomLine), " "))
+
+	return lines
 }
 
 func renderNoteRightOf(note *Note, layout *diagramLayout, chars BoxChars) []string {
-	return nil
+	var lines []string
+	actor := note.Actors[0]
+	center := layout.participantCenters[actor.Index]
+
+	textWidth := runewidth.StringWidth(note.Text)
+	boxWidth := textWidth + 4
+	boxLeft := center + 2
+	boxRight := boxLeft + boxWidth
+
+	ensureWidth := layout.totalWidth
+	if boxRight > ensureWidth {
+		ensureWidth = boxRight + 1
+	}
+
+	// Top border
+	topLine := make([]rune, ensureWidth)
+	for i := range topLine {
+		topLine[i] = ' '
+	}
+	for _, c := range layout.participantCenters {
+		if c < len(topLine) {
+			topLine[c] = chars.Vertical
+		}
+	}
+	topLine[boxLeft] = chars.TopLeft
+	for i := boxLeft + 1; i < boxRight; i++ {
+		topLine[i] = chars.Horizontal
+	}
+	topLine[boxRight] = chars.TopRight
+	lines = append(lines, strings.TrimRight(string(topLine), " "))
+
+	// Text line with connector
+	textLine := make([]rune, ensureWidth)
+	for i := range textLine {
+		textLine[i] = ' '
+	}
+	for _, c := range layout.participantCenters {
+		if c < len(textLine) {
+			textLine[c] = chars.Vertical
+		}
+	}
+	textLine[center] = chars.TeeRight
+	for i := center + 1; i < boxLeft; i++ {
+		textLine[i] = chars.Horizontal
+	}
+	textLine[boxLeft] = chars.TeeRight
+	textLine[boxRight] = chars.Vertical
+	// Add text
+	textStart := boxLeft + 2
+	col := textStart
+	for _, r := range note.Text {
+		if col < boxRight {
+			textLine[col] = r
+			col++
+		}
+	}
+	lines = append(lines, strings.TrimRight(string(textLine), " "))
+
+	// Bottom border
+	bottomLine := make([]rune, ensureWidth)
+	for i := range bottomLine {
+		bottomLine[i] = ' '
+	}
+	for _, c := range layout.participantCenters {
+		if c < len(bottomLine) {
+			bottomLine[c] = chars.Vertical
+		}
+	}
+	bottomLine[boxLeft] = chars.BottomLeft
+	for i := boxLeft + 1; i < boxRight; i++ {
+		bottomLine[i] = chars.Horizontal
+	}
+	bottomLine[boxRight] = chars.BottomRight
+	lines = append(lines, strings.TrimRight(string(bottomLine), " "))
+
+	return lines
 }
 
 func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string {

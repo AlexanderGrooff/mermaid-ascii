@@ -8,6 +8,7 @@ type BoxChars struct {
 	BottomRight  rune
 	Horizontal   rune
 	Vertical     rune
+	TeeUp        rune
 	TeeDown      rune
 	TeeRight     rune
 	TeeLeft      rune
@@ -27,6 +28,7 @@ var ASCII = BoxChars{
 	BottomRight:  '+',
 	Horizontal:   '-',
 	Vertical:     '|',
+	TeeUp:        '+',
 	TeeDown:      '+',
 	TeeRight:     '+',
 	TeeLeft:      '+',
@@ -46,6 +48,7 @@ var Unicode = BoxChars{
 	BottomRight:  '┘',
 	Horizontal:   '─',
 	Vertical:     '│',
+	TeeUp:        '┴',
 	TeeDown:      '┬',
 	TeeRight:     '├',
 	TeeLeft:      '┤',
