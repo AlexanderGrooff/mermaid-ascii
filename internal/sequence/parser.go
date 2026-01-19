@@ -223,46 +223,68 @@ func Parse(input string) (*SequenceDiagram, error) {
 	if !strings.HasPrefix(strings.TrimSpace(lines[0]), SequenceDiagramKeyword) {
 		return nil, fmt.Errorf("expected %q keyword", SequenceDiagramKeyword)
 	}
-	lines = lines[1:]
 
 	sd := &SequenceDiagram{
 		Participants: []*Participant{},
 		Messages:     []*Message{},
+		Elements:     []DiagramElement{},
 		Autonumber:   false,
 	}
 	participantMap := make(map[string]*Participant)
 
-	for i, line := range lines {
+	idx := 1
+	for idx < len(lines) {
+		line := lines[idx]
 		trimmed := strings.TrimSpace(line)
+
 		if trimmed == "" {
+			idx++
 			continue
 		}
 
-		// Check for autonumber directive
+		// Check for autonumber
 		if autonumberRegex.MatchString(trimmed) {
 			sd.Autonumber = true
+			idx++
 			continue
 		}
 
+		// Check for participant
 		if matched, err := sd.parseParticipant(trimmed, participantMap); err != nil {
-			return nil, fmt.Errorf("line %d: %w", i+2, err)
+			return nil, fmt.Errorf("line %d: %w", idx+1, err)
 		} else if matched {
+			idx++
 			continue
 		}
 
+		// Check for block start
+		if blockStartRegex.MatchString(trimmed) {
+			block, nextIdx, err := sd.parseBlock(lines, idx, participantMap)
+			if err != nil {
+				return nil, fmt.Errorf("line %d: %w", idx+1, err)
+			}
+			sd.Elements = append(sd.Elements, block)
+			idx = nextIdx
+			continue
+		}
+
+		// Check for message
 		if matched, err := sd.parseMessage(trimmed, participantMap); err != nil {
-			return nil, fmt.Errorf("line %d: %w", i+2, err)
+			return nil, fmt.Errorf("line %d: %w", idx+1, err)
 		} else if matched {
+			idx++
 			continue
 		}
 
+		// Check for note
 		if matched, err := sd.parseNote(trimmed, participantMap); err != nil {
-			return nil, fmt.Errorf("line %d: %w", i+2, err)
+			return nil, fmt.Errorf("line %d: %w", idx+1, err)
 		} else if matched {
+			idx++
 			continue
 		}
 
-		return nil, fmt.Errorf("line %d: invalid syntax: %q", i+2, trimmed)
+		return nil, fmt.Errorf("line %d: invalid syntax: %q", idx+1, trimmed)
 	}
 
 	if len(sd.Participants) == 0 {
