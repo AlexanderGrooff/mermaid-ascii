@@ -99,6 +99,52 @@ type Note struct {
 	Text     string
 }
 
+type BlockType int
+
+const (
+	BlockLoop BlockType = iota
+	BlockAlt
+	BlockOpt
+	BlockPar
+	BlockCritical
+	BlockBreak
+	BlockRect
+)
+
+func (b BlockType) String() string {
+	switch b {
+	case BlockLoop:
+		return "loop"
+	case BlockAlt:
+		return "alt"
+	case BlockOpt:
+		return "opt"
+	case BlockPar:
+		return "par"
+	case BlockCritical:
+		return "critical"
+	case BlockBreak:
+		return "break"
+	case BlockRect:
+		return "rect"
+	default:
+		return fmt.Sprintf("BlockType(%d)", b)
+	}
+}
+
+type BlockSection struct {
+	Label    string
+	Elements []DiagramElement
+}
+
+type Block struct {
+	Type     BlockType
+	Label    string
+	Sections []*BlockSection
+}
+
+func (*Block) isElement() {}
+
 type DiagramElement interface {
 	isElement()
 }
