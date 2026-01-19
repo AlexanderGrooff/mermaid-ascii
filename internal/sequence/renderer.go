@@ -130,7 +130,7 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 				lines = append(lines, noteLines...)
 			}
 		case *Block:
-			blockLines := renderBlock(e, layout, chars, 0)
+			blockLines := renderBlock(e, layout, chars, 0, layout.messageSpacing)
 			if blockLines != nil {
 				lines = append(lines, blockLines...)
 			}
@@ -143,15 +143,19 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 
 func buildLine(participants []*Participant, layout *diagramLayout, draw func(int) string) string {
 	var sb strings.Builder
+	currentWidth := 0
 	for i := range participants {
 		boxWidth := layout.participantWidths[i] + boxBorderWidth
 		left := layout.participantCenters[i] - boxWidth/2
 
-		needed := left - runewidth.StringWidth(sb.String())
+		needed := left - currentWidth
 		if needed > 0 {
 			sb.WriteString(strings.Repeat(" ", needed))
+			currentWidth += needed
 		}
-		sb.WriteString(draw(i))
+		content := draw(i)
+		sb.WriteString(content)
+		currentWidth += runewidth.StringWidth(content)
 	}
 	return sb.String()
 }
@@ -498,8 +502,11 @@ func renderNoteRightOf(note *Note, layout *diagramLayout, chars BoxChars) []stri
 	return lines
 }
 
-func calculateBlockContentWidth(block *Block, layout *diagramLayout) int {
-	maxWidth := 0
+// calculateBlockRightEdge returns the minimum rightmost column index needed to
+// contain all content in the block. This accounts for message labels, note texts,
+// section labels, and nested blocks.
+func calculateBlockRightEdge(block *Block, layout *diagramLayout) int {
+	maxRightEdge := 0
 
 	var checkElements func(elements []DiagramElement)
 	checkElements = func(elements []DiagramElement) {
@@ -515,9 +522,9 @@ func calculateBlockContentWidth(block *Block, layout *diagramLayout) int {
 					to := layout.participantCenters[e.To.Index]
 					start := min(from, to) + labelLeftMargin
 					labelWidth := runewidth.StringWidth(label)
-					width := start + labelWidth + 2
-					if width > maxWidth {
-						maxWidth = width
+					rightEdge := start + labelWidth + 2
+					if rightEdge > maxRightEdge {
+						maxRightEdge = rightEdge
 					}
 				}
 			case *Note:
@@ -544,13 +551,13 @@ func calculateBlockContentWidth(block *Block, layout *diagramLayout) int {
 				case NoteLeftOf:
 					noteRight = layout.participantCenters[e.Actors[0].Index]
 				}
-				if noteRight > maxWidth {
-					maxWidth = noteRight
+				if noteRight > maxRightEdge {
+					maxRightEdge = noteRight
 				}
 			case *Block:
-				nestedWidth := calculateBlockContentWidth(e, layout)
-				if nestedWidth > maxWidth {
-					maxWidth = nestedWidth
+				nestedRightEdge := calculateBlockRightEdge(e, layout)
+				if nestedRightEdge > maxRightEdge {
+					maxRightEdge = nestedRightEdge
 				}
 			}
 		}
@@ -558,13 +565,13 @@ func calculateBlockContentWidth(block *Block, layout *diagramLayout) int {
 
 	for _, section := range block.Sections {
 		sectionLabelWidth := runewidth.StringWidth(section.Label)
-		if sectionLabelWidth+4 > maxWidth {
-			maxWidth = sectionLabelWidth + 4
+		if sectionLabelWidth+4 > maxRightEdge {
+			maxRightEdge = sectionLabelWidth + 4
 		}
 		checkElements(section.Elements)
 	}
 
-	return maxWidth
+	return maxRightEdge
 }
 
 func findBlockParticipantRange(block *Block) (minIdx, maxIdx int) {
@@ -618,7 +625,7 @@ func findBlockParticipantRange(block *Block) (minIdx, maxIdx int) {
 	return minIdx, maxIdx
 }
 
-func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int) []string {
+func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int, messageSpacing int) []string {
 	var lines []string
 
 	minIdx, maxIdx := findBlockParticipantRange(block)
@@ -643,9 +650,9 @@ func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int)
 		boxRight = boxLeft + labelWidth + 4
 	}
 
-	contentWidth := calculateBlockContentWidth(block, layout)
-	if contentWidth > boxRight {
-		boxRight = contentWidth
+	contentRightEdge := calculateBlockRightEdge(block, layout)
+	if contentRightEdge > boxRight {
+		boxRight = contentRightEdge
 	}
 
 	ensureWidth := boxRight + 1
@@ -734,10 +741,12 @@ func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int)
 		}
 
 		for _, elem := range section.Elements {
-			spaceLine := makeLine()
-			spaceLine[boxLeft] = bc.Vertical
-			spaceLine[boxRight] = bc.Vertical
-			lines = append(lines, strings.TrimRight(string(spaceLine), " "))
+			for i := 0; i < messageSpacing; i++ {
+				spaceLine := makeLine()
+				spaceLine[boxLeft] = bc.Vertical
+				spaceLine[boxRight] = bc.Vertical
+				lines = append(lines, strings.TrimRight(string(spaceLine), " "))
+			}
 
 			switch e := elem.(type) {
 			case *Message:
@@ -763,7 +772,7 @@ func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int)
 					lines = append(lines, strings.TrimRight(string(nlRunes), " "))
 				}
 			case *Block:
-				nestedLines := renderBlock(e, layout, chars, depth+1)
+				nestedLines := renderBlock(e, layout, chars, depth+1, messageSpacing)
 				for _, nl := range nestedLines {
 					nlRunes := []rune(nl)
 					for len(nlRunes) <= ensureWidth {

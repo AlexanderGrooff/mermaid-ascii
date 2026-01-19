@@ -259,9 +259,9 @@ func Parse(input string) (*SequenceDiagram, error) {
 
 		// Check for block start
 		if blockStartRegex.MatchString(trimmed) {
-			block, nextIdx, err := sd.parseBlock(lines, idx, participantMap)
+			block, nextIdx, err := sd.parseBlock(lines, idx, idx, participantMap)
 			if err != nil {
-				return nil, fmt.Errorf("line %d: %w", idx+1, err)
+				return nil, err
 			}
 			sd.Elements = append(sd.Elements, block)
 			idx = nextIdx
@@ -324,10 +324,10 @@ func (sd *SequenceDiagram) parseParticipant(line string, participants map[string
 	return true, nil
 }
 
-func (sd *SequenceDiagram) parseMessage(line string, participants map[string]*Participant) (bool, error) {
+func (sd *SequenceDiagram) parseMessageElement(line string, participants map[string]*Participant) (*Message, bool, error) {
 	match := messageRegex.FindStringSubmatch(line)
 	if match == nil {
-		return false, nil
+		return nil, false, nil
 	}
 
 	fromID := match[2]
@@ -365,6 +365,14 @@ func (sd *SequenceDiagram) parseMessage(line string, participants map[string]*Pa
 		Number:    msgNumber,
 	}
 	sd.Messages = append(sd.Messages, msg)
+	return msg, true, nil
+}
+
+func (sd *SequenceDiagram) parseMessage(line string, participants map[string]*Participant) (bool, error) {
+	msg, matched, err := sd.parseMessageElement(line, participants)
+	if err != nil || !matched {
+		return matched, err
+	}
 	sd.Elements = append(sd.Elements, msg)
 	return true, nil
 }
@@ -384,10 +392,10 @@ func (sd *SequenceDiagram) getParticipant(id string, participants map[string]*Pa
 	return p
 }
 
-func (sd *SequenceDiagram) parseNote(line string, participants map[string]*Participant) (bool, error) {
+func (sd *SequenceDiagram) parseNoteElement(line string, participants map[string]*Participant) (*Note, bool, error) {
 	match := noteRegex.FindStringSubmatch(line)
 	if match == nil {
-		return false, nil
+		return nil, false, nil
 	}
 
 	posStr := strings.ToLower(match[1])
@@ -403,7 +411,7 @@ func (sd *SequenceDiagram) parseNote(line string, participants map[string]*Parti
 	case strings.Contains(posStr, "right"):
 		position = NoteRightOf
 	default:
-		return false, fmt.Errorf("unknown note position: %q", posStr)
+		return nil, false, fmt.Errorf("unknown note position: %q", posStr)
 	}
 
 	// Parse actor(s) - comma separated for "over" with multiple actors
@@ -414,15 +422,19 @@ func (sd *SequenceDiagram) parseNote(line string, participants map[string]*Parti
 		if id == "" {
 			continue
 		}
+		// Remove surrounding quotes if present (e.g., "My Service" -> My Service)
+		if len(id) >= 2 && id[0] == '"' && id[len(id)-1] == '"' {
+			id = id[1 : len(id)-1]
+		}
 		actors = append(actors, sd.getParticipant(id, participants))
 	}
 
 	if len(actors) == 0 {
-		return false, fmt.Errorf("note requires at least one actor")
+		return nil, false, fmt.Errorf("note requires at least one actor")
 	}
 
 	if position != NoteOver && len(actors) > 1 {
-		return false, fmt.Errorf("note %s only supports one actor", position)
+		return nil, false, fmt.Errorf("note %s only supports one actor", position)
 	}
 
 	note := &Note{
@@ -430,23 +442,31 @@ func (sd *SequenceDiagram) parseNote(line string, participants map[string]*Parti
 		Actors:   actors,
 		Text:     text,
 	}
+	return note, true, nil
+}
+
+func (sd *SequenceDiagram) parseNote(line string, participants map[string]*Participant) (bool, error) {
+	note, matched, err := sd.parseNoteElement(line, participants)
+	if err != nil || !matched {
+		return matched, err
+	}
 	sd.Elements = append(sd.Elements, note)
 	return true, nil
 }
 
-func (sd *SequenceDiagram) parseBlock(lines []string, startIdx int, participants map[string]*Participant) (*Block, int, error) {
+func (sd *SequenceDiagram) parseBlock(lines []string, startIdx int, startLine int, participants map[string]*Participant) (*Block, int, error) {
 	if startIdx >= len(lines) {
-		return nil, startIdx, fmt.Errorf("unexpected end of input")
+		return nil, startIdx, fmt.Errorf("line %d: unexpected end of input", startLine+1)
 	}
 
 	match := blockStartRegex.FindStringSubmatch(lines[startIdx])
 	if match == nil {
-		return nil, startIdx, fmt.Errorf("expected block start")
+		return nil, startIdx, fmt.Errorf("line %d: expected block start", startLine+1)
 	}
 
 	blockType, err := parseBlockType(match[1])
 	if err != nil {
-		return nil, startIdx, err
+		return nil, startIdx, fmt.Errorf("line %d: %w", startLine+1, err)
 	}
 
 	block := &Block{
@@ -459,6 +479,7 @@ func (sd *SequenceDiagram) parseBlock(lines []string, startIdx int, participants
 
 	currentSection := block.Sections[0]
 	idx := startIdx + 1
+	lineOffset := startLine + 1
 
 	for idx < len(lines) {
 		line := lines[idx]
@@ -466,6 +487,7 @@ func (sd *SequenceDiagram) parseBlock(lines []string, startIdx int, participants
 
 		if trimmed == "" {
 			idx++
+			lineOffset++
 			continue
 		}
 
@@ -476,7 +498,10 @@ func (sd *SequenceDiagram) parseBlock(lines []string, startIdx int, participants
 		if divMatch := blockDividerRegex.FindStringSubmatch(trimmed); divMatch != nil {
 			divider := divMatch[1]
 			if !isValidDivider(block.Type, divider) {
-				return nil, idx, fmt.Errorf("invalid divider %q for block type %s", divider, block.Type)
+				return nil, idx, fmt.Errorf("line %d: invalid divider %q for block type %s", lineOffset+1, divider, block.Type)
+			}
+			if len(currentSection.Elements) == 0 && len(block.Sections) == 1 {
+				return nil, idx, fmt.Errorf("line %d: divider %q cannot be first content in block", lineOffset+1, divider)
 			}
 			currentSection = &BlockSection{
 				Label:    strings.TrimSpace(divMatch[2]),
@@ -484,51 +509,41 @@ func (sd *SequenceDiagram) parseBlock(lines []string, startIdx int, participants
 			}
 			block.Sections = append(block.Sections, currentSection)
 			idx++
+			lineOffset++
 			continue
 		}
 
 		if blockStartRegex.MatchString(trimmed) {
-			nestedBlock, nextIdx, err := sd.parseBlock(lines, idx, participants)
+			nestedBlock, nextIdx, err := sd.parseBlock(lines, idx, lineOffset, participants)
 			if err != nil {
-				return nil, idx, fmt.Errorf("nested block: %w", err)
+				return nil, idx, fmt.Errorf("line %d: nested block: %w", lineOffset+1, err)
 			}
 			currentSection.Elements = append(currentSection.Elements, nestedBlock)
+			lineOffset += nextIdx - idx
 			idx = nextIdx
 			continue
 		}
 
-		if noteRegex.MatchString(trimmed) {
-			elemsBefore := len(sd.Elements)
-			if matched, err := sd.parseNote(trimmed, participants); err != nil {
-				return nil, idx, err
-			} else if matched {
-				if len(sd.Elements) > elemsBefore {
-					lastElem := sd.Elements[len(sd.Elements)-1]
-					sd.Elements = sd.Elements[:len(sd.Elements)-1]
-					currentSection.Elements = append(currentSection.Elements, lastElem)
-				}
-				idx++
-				continue
-			}
+		if note, matched, err := sd.parseNoteElement(trimmed, participants); err != nil {
+			return nil, idx, fmt.Errorf("line %d: %w", lineOffset+1, err)
+		} else if matched {
+			currentSection.Elements = append(currentSection.Elements, note)
+			idx++
+			lineOffset++
+			continue
 		}
 
-		if messageRegex.MatchString(trimmed) {
-			elemsBefore := len(sd.Elements)
-			if matched, err := sd.parseMessage(trimmed, participants); err != nil {
-				return nil, idx, err
-			} else if matched {
-				if len(sd.Elements) > elemsBefore {
-					lastElem := sd.Elements[len(sd.Elements)-1]
-					sd.Elements = sd.Elements[:len(sd.Elements)-1]
-					currentSection.Elements = append(currentSection.Elements, lastElem)
-				}
-				idx++
-				continue
-			}
+		if msg, matched, err := sd.parseMessageElement(trimmed, participants); err != nil {
+			return nil, idx, fmt.Errorf("line %d: %w", lineOffset+1, err)
+		} else if matched {
+			currentSection.Elements = append(currentSection.Elements, msg)
+			idx++
+			lineOffset++
+			continue
 		}
 
-		return nil, idx, fmt.Errorf("invalid syntax in block: %q", trimmed)
+		return nil, idx, fmt.Errorf("line %d: invalid syntax in block: %q", lineOffset+1, trimmed)
 	}
 
-	return nil, startIdx, fmt.Errorf("block starting at line %d has no 'end'", startIdx+1)
+	return nil, startIdx, fmt.Errorf("block starting at line %d has no 'end'", startLine+1)
 }

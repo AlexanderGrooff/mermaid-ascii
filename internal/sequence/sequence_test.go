@@ -231,6 +231,44 @@ func TestArrowTypeString(t *testing.T) {
 	}
 }
 
+func TestParseNoteQuotedActorSameAsMessage(t *testing.T) {
+	input := `sequenceDiagram
+		"My Service"->>B: Hello
+		Note over "My Service": This is a note`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(sd.Participants) != 2 {
+		t.Fatalf("expected 2 participants, got %d: %v", len(sd.Participants), sd.Participants)
+	}
+
+	if sd.Participants[0].ID != "My Service" {
+		t.Errorf("expected first participant ID to be 'My Service', got %q", sd.Participants[0].ID)
+	}
+
+	if len(sd.Elements) != 2 {
+		t.Fatalf("expected 2 elements, got %d", len(sd.Elements))
+	}
+
+	msg, ok := sd.Elements[0].(*Message)
+	if !ok {
+		t.Fatalf("expected Message, got %T", sd.Elements[0])
+	}
+
+	note, ok := sd.Elements[1].(*Note)
+	if !ok {
+		t.Fatalf("expected Note, got %T", sd.Elements[1])
+	}
+
+	if msg.From != note.Actors[0] {
+		t.Errorf("message From participant (%p, ID=%q) should be same as note actor (%p, ID=%q)",
+			msg.From, msg.From.ID, note.Actors[0], note.Actors[0].ID)
+	}
+}
+
 func TestParseNoteOverSingleActor(t *testing.T) {
 	input := `sequenceDiagram
 		participant A
@@ -628,6 +666,24 @@ func TestParseBlockNested(t *testing.T) {
 
 	if innerBlock.Type != BlockAlt {
 		t.Errorf("expected nested BlockAlt, got %v", innerBlock.Type)
+	}
+}
+
+func TestParseBlockDividerAsFirstContent(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		alt
+		else something
+			A->>B: message
+		end`
+
+	_, err := Parse(input)
+	if err == nil {
+		t.Fatal("expected error for divider as first content")
+	}
+	if !strings.Contains(err.Error(), "divider") || !strings.Contains(err.Error(), "cannot be first content") {
+		t.Errorf("expected error about divider as first content, got: %v", err)
 	}
 }
 
