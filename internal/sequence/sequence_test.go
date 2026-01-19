@@ -754,11 +754,18 @@ func TestRenderBlockNestedIndentation(t *testing.T) {
 		t.Fatalf("could not find block header lines in output:\n%s", output)
 	}
 
+	isTopLeftCorner := func(ch rune) bool {
+		return ch == '┌' || ch == '╭' || ch == '╔' || ch == '╓'
+	}
+	isTopRightCorner := func(ch rune) bool {
+		return ch == '┐' || ch == '╮' || ch == '╗' || ch == '╖'
+	}
+
 	findTopLeftCorner := func(lineIdx int) int {
 		for i := lineIdx; i >= 0; i-- {
 			runes := []rune(lines[i])
 			for j, ch := range runes {
-				if ch == '┌' {
+				if isTopLeftCorner(ch) {
 					return j
 				}
 			}
@@ -770,7 +777,7 @@ func TestRenderBlockNestedIndentation(t *testing.T) {
 		for i := lineIdx; i >= 0; i-- {
 			runes := []rune(lines[i])
 			for j := len(runes) - 1; j >= 0; j-- {
-				if runes[j] == '┐' {
+				if isTopRightCorner(runes[j]) {
 					return j
 				}
 			}
@@ -783,14 +790,18 @@ func TestRenderBlockNestedIndentation(t *testing.T) {
 
 	outerStartLine := -1
 	for i := outerTopLineIdx; i >= 0; i-- {
-		if strings.Contains(lines[i], "┌") && strings.Contains(lines[i], "┐") {
-			runes := []rune(lines[i])
-			for j := len(runes) - 1; j >= 0; j-- {
-				if runes[j] == '┐' {
-					outerStartLine = i
-					break
-				}
+		runes := []rune(lines[i])
+		hasLeft, hasRight := false, false
+		for _, ch := range runes {
+			if isTopLeftCorner(ch) {
+				hasLeft = true
 			}
+			if isTopRightCorner(ch) {
+				hasRight = true
+			}
+		}
+		if hasLeft && hasRight {
+			outerStartLine = i
 			break
 		}
 	}
@@ -801,7 +812,7 @@ func TestRenderBlockNestedIndentation(t *testing.T) {
 		runes := []rune(lines[i])
 		count := 0
 		for _, ch := range runes {
-			if ch == '┌' {
+			if isTopLeftCorner(ch) {
 				count++
 			}
 		}
@@ -813,7 +824,7 @@ func TestRenderBlockNestedIndentation(t *testing.T) {
 	runes := []rune(lines[innerStartLine])
 	innerRight := -1
 	for j := len(runes) - 1; j >= 0; j-- {
-		if runes[j] == '┐' {
+		if isTopRightCorner(runes[j]) {
 			innerRight = j
 			break
 		}

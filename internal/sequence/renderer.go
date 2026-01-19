@@ -653,6 +653,8 @@ func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int)
 		ensureWidth = layout.totalWidth
 	}
 
+	bc := GetBlockChars(block.Type, chars)
+
 	makeLine := func() []rune {
 		line := make([]rune, ensureWidth+1)
 		for i := range line {
@@ -667,20 +669,20 @@ func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int)
 	}
 
 	topLine := makeLine()
-	topLine[boxLeft] = chars.TopLeft
+	topLine[boxLeft] = bc.TopLeft
 	for i := boxLeft + 1; i < boxRight; i++ {
 		if topLine[i] == chars.Vertical {
-			topLine[i] = chars.TeeUp
+			topLine[i] = bc.TeeUp
 		} else {
-			topLine[i] = chars.Horizontal
+			topLine[i] = bc.Horizontal
 		}
 	}
-	topLine[boxRight] = chars.TopRight
+	topLine[boxRight] = bc.TopRight
 	lines = append(lines, strings.TrimRight(string(topLine), " "))
 
 	headerLine := makeLine()
-	headerLine[boxLeft] = chars.Vertical
-	headerLine[boxRight] = chars.Vertical
+	headerLine[boxLeft] = bc.Vertical
+	headerLine[boxRight] = bc.Vertical
 	col := boxLeft + 2
 	for _, r := range headerLabel {
 		if col < boxRight {
@@ -691,35 +693,35 @@ func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int)
 	lines = append(lines, strings.TrimRight(string(headerLine), " "))
 
 	sepLine := makeLine()
-	sepLine[boxLeft] = chars.TeeRight
+	sepLine[boxLeft] = bc.TeeRight
 	for i := boxLeft + 1; i < boxRight; i++ {
 		if sepLine[i] == chars.Vertical {
-			sepLine[i] = chars.Cross
+			sepLine[i] = bc.Cross
 		} else {
-			sepLine[i] = chars.Horizontal
+			sepLine[i] = bc.Horizontal
 		}
 	}
-	sepLine[boxRight] = chars.TeeLeft
+	sepLine[boxRight] = bc.TeeLeft
 	lines = append(lines, strings.TrimRight(string(sepLine), " "))
 
 	for sectionIdx, section := range block.Sections {
 		if sectionIdx > 0 {
 			divLine := makeLine()
-			divLine[boxLeft] = chars.TeeRight
+			divLine[boxLeft] = bc.TeeRight
 			for i := boxLeft + 1; i < boxRight; i++ {
 				if divLine[i] == chars.Vertical {
-					divLine[i] = chars.Cross
+					divLine[i] = bc.Cross
 				} else {
-					divLine[i] = chars.Horizontal
+					divLine[i] = bc.Horizontal
 				}
 			}
-			divLine[boxRight] = chars.TeeLeft
+			divLine[boxRight] = bc.TeeLeft
 			lines = append(lines, strings.TrimRight(string(divLine), " "))
 
 			if section.Label != "" {
 				labelLine := makeLine()
-				labelLine[boxLeft] = chars.Vertical
-				labelLine[boxRight] = chars.Vertical
+				labelLine[boxLeft] = bc.Vertical
+				labelLine[boxRight] = bc.Vertical
 				col := boxLeft + 2
 				for _, r := range section.Label {
 					if col < boxRight {
@@ -733,8 +735,8 @@ func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int)
 
 		for _, elem := range section.Elements {
 			spaceLine := makeLine()
-			spaceLine[boxLeft] = chars.Vertical
-			spaceLine[boxRight] = chars.Vertical
+			spaceLine[boxLeft] = bc.Vertical
+			spaceLine[boxRight] = bc.Vertical
 			lines = append(lines, strings.TrimRight(string(spaceLine), " "))
 
 			switch e := elem.(type) {
@@ -745,8 +747,8 @@ func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int)
 					for len(mlRunes) <= ensureWidth {
 						mlRunes = append(mlRunes, ' ')
 					}
-					mlRunes[boxLeft] = chars.Vertical
-					mlRunes[boxRight] = chars.Vertical
+					mlRunes[boxLeft] = bc.Vertical
+					mlRunes[boxRight] = bc.Vertical
 					lines = append(lines, strings.TrimRight(string(mlRunes), " "))
 				}
 			case *Note:
@@ -756,8 +758,8 @@ func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int)
 					for len(nlRunes) <= ensureWidth {
 						nlRunes = append(nlRunes, ' ')
 					}
-					nlRunes[boxLeft] = chars.Vertical
-					nlRunes[boxRight] = chars.Vertical
+					nlRunes[boxLeft] = bc.Vertical
+					nlRunes[boxRight] = bc.Vertical
 					lines = append(lines, strings.TrimRight(string(nlRunes), " "))
 				}
 			case *Block:
@@ -767,8 +769,8 @@ func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int)
 					for len(nlRunes) <= ensureWidth {
 						nlRunes = append(nlRunes, ' ')
 					}
-					nlRunes[boxLeft] = chars.Vertical
-					nlRunes[boxRight] = chars.Vertical
+					nlRunes[boxLeft] = bc.Vertical
+					nlRunes[boxRight] = bc.Vertical
 					lines = append(lines, strings.TrimRight(string(nlRunes), " "))
 				}
 			}
@@ -776,20 +778,20 @@ func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int)
 	}
 
 	spaceLine := makeLine()
-	spaceLine[boxLeft] = chars.Vertical
-	spaceLine[boxRight] = chars.Vertical
+	spaceLine[boxLeft] = bc.Vertical
+	spaceLine[boxRight] = bc.Vertical
 	lines = append(lines, strings.TrimRight(string(spaceLine), " "))
 
 	bottomLine := makeLine()
-	bottomLine[boxLeft] = chars.BottomLeft
+	bottomLine[boxLeft] = bc.BottomLeft
 	for i := boxLeft + 1; i < boxRight; i++ {
 		if bottomLine[i] == chars.Vertical {
-			bottomLine[i] = chars.TeeDown
+			bottomLine[i] = bc.TeeDown
 		} else {
-			bottomLine[i] = chars.Horizontal
+			bottomLine[i] = bc.Horizontal
 		}
 	}
-	bottomLine[boxRight] = chars.BottomRight
+	bottomLine[boxRight] = bc.BottomRight
 	lines = append(lines, strings.TrimRight(string(bottomLine), " "))
 
 	return lines
