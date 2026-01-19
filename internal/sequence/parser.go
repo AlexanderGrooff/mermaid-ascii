@@ -166,6 +166,12 @@ func Parse(input string) (*SequenceDiagram, error) {
 			continue
 		}
 
+		if matched, err := sd.parseNote(trimmed, participantMap); err != nil {
+			return nil, fmt.Errorf("line %d: %w", i+2, err)
+		} else if matched {
+			continue
+		}
+
 		return nil, fmt.Errorf("line %d: invalid syntax: %q", i+2, trimmed)
 	}
 
@@ -247,6 +253,7 @@ func (sd *SequenceDiagram) parseMessage(line string, participants map[string]*Pa
 		Number:    msgNumber,
 	}
 	sd.Messages = append(sd.Messages, msg)
+	sd.Elements = append(sd.Elements, msg)
 	return true, nil
 }
 
