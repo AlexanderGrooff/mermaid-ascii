@@ -498,6 +498,139 @@ func TestRenderNoteLeftOf(t *testing.T) {
 	}
 }
 
+func TestParseBlockLoop(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		loop Every minute
+			A->>B: Ping
+			B-->>A: Pong
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(sd.Elements) != 1 {
+		t.Fatalf("expected 1 element, got %d", len(sd.Elements))
+	}
+
+	block, ok := sd.Elements[0].(*Block)
+	if !ok {
+		t.Fatalf("expected Block, got %T", sd.Elements[0])
+	}
+
+	if block.Type != BlockLoop {
+		t.Errorf("expected BlockLoop, got %v", block.Type)
+	}
+	if block.Label != "Every minute" {
+		t.Errorf("expected label 'Every minute', got %q", block.Label)
+	}
+	if len(block.Sections) != 1 {
+		t.Errorf("expected 1 section, got %d", len(block.Sections))
+	}
+	if len(block.Sections[0].Elements) != 2 {
+		t.Errorf("expected 2 elements in section, got %d", len(block.Sections[0].Elements))
+	}
+}
+
+func TestParseBlockAltElse(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		alt Success
+			A->>B: 200 OK
+		else Failure
+			A->>B: 500 Error
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	block, ok := sd.Elements[0].(*Block)
+	if !ok {
+		t.Fatalf("expected Block, got %T", sd.Elements[0])
+	}
+
+	if block.Type != BlockAlt {
+		t.Errorf("expected BlockAlt, got %v", block.Type)
+	}
+	if len(block.Sections) != 2 {
+		t.Errorf("expected 2 sections, got %d", len(block.Sections))
+	}
+	if block.Sections[1].Label != "Failure" {
+		t.Errorf("expected section label 'Failure', got %q", block.Sections[1].Label)
+	}
+}
+
+func TestParseBlockParAnd(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		participant C
+		par Task 1
+			A->>B: Do X
+		and Task 2
+			A->>C: Do Y
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	block, ok := sd.Elements[0].(*Block)
+	if !ok {
+		t.Fatalf("expected Block, got %T", sd.Elements[0])
+	}
+
+	if block.Type != BlockPar {
+		t.Errorf("expected BlockPar, got %v", block.Type)
+	}
+	if len(block.Sections) != 2 {
+		t.Errorf("expected 2 sections, got %d", len(block.Sections))
+	}
+}
+
+func TestParseBlockNested(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		loop Outer
+			alt Check
+				A->>B: Request
+			else Skip
+				A->>B: Skip
+			end
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	outerBlock, ok := sd.Elements[0].(*Block)
+	if !ok {
+		t.Fatalf("expected Block, got %T", sd.Elements[0])
+	}
+
+	if outerBlock.Type != BlockLoop {
+		t.Errorf("expected BlockLoop, got %v", outerBlock.Type)
+	}
+
+	innerBlock, ok := outerBlock.Sections[0].Elements[0].(*Block)
+	if !ok {
+		t.Fatalf("expected nested Block, got %T", outerBlock.Sections[0].Elements[0])
+	}
+
+	if innerBlock.Type != BlockAlt {
+		t.Errorf("expected nested BlockAlt, got %v", innerBlock.Type)
+	}
+}
+
 func FuzzParseSequenceDiagram(f *testing.F) {
 	f.Add("sequenceDiagram\nA->>B: Hello")
 	f.Add("sequenceDiagram\nparticipant Alice\nAlice->>Bob: Hi")
