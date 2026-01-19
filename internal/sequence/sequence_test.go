@@ -231,6 +231,145 @@ func TestArrowTypeString(t *testing.T) {
 	}
 }
 
+func TestParseNoteOverSingleActor(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		Note over A: This is a note`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(sd.Elements) != 1 {
+		t.Fatalf("expected 1 element, got %d", len(sd.Elements))
+	}
+
+	note, ok := sd.Elements[0].(*Note)
+	if !ok {
+		t.Fatalf("expected Note, got %T", sd.Elements[0])
+	}
+
+	if note.Position != NoteOver {
+		t.Errorf("expected NoteOver, got %v", note.Position)
+	}
+	if len(note.Actors) != 1 || note.Actors[0].ID != "A" {
+		t.Errorf("expected 1 actor with ID 'A', got %v", note.Actors)
+	}
+	if note.Text != "This is a note" {
+		t.Errorf("expected text 'This is a note', got %q", note.Text)
+	}
+}
+
+func TestParseNoteOverMultipleActors(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		Note over A,B: Spanning note`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(sd.Elements) != 1 {
+		t.Fatalf("expected 1 element, got %d", len(sd.Elements))
+	}
+
+	note, ok := sd.Elements[0].(*Note)
+	if !ok {
+		t.Fatalf("expected Note, got %T", sd.Elements[0])
+	}
+
+	if note.Position != NoteOver {
+		t.Errorf("expected NoteOver, got %v", note.Position)
+	}
+	if len(note.Actors) != 2 {
+		t.Fatalf("expected 2 actors, got %d", len(note.Actors))
+	}
+	if note.Actors[0].ID != "A" || note.Actors[1].ID != "B" {
+		t.Errorf("expected actors A and B, got %v and %v", note.Actors[0].ID, note.Actors[1].ID)
+	}
+	if note.Text != "Spanning note" {
+		t.Errorf("expected text 'Spanning note', got %q", note.Text)
+	}
+}
+
+func TestParseNoteLeftRight(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		wantPosition NotePosition
+		wantActorID  string
+		wantText     string
+	}{
+		{
+			name: "note left of",
+			input: `sequenceDiagram
+				participant A
+				Note left of A: Left note`,
+			wantPosition: NoteLeftOf,
+			wantActorID:  "A",
+			wantText:     "Left note",
+		},
+		{
+			name: "note right of",
+			input: `sequenceDiagram
+				participant B
+				Note right of B: Right note`,
+			wantPosition: NoteRightOf,
+			wantActorID:  "B",
+			wantText:     "Right note",
+		},
+		{
+			name: "note left of case insensitive",
+			input: `sequenceDiagram
+				participant C
+				NOTE LEFT OF C: Case test`,
+			wantPosition: NoteLeftOf,
+			wantActorID:  "C",
+			wantText:     "Case test",
+		},
+		{
+			name: "note right of case insensitive",
+			input: `sequenceDiagram
+				participant D
+				note RIGHT OF D: Mixed case`,
+			wantPosition: NoteRightOf,
+			wantActorID:  "D",
+			wantText:     "Mixed case",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sd, err := Parse(tt.input)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(sd.Elements) != 1 {
+				t.Fatalf("expected 1 element, got %d", len(sd.Elements))
+			}
+
+			note, ok := sd.Elements[0].(*Note)
+			if !ok {
+				t.Fatalf("expected Note, got %T", sd.Elements[0])
+			}
+
+			if note.Position != tt.wantPosition {
+				t.Errorf("expected position %v, got %v", tt.wantPosition, note.Position)
+			}
+			if len(note.Actors) != 1 || note.Actors[0].ID != tt.wantActorID {
+				t.Errorf("expected actor %q, got %v", tt.wantActorID, note.Actors)
+			}
+			if note.Text != tt.wantText {
+				t.Errorf("expected text %q, got %q", tt.wantText, note.Text)
+			}
+		})
+	}
+}
+
 func FuzzParseSequenceDiagram(f *testing.F) {
 	f.Add("sequenceDiagram\nA->>B: Hello")
 	f.Add("sequenceDiagram\nparticipant Alice\nAlice->>Bob: Hi")
