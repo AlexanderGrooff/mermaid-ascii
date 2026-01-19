@@ -247,15 +247,18 @@ func renderNoteOver(note *Note, layout *diagramLayout, chars BoxChars) []string 
 	}
 
 	padding := 2
-	boxLeft := leftCenter - padding
-	if boxLeft < 0 {
-		boxLeft = 0
-	}
 	textWidth := runewidth.StringWidth(note.Text)
 	minBoxWidth := textWidth + 4
-	boxWidth := rightCenter - leftCenter + padding*2
+	spanWidth := rightCenter - leftCenter + padding*2
+	boxWidth := spanWidth
 	if boxWidth < minBoxWidth {
 		boxWidth = minBoxWidth
+	}
+
+	spanCenter := (leftCenter + rightCenter) / 2
+	boxLeft := spanCenter - boxWidth/2
+	if boxLeft < 0 {
+		boxLeft = 0
 	}
 	boxRight := boxLeft + boxWidth
 
@@ -337,11 +340,9 @@ func renderNoteLeftOf(note *Note, layout *diagramLayout, chars BoxChars) []strin
 	boxRight := center - 2
 	boxLeft := boxRight - boxWidth
 
-	offset := 0
 	if boxLeft < 0 {
-		offset = -boxLeft
 		boxLeft = 0
-		boxRight += offset
+		boxRight = boxWidth
 	}
 
 	ensureWidth := layout.totalWidth + 1
@@ -349,18 +350,12 @@ func renderNoteLeftOf(note *Note, layout *diagramLayout, chars BoxChars) []strin
 		ensureWidth = boxRight + 1
 	}
 
-	shiftedCenters := make([]int, len(layout.participantCenters))
-	for i, c := range layout.participantCenters {
-		shiftedCenters[i] = c + offset
-	}
-	shiftedCenter := center + offset
-
-	topLine := make([]rune, ensureWidth+offset)
+	topLine := make([]rune, ensureWidth)
 	for i := range topLine {
 		topLine[i] = ' '
 	}
-	for _, c := range shiftedCenters {
-		if c < len(topLine) {
+	for _, c := range layout.participantCenters {
+		if c < len(topLine) && (c < boxLeft || c > boxRight) {
 			topLine[c] = chars.Vertical
 		}
 	}
@@ -371,21 +366,25 @@ func renderNoteLeftOf(note *Note, layout *diagramLayout, chars BoxChars) []strin
 	topLine[boxRight] = chars.TopRight
 	lines = append(lines, strings.TrimRight(string(topLine), " "))
 
-	textLine := make([]rune, ensureWidth+offset)
+	textLine := make([]rune, ensureWidth)
 	for i := range textLine {
 		textLine[i] = ' '
 	}
-	for _, c := range shiftedCenters {
-		if c < len(textLine) {
+	for _, c := range layout.participantCenters {
+		if c < len(textLine) && (c < boxLeft || c > boxRight) {
 			textLine[c] = chars.Vertical
 		}
 	}
 	textLine[boxLeft] = chars.Vertical
-	textLine[boxRight] = chars.TeeLeft
-	for i := boxRight + 1; i < shiftedCenter; i++ {
-		textLine[i] = chars.Horizontal
+	if boxRight < center {
+		textLine[boxRight] = chars.TeeLeft
+		for i := boxRight + 1; i < center; i++ {
+			textLine[i] = chars.Horizontal
+		}
+		textLine[center] = chars.TeeLeft
+	} else {
+		textLine[boxRight] = chars.Vertical
 	}
-	textLine[shiftedCenter] = chars.TeeLeft
 	textStart := boxLeft + 2
 	col := textStart
 	for _, r := range note.Text {
@@ -396,12 +395,12 @@ func renderNoteLeftOf(note *Note, layout *diagramLayout, chars BoxChars) []strin
 	}
 	lines = append(lines, strings.TrimRight(string(textLine), " "))
 
-	bottomLine := make([]rune, ensureWidth+offset)
+	bottomLine := make([]rune, ensureWidth)
 	for i := range bottomLine {
 		bottomLine[i] = ' '
 	}
-	for _, c := range shiftedCenters {
-		if c < len(bottomLine) {
+	for _, c := range layout.participantCenters {
+		if c < len(bottomLine) && (c < boxLeft || c > boxRight) {
 			bottomLine[c] = chars.Vertical
 		}
 	}
@@ -426,7 +425,7 @@ func renderNoteRightOf(note *Note, layout *diagramLayout, chars BoxChars) []stri
 	boxRight := boxLeft + boxWidth
 
 	ensureWidth := layout.totalWidth
-	if boxRight > ensureWidth {
+	if boxRight >= ensureWidth {
 		ensureWidth = boxRight + 1
 	}
 

@@ -316,6 +316,51 @@ func TestRenderNoteOver(t *testing.T) {
 	}
 }
 
+func TestRenderNoteOverLongText(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		Note over A: This is a very long note text that should expand the box`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	longText := "This is a very long note text that should expand the box"
+	if !strings.Contains(output, longText) {
+		t.Errorf("output should contain full note text:\n%s", output)
+	}
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "TopLeft") || strings.Contains(line, "TopRight") {
+			continue
+		}
+		for i, r := range line {
+			if r == '│' || r == '|' {
+				if i > 0 && i < len(line)-1 {
+					prev := rune(line[i-1])
+					next := rune(line[i+1])
+					if (prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z') {
+						t.Errorf("border character at position %d may be overwriting text: %s", i, line)
+					}
+					if (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') {
+						if next != 'T' {
+							t.Errorf("border character at position %d may be adjacent to truncated text: %s", i, line)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 func TestParseNoteLeftRight(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -408,6 +453,26 @@ func TestRenderNoteRightOf(t *testing.T) {
 	}
 
 	if !strings.Contains(output, "Right note") {
+		t.Errorf("output should contain note text:\n%s", output)
+	}
+}
+
+func TestRenderNoteRightOfEdgeBoundary(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		Note right of A: Hi`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "Hi") {
 		t.Errorf("output should contain note text:\n%s", output)
 	}
 }
