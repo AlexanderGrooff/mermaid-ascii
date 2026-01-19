@@ -158,6 +158,41 @@ type DiagramElement interface {
 	isElement()
 }
 
+func parseBlockType(keyword string) (BlockType, error) {
+	switch strings.ToLower(keyword) {
+	case "loop":
+		return BlockLoop, nil
+	case "alt":
+		return BlockAlt, nil
+	case "opt":
+		return BlockOpt, nil
+	case "par":
+		return BlockPar, nil
+	case "critical":
+		return BlockCritical, nil
+	case "break":
+		return BlockBreak, nil
+	case "rect":
+		return BlockRect, nil
+	default:
+		return 0, fmt.Errorf("unknown block type: %q", keyword)
+	}
+}
+
+func isValidDivider(blockType BlockType, divider string) bool {
+	divider = strings.ToLower(divider)
+	switch blockType {
+	case BlockAlt:
+		return divider == "else"
+	case BlockPar:
+		return divider == "and"
+	case BlockCritical:
+		return divider == "option"
+	default:
+		return false
+	}
+}
+
 func (*Message) isElement() {}
 func (*Note) isElement()    {}
 
@@ -375,4 +410,103 @@ func (sd *SequenceDiagram) parseNote(line string, participants map[string]*Parti
 	}
 	sd.Elements = append(sd.Elements, note)
 	return true, nil
+}
+
+func (sd *SequenceDiagram) parseBlock(lines []string, startIdx int, participants map[string]*Participant) (*Block, int, error) {
+	if startIdx >= len(lines) {
+		return nil, startIdx, fmt.Errorf("unexpected end of input")
+	}
+
+	match := blockStartRegex.FindStringSubmatch(lines[startIdx])
+	if match == nil {
+		return nil, startIdx, fmt.Errorf("expected block start")
+	}
+
+	blockType, err := parseBlockType(match[1])
+	if err != nil {
+		return nil, startIdx, err
+	}
+
+	block := &Block{
+		Type:  blockType,
+		Label: strings.TrimSpace(match[2]),
+		Sections: []*BlockSection{
+			{Label: "", Elements: []DiagramElement{}},
+		},
+	}
+
+	currentSection := block.Sections[0]
+	idx := startIdx + 1
+
+	for idx < len(lines) {
+		line := lines[idx]
+		trimmed := strings.TrimSpace(line)
+
+		if trimmed == "" {
+			idx++
+			continue
+		}
+
+		if blockEndRegex.MatchString(trimmed) {
+			return block, idx + 1, nil
+		}
+
+		if divMatch := blockDividerRegex.FindStringSubmatch(trimmed); divMatch != nil {
+			divider := divMatch[1]
+			if !isValidDivider(block.Type, divider) {
+				return nil, idx, fmt.Errorf("invalid divider %q for block type %s", divider, block.Type)
+			}
+			currentSection = &BlockSection{
+				Label:    strings.TrimSpace(divMatch[2]),
+				Elements: []DiagramElement{},
+			}
+			block.Sections = append(block.Sections, currentSection)
+			idx++
+			continue
+		}
+
+		if blockStartRegex.MatchString(trimmed) {
+			nestedBlock, nextIdx, err := sd.parseBlock(lines, idx, participants)
+			if err != nil {
+				return nil, idx, fmt.Errorf("nested block: %w", err)
+			}
+			currentSection.Elements = append(currentSection.Elements, nestedBlock)
+			idx = nextIdx
+			continue
+		}
+
+		if noteRegex.MatchString(trimmed) {
+			elemsBefore := len(sd.Elements)
+			if matched, err := sd.parseNote(trimmed, participants); err != nil {
+				return nil, idx, err
+			} else if matched {
+				if len(sd.Elements) > elemsBefore {
+					lastElem := sd.Elements[len(sd.Elements)-1]
+					sd.Elements = sd.Elements[:len(sd.Elements)-1]
+					currentSection.Elements = append(currentSection.Elements, lastElem)
+				}
+				idx++
+				continue
+			}
+		}
+
+		if messageRegex.MatchString(trimmed) {
+			elemsBefore := len(sd.Elements)
+			if matched, err := sd.parseMessage(trimmed, participants); err != nil {
+				return nil, idx, err
+			} else if matched {
+				if len(sd.Elements) > elemsBefore {
+					lastElem := sd.Elements[len(sd.Elements)-1]
+					sd.Elements = sd.Elements[:len(sd.Elements)-1]
+					currentSection.Elements = append(currentSection.Elements, lastElem)
+				}
+				idx++
+				continue
+			}
+		}
+
+		return nil, idx, fmt.Errorf("invalid syntax in block: %q", trimmed)
+	}
+
+	return nil, startIdx, fmt.Errorf("block starting at line %d has no 'end'", startIdx+1)
 }
