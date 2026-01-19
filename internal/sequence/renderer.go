@@ -129,6 +129,11 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 			if noteLines != nil {
 				lines = append(lines, noteLines...)
 			}
+		case *Block:
+			blockLines := renderBlock(e, layout, chars, 0)
+			if blockLines != nil {
+				lines = append(lines, blockLines...)
+			}
 		}
 	}
 
@@ -491,6 +496,61 @@ func renderNoteRightOf(note *Note, layout *diagramLayout, chars BoxChars) []stri
 	lines = append(lines, strings.TrimRight(string(bottomLine), " "))
 
 	return lines
+}
+
+func findBlockParticipantRange(block *Block) (minIdx, maxIdx int) {
+	minIdx = -1
+	maxIdx = -1
+
+	var findInElements func(elements []DiagramElement)
+	findInElements = func(elements []DiagramElement) {
+		for _, elem := range elements {
+			switch e := elem.(type) {
+			case *Message:
+				if minIdx == -1 || e.From.Index < minIdx {
+					minIdx = e.From.Index
+				}
+				if minIdx == -1 || e.To.Index < minIdx {
+					minIdx = e.To.Index
+				}
+				if e.From.Index > maxIdx {
+					maxIdx = e.From.Index
+				}
+				if e.To.Index > maxIdx {
+					maxIdx = e.To.Index
+				}
+			case *Note:
+				for _, actor := range e.Actors {
+					if minIdx == -1 || actor.Index < minIdx {
+						minIdx = actor.Index
+					}
+					if actor.Index > maxIdx {
+						maxIdx = actor.Index
+					}
+				}
+			case *Block:
+				nestedMin, nestedMax := findBlockParticipantRange(e)
+				if nestedMin != -1 {
+					if minIdx == -1 || nestedMin < minIdx {
+						minIdx = nestedMin
+					}
+					if nestedMax > maxIdx {
+						maxIdx = nestedMax
+					}
+				}
+			}
+		}
+	}
+
+	for _, section := range block.Sections {
+		findInElements(section.Elements)
+	}
+
+	return minIdx, maxIdx
+}
+
+func renderBlock(block *Block, layout *diagramLayout, chars BoxChars, depth int) []string {
+	return nil
 }
 
 func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string {
