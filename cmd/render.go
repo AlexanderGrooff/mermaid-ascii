@@ -27,3 +27,11 @@ func RenderDiagram(input string, config *diagram.Config) (string, error) {
 
 	return output, nil
 }
+
+func RenderDiagramWithOptions(input string, options ...RenderOption) (string, error) {
+	config := diagram.DefaultConfig()
+	for _, opt := range options {
+		opt(config)
+	}
+	return RenderDiagram(input, config)
+}
