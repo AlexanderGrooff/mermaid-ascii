@@ -20,6 +20,7 @@ type graphProperties struct {
 	paddingY       int
 	subgraphs      []*textSubgraph
 	useAscii       bool
+	nodeAliases    map[string]string
 }
 
 type textNode struct {
@@ -40,17 +41,65 @@ type textSubgraph struct {
 	children []*textSubgraph
 }
 
-func parseNode(line string) textNode {
+var nodeLabelRegex = regexp.MustCompile(`^([A-Za-z0-9_.-]+)\[(.*)\]$`)
+
+func trimOptionalQuotes(label string) string {
+	label = strings.TrimSpace(label)
+	if len(label) < 2 {
+		return label
+	}
+	if (label[0] == '"' && label[len(label)-1] == '"') || (label[0] == '\'' && label[len(label)-1] == '\'') {
+		return label[1 : len(label)-1]
+	}
+	return label
+}
+
+func parseLabeledIdentifier(raw string) (string, string, bool) {
+	match := nodeLabelRegex.FindStringSubmatch(strings.TrimSpace(raw))
+	if match == nil {
+		return "", "", false
+	}
+	id := strings.TrimSpace(match[1])
+	label := trimOptionalQuotes(strings.TrimSpace(match[2]))
+	if label == "" {
+		label = id
+	}
+	return id, label, true
+}
+
+func normalizeSubgraphName(name string) string {
+	if _, label, ok := parseLabeledIdentifier(name); ok {
+		return label
+	}
+	return trimOptionalQuotes(strings.TrimSpace(name))
+}
+
+func (gp *graphProperties) parseNode(line string) textNode {
 	// Trim any whitespace from the line that might be left after comment removal
 	trimmedLine := strings.TrimSpace(line)
 
 	nodeWithClass, _ := regexp.Compile(`^(.+):::(.+)$`)
 
 	if match := nodeWithClass.FindStringSubmatch(trimmedLine); match != nil {
-		return textNode{strings.TrimSpace(match[1]), strings.TrimSpace(match[2])}
-	} else {
-		return textNode{trimmedLine, ""}
+		nodePart := strings.TrimSpace(match[1])
+		styleClass := strings.TrimSpace(match[2])
+		if id, label, ok := parseLabeledIdentifier(nodePart); ok {
+			gp.nodeAliases[id] = label
+			return textNode{label, styleClass}
+		}
+		if alias, ok := gp.nodeAliases[nodePart]; ok {
+			return textNode{alias, styleClass}
+		}
+		return textNode{nodePart, styleClass}
 	}
+	if id, label, ok := parseLabeledIdentifier(trimmedLine); ok {
+		gp.nodeAliases[id] = label
+		return textNode{label, ""}
+	}
+	if alias, ok := gp.nodeAliases[trimmedLine]; ok {
+		return textNode{alias, ""}
+	}
+	return textNode{trimmedLine, ""}
 }
 
 func parseStyleClass(matchedLine []string) styleClass {
@@ -124,10 +173,10 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 			regex: regexp.MustCompile(`^(.+)\s+-->\s+(.+)$`),
 			handler: func(match []string) ([]textNode, error) {
 				if lhs, err = gp.parseString(match[0]); err != nil {
-					lhs = []textNode{parseNode(match[0])}
+					lhs = []textNode{gp.parseNode(match[0])}
 				}
 				if rhs, err = gp.parseString(match[1]); err != nil {
-					rhs = []textNode{parseNode(match[1])}
+					rhs = []textNode{gp.parseNode(match[1])}
 				}
 				return setArrow(lhs, rhs, gp.data), nil
 			},
@@ -136,10 +185,10 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 			regex: regexp.MustCompile(`^(.+)\s+-->\|(.+)\|\s+(.+)$`),
 			handler: func(match []string) ([]textNode, error) {
 				if lhs, err = gp.parseString(match[0]); err != nil {
-					lhs = []textNode{parseNode(match[0])}
+					lhs = []textNode{gp.parseNode(match[0])}
 				}
 				if rhs, err = gp.parseString(match[2]); err != nil {
-					rhs = []textNode{parseNode(match[2])}
+					rhs = []textNode{gp.parseNode(match[2])}
 				}
 				return setArrowWithLabel(lhs, rhs, match[1], gp.data), nil
 			},
@@ -158,11 +207,11 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 				log.Debugf("Found & pattern node %v to %v", match[0], match[1])
 				var node textNode
 				if lhs, err = gp.parseString(match[0]); err != nil {
-					node = parseNode(match[0])
+					node = gp.parseNode(match[0])
 					lhs = []textNode{node}
 				}
 				if rhs, err = gp.parseString(match[1]); err != nil {
-					node = parseNode(match[1])
+					node = gp.parseNode(match[1])
 					rhs = []textNode{node}
 				}
 				return append(lhs, rhs...), nil
@@ -219,6 +268,7 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 		paddingX:       paddingBetweenX,
 		paddingY:       paddingBetweenY,
 		subgraphs:      []*textSubgraph{},
+		nodeAliases:    make(map[string]string),
 	}
 
 	// Pick up optional padding directives before the graph definition
@@ -271,7 +321,7 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 
 		// Check for subgraph start
 		if match := subgraphRegex.FindStringSubmatch(trimmedLine); match != nil {
-			subgraphName := strings.TrimSpace(match[1])
+			subgraphName := normalizeSubgraphName(match[1])
 			newSubgraph := &textSubgraph{
 				name:     subgraphName,
 				nodes:    []string{},
@@ -311,7 +361,7 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 		nodes, err := properties.parseString(line)
 		if err != nil {
 			log.Debugf("Parsing remaining text to node %v", line)
-			node := parseNode(line)
+			node := properties.parseNode(line)
 			addNode(node, properties.data)
 		} else {
 			// Ensure all returned nodes are in the map
