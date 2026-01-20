@@ -32,6 +32,13 @@ type Config struct {
 	// This controls whether graphs use colored output (html) or plain text (cli)
 	StyleType string
 
+	// MaxWidth constrains output width in characters. Zero disables fitting.
+	MaxWidth int
+
+	// FitPolicy controls how the renderer fits diagrams to MaxWidth.
+	// Use FitPolicyNone to disable fitting and FitPolicyAuto for heuristics.
+	FitPolicy string
+
 	// --- Sequence diagram-specific configuration ---
 
 	// SequenceParticipantSpacing is the horizontal space between participants
@@ -57,6 +64,8 @@ func DefaultConfig() *Config {
 		PaddingBetweenY:  5,
 		GraphDirection:   "LR",
 		StyleType:        "cli",
+		MaxWidth:         0,
+		FitPolicy:        FitPolicyNone,
 		// Sequence diagram defaults
 		SequenceParticipantSpacing: 5,
 		SequenceMessageSpacing:     1,
@@ -77,6 +86,8 @@ func NewConfig(useAscii bool, graphDirection, styleType string) (*Config, error)
 		PaddingBetweenY:            5,
 		GraphDirection:             graphDirection,
 		StyleType:                  styleType,
+		MaxWidth:                   0,
+		FitPolicy:                  FitPolicyNone,
 		SequenceParticipantSpacing: 5,
 		SequenceMessageSpacing:     1,
 		SequenceSelfMessageWidth:   4,
@@ -100,6 +111,8 @@ func NewCLIConfig(useAscii, showCoords, verbose bool, boxBorderPadding, paddingX
 		PaddingBetweenY:            paddingY,
 		GraphDirection:             graphDirection,
 		StyleType:                  "cli",
+		MaxWidth:                   defaults.MaxWidth,
+		FitPolicy:                  defaults.FitPolicy,
 		SequenceParticipantSpacing: defaults.SequenceParticipantSpacing,
 		SequenceMessageSpacing:     defaults.SequenceMessageSpacing,
 		SequenceSelfMessageWidth:   defaults.SequenceSelfMessageWidth,
@@ -123,6 +136,8 @@ func NewWebConfig(useAscii bool, boxBorderPadding, paddingX, paddingY int) (*Con
 		PaddingBetweenY:            paddingY,
 		GraphDirection:             "LR",
 		StyleType:                  "html",
+		MaxWidth:                   defaults.MaxWidth,
+		FitPolicy:                  defaults.FitPolicy,
 		SequenceParticipantSpacing: defaults.SequenceParticipantSpacing,
 		SequenceMessageSpacing:     defaults.SequenceMessageSpacing,
 		SequenceSelfMessageWidth:   defaults.SequenceSelfMessageWidth,
@@ -147,6 +162,13 @@ func NewTestConfig(useAscii bool, styleType string) *Config {
 // Validate checks if the configuration values are valid.
 // Returns an error if any values are invalid or would cause rendering issues.
 func (c *Config) Validate() error {
+	if c.MaxWidth < 0 {
+		return &ConfigError{Field: "MaxWidth", Value: c.MaxWidth, Message: "must be non-negative"}
+	}
+	if c.FitPolicy != "" && c.FitPolicy != FitPolicyNone && c.FitPolicy != FitPolicyAuto {
+		return &ConfigError{Field: "FitPolicy", Value: c.FitPolicy, Message: "must be \"none\" or \"auto\""}
+	}
+
 	// Validate graph configuration
 	if c.BoxBorderPadding < 0 {
 		return &ConfigError{Field: "BoxBorderPadding", Value: c.BoxBorderPadding, Message: "must be non-negative"}
