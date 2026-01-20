@@ -94,6 +94,10 @@ func (gd *GraphDiagram) Render(config *diagram.Config) (string, error) {
 	gd.properties.edgeLabelPolicy = config.EdgeLabelPolicy
 	gd.properties.edgeLabelMaxWidth = config.EdgeLabelMaxWidth
 
+	if config.FitPolicy == diagram.FitPolicyAuto && config.MaxWidth > 0 {
+		return fitGraphToWidth(gd.properties, config), nil
+	}
+
 	return drawMap(gd.properties), nil
 }
 
