@@ -32,6 +32,9 @@ type Config struct {
 	// This controls whether graphs use colored output (html) or plain text (cli)
 	StyleType string
 
+	// LabelWrapWidth wraps graph node labels to this width. Zero disables wrapping.
+	LabelWrapWidth int
+
 	// MaxWidth constrains output width in characters. Zero disables fitting.
 	MaxWidth int
 
@@ -64,6 +67,7 @@ func DefaultConfig() *Config {
 		PaddingBetweenY:  5,
 		GraphDirection:   "",
 		StyleType:        "cli",
+		LabelWrapWidth:   0,
 		MaxWidth:         0,
 		FitPolicy:        FitPolicyNone,
 		// Sequence diagram defaults
@@ -86,6 +90,7 @@ func NewConfig(useAscii bool, graphDirection, styleType string) (*Config, error)
 		PaddingBetweenY:            5,
 		GraphDirection:             graphDirection,
 		StyleType:                  styleType,
+		LabelWrapWidth:             0,
 		MaxWidth:                   0,
 		FitPolicy:                  FitPolicyNone,
 		SequenceParticipantSpacing: 5,
@@ -111,6 +116,7 @@ func NewCLIConfig(useAscii, showCoords, verbose bool, boxBorderPadding, paddingX
 		PaddingBetweenY:            paddingY,
 		GraphDirection:             graphDirection,
 		StyleType:                  "cli",
+		LabelWrapWidth:             defaults.LabelWrapWidth,
 		MaxWidth:                   defaults.MaxWidth,
 		FitPolicy:                  defaults.FitPolicy,
 		SequenceParticipantSpacing: defaults.SequenceParticipantSpacing,
@@ -136,6 +142,7 @@ func NewWebConfig(useAscii bool, boxBorderPadding, paddingX, paddingY int) (*Con
 		PaddingBetweenY:            paddingY,
 		GraphDirection:             "",
 		StyleType:                  "html",
+		LabelWrapWidth:             defaults.LabelWrapWidth,
 		MaxWidth:                   defaults.MaxWidth,
 		FitPolicy:                  defaults.FitPolicy,
 		SequenceParticipantSpacing: defaults.SequenceParticipantSpacing,
@@ -178,6 +185,9 @@ func (c *Config) Validate() error {
 	}
 	if c.PaddingBetweenY < 0 {
 		return &ConfigError{Field: "PaddingBetweenY", Value: c.PaddingBetweenY, Message: "must be non-negative"}
+	}
+	if c.LabelWrapWidth < 0 {
+		return &ConfigError{Field: "LabelWrapWidth", Value: c.LabelWrapWidth, Message: "must be non-negative"}
 	}
 	if c.GraphDirection != "" && c.GraphDirection != "LR" && c.GraphDirection != "TD" {
 		return &ConfigError{Field: "GraphDirection", Value: c.GraphDirection, Message: "must be \"LR\" or \"TD\""}

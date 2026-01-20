@@ -90,6 +90,7 @@ func (gd *GraphDiagram) Render(config *diagram.Config) (string, error) {
 	gd.properties.paddingX = config.PaddingBetweenX
 	gd.properties.paddingY = config.PaddingBetweenY
 	gd.properties.boxBorderPadding = config.BoxBorderPadding
+	gd.properties.labelWrapWidth = config.LabelWrapWidth
 
 	return drawMap(gd.properties), nil
 }

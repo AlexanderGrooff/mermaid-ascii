@@ -42,6 +42,7 @@ type graph struct {
 	paddingY         int
 	graphDirection   string
 	boxBorderPadding int
+	labelWrapWidth   int
 	subgraphs        []*subgraph
 	offsetX          int
 	offsetY          int
@@ -103,6 +104,13 @@ func (g *graph) setStyleClasses(properties *graphProperties) {
 			log.Debugf("Setting style class for node %s to %s", n.name, n.styleClassName)
 			(*n).styleClass = g.styleClasses[n.styleClassName]
 		}
+	}
+}
+
+func (g *graph) setLabelLines() {
+	for _, n := range g.nodes {
+		n.labelLines = wrapLabelLines(n.name, g.labelWrapWidth)
+		n.labelWidth = maxLineWidth(n.labelLines)
 	}
 }
 

@@ -157,7 +157,9 @@ func drawMap(properties *graphProperties) string {
 	g.paddingY = properties.paddingY
 	g.graphDirection = properties.graphDirection
 	g.boxBorderPadding = properties.boxBorderPadding
+	g.labelWrapWidth = properties.labelWrapWidth
 	g.useAscii = properties.useAscii
+	g.setLabelLines()
 	g.setSubgraphs(properties.subgraphs)
 	g.createMapping()
 	d := g.draw()
@@ -230,10 +232,35 @@ func drawBox(n *node, g graph) *drawing {
 		boxDrawing[to.x][to.y] = "+"     // Bottom right corner
 	}
 	// Draw text
-	textY := from.y + h/2
-	textX := from.x + w/2 - CeilDiv(len(n.name), 2) + 1
-	for x := 0; x < len(n.name); x++ {
-		boxDrawing[textX+x][textY] = wrapTextInColor(string(n.name[x]), n.styleClass.styles["color"], g.styleType)
+	labelLines := n.labelLines
+	if len(labelLines) == 0 {
+		labelLines = []string{n.name}
+	}
+	innerLeft := from.x + 1
+	innerRight := to.x - 1
+	innerTop := from.y + 1
+	innerBottom := to.y - 1
+	innerWidth := innerRight - innerLeft + 1
+	innerHeight := innerBottom - innerTop + 1
+	startY := innerTop
+	if innerHeight > len(labelLines) {
+		startY = innerTop + (innerHeight-len(labelLines))/2
+	}
+	maxLines := Min(len(labelLines), innerHeight)
+	for lineIdx := 0; lineIdx < maxLines; lineIdx++ {
+		line := labelLines[lineIdx]
+		lineWidth := len(line)
+		startX := innerLeft
+		if innerWidth > lineWidth {
+			startX = innerLeft + (innerWidth-lineWidth)/2
+		}
+		maxChars := Min(lineWidth, innerWidth)
+		for x := 0; x < maxChars; x++ {
+			if startX+x > innerRight {
+				break
+			}
+			boxDrawing[startX+x][startY+lineIdx] = wrapTextInColor(string(line[x]), n.styleClass.styles["color"], g.styleType)
+		}
 	}
 
 	return &boxDrawing

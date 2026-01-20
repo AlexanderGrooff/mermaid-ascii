@@ -19,6 +19,7 @@ type graphProperties struct {
 	paddingX         int
 	paddingY         int
 	boxBorderPadding int
+	labelWrapWidth   int
 	subgraphs        []*textSubgraph
 	useAscii         bool
 	nodeAliases      map[string]string
@@ -269,6 +270,7 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 		paddingX:         paddingBetweenX,
 		paddingY:         paddingBetweenY,
 		boxBorderPadding: boxBorderPadding,
+		labelWrapWidth:   0,
 		subgraphs:        []*textSubgraph{},
 		nodeAliases:      make(map[string]string),
 	}
