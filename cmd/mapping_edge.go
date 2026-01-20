@@ -21,7 +21,7 @@ func (g *graph) determinePath(e *edge) {
 	var preferredPath, alternativePath []gridCoord
 	var from, to gridCoord
 	var err error
-	preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir := determineStartAndEndDir(e)
+	preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir := g.determineStartAndEndDir(e)
 
 	from = e.from.gridCoord.Direction(preferredDir)
 	to = e.to.gridCoord.Direction(preferredOppositeDir)

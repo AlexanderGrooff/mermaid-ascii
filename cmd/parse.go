@@ -12,15 +12,16 @@ import (
 )
 
 type graphProperties struct {
-	data           *orderedmap.OrderedMap[string, []textEdge]
-	styleClasses   *map[string]styleClass
-	graphDirection string
-	styleType      string
-	paddingX       int
-	paddingY       int
-	subgraphs      []*textSubgraph
-	useAscii       bool
-	nodeAliases    map[string]string
+	data             *orderedmap.OrderedMap[string, []textEdge]
+	styleClasses     *map[string]styleClass
+	graphDirection   string
+	styleType        string
+	paddingX         int
+	paddingY         int
+	boxBorderPadding int
+	subgraphs        []*textSubgraph
+	useAscii         bool
+	nodeAliases      map[string]string
 }
 
 type textNode struct {
@@ -261,14 +262,15 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 	data := orderedmap.NewOrderedMap[string, []textEdge]()
 	styleClasses := make(map[string]styleClass)
 	properties := graphProperties{
-		data:           data,
-		styleClasses:   &styleClasses,
-		graphDirection: "",
-		styleType:      styleType,
-		paddingX:       paddingBetweenX,
-		paddingY:       paddingBetweenY,
-		subgraphs:      []*textSubgraph{},
-		nodeAliases:    make(map[string]string),
+		data:             data,
+		styleClasses:     &styleClasses,
+		graphDirection:   "",
+		styleType:        styleType,
+		paddingX:         paddingBetweenX,
+		paddingY:         paddingBetweenY,
+		boxBorderPadding: boxBorderPadding,
+		subgraphs:        []*textSubgraph{},
+		nodeAliases:      make(map[string]string),
 	}
 
 	// Pick up optional padding directives before the graph definition
@@ -300,6 +302,7 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 	}
 
 	// First line should either say "graph TD" or "graph LR"
+	graphDirection := ""
 	switch lines[0] {
 	case "graph LR", "flowchart LR":
 		graphDirection = "LR"
@@ -309,6 +312,7 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 		return &properties, fmt.Errorf("unsupported graph type '%s'. Supported types: graph TD, graph TB, graph LR, flowchart TD, flowchart TB, flowchart LR", lines[0])
 	}
 	lines = lines[1:]
+	properties.graphDirection = graphDirection
 
 	// Track subgraph context using a stack
 	subgraphStack := []*textSubgraph{}

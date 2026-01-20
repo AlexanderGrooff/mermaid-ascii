@@ -62,7 +62,7 @@ func DefaultConfig() *Config {
 		BoxBorderPadding: 1,
 		PaddingBetweenX:  5,
 		PaddingBetweenY:  5,
-		GraphDirection:   "LR",
+		GraphDirection:   "",
 		StyleType:        "cli",
 		MaxWidth:         0,
 		FitPolicy:        FitPolicyNone,
@@ -134,7 +134,7 @@ func NewWebConfig(useAscii bool, boxBorderPadding, paddingX, paddingY int) (*Con
 		BoxBorderPadding:           boxBorderPadding,
 		PaddingBetweenX:            paddingX,
 		PaddingBetweenY:            paddingY,
-		GraphDirection:             "LR",
+		GraphDirection:             "",
 		StyleType:                  "html",
 		MaxWidth:                   defaults.MaxWidth,
 		FitPolicy:                  defaults.FitPolicy,
@@ -179,7 +179,7 @@ func (c *Config) Validate() error {
 	if c.PaddingBetweenY < 0 {
 		return &ConfigError{Field: "PaddingBetweenY", Value: c.PaddingBetweenY, Message: "must be non-negative"}
 	}
-	if c.GraphDirection != "LR" && c.GraphDirection != "TD" {
+	if c.GraphDirection != "" && c.GraphDirection != "LR" && c.GraphDirection != "TD" {
 		return &ConfigError{Field: "GraphDirection", Value: c.GraphDirection, Message: "must be \"LR\" or \"TD\""}
 	}
 	if c.StyleType != "cli" && c.StyleType != "html" {

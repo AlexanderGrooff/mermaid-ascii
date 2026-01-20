@@ -16,7 +16,7 @@ var Coords bool
 var boxBorderPadding = 1
 var paddingBetweenX = 5
 var paddingBetweenY = 5
-var graphDirection = "LR"
+var graphDirection = ""
 var useAscii = false
 
 // rootCmd represents the base command when called without any subcommands

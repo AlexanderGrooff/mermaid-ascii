@@ -155,6 +155,8 @@ func drawMap(properties *graphProperties) string {
 	g.setStyleClasses(properties)
 	g.paddingX = properties.paddingX
 	g.paddingY = properties.paddingY
+	g.graphDirection = properties.graphDirection
+	g.boxBorderPadding = properties.boxBorderPadding
 	g.useAscii = properties.useAscii
 	g.setSubgraphs(properties.subgraphs)
 	g.createMapping()

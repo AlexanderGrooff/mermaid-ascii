@@ -84,6 +84,12 @@ func (gd *GraphDiagram) Render(config *diagram.Config) (string, error) {
 	}
 	gd.properties.styleType = styleType
 	gd.properties.useAscii = config.UseAscii
+	if config.GraphDirection != "" {
+		gd.properties.graphDirection = config.GraphDirection
+	}
+	gd.properties.paddingX = config.PaddingBetweenX
+	gd.properties.paddingY = config.PaddingBetweenY
+	gd.properties.boxBorderPadding = config.BoxBorderPadding
 
 	return drawMap(gd.properties), nil
 }

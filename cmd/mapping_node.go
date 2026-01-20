@@ -36,10 +36,10 @@ func (g *graph) setColumnWidth(n *node) {
 	// - 2x padding
 	// - 2x margin
 	col1 := 1
-	col2 := 2*boxBorderPadding + len(n.name)
+	col2 := 2*g.boxBorderPadding + len(n.name)
 	col3 := 1
 	colsToBePlaced := []int{col1, col2, col3}
-	rowsToBePlaced := []int{1, 1 + 2*boxBorderPadding, 1} // Border, padding + line, border
+	rowsToBePlaced := []int{1, 1 + 2*g.boxBorderPadding, 1} // Border, padding + line, border
 
 	for idx, col := range colsToBePlaced {
 		// Set new width for column if the size increased
@@ -90,7 +90,7 @@ func (g *graph) reserveSpotInGrid(n *node, requestedCoord *gridCoord) *gridCoord
 	if g.grid[*requestedCoord] != nil {
 		log.Debugf("Coord %d,%d is already taken", requestedCoord.x, requestedCoord.y)
 		// Next column is 4 coords further. This is because every node is 3 coords wide + 1 coord inbetween.
-		if graphDirection == "LR" {
+		if g.graphDirection == "LR" {
 			return g.reserveSpotInGrid(n, &gridCoord{x: requestedCoord.x, y: requestedCoord.y + 4})
 		} else {
 			return g.reserveSpotInGrid(n, &gridCoord{x: requestedCoord.x + 4, y: requestedCoord.y})

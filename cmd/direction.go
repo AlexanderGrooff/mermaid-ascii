@@ -45,23 +45,23 @@ func (c drawingCoord) Direction(dir direction) drawingCoord {
 	return drawingCoord{x: c.x + dir.x, y: c.y + dir.y}
 }
 
-func selfReferenceDirection(e *edge) (direction, direction, direction, direction) {
-	if graphDirection == "LR" {
+func (g *graph) selfReferenceDirection(e *edge) (direction, direction, direction, direction) {
+	if g.graphDirection == "LR" {
 		return Right, Down, Down, Right
 	}
 	return Down, Right, Right, Down
 }
 
-func determineStartAndEndDir(e *edge) (direction, direction, direction, direction) {
+func (g *graph) determineStartAndEndDir(e *edge) (direction, direction, direction, direction) {
 	if e.from == e.to {
-		return selfReferenceDirection(e)
+		return g.selfReferenceDirection(e)
 	}
 	d := determineDirection(genericCoord(*e.from.gridCoord), genericCoord(*e.to.gridCoord))
 	var preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir direction
 
 	// Check if this is a backwards flowing edge
 	isBackwards := false
-	if graphDirection == "LR" {
+	if g.graphDirection == "LR" {
 		// In LR mode, backwards flow is when edge goes from right to left (Left direction)
 		isBackwards = (d == Left || d == UpperLeft || d == LowerLeft)
 	} else { // TD mode
@@ -75,7 +75,7 @@ func determineStartAndEndDir(e *edge) (direction, direction, direction, directio
 	// For backwards edges, use special start positions: Down in LR mode, Right in TD mode
 	switch d {
 	case LowerRight:
-		if graphDirection == "LR" {
+		if g.graphDirection == "LR" {
 			preferredDir = Down
 			preferredOppositeDir = Left
 			alternativeDir = Right
@@ -87,7 +87,7 @@ func determineStartAndEndDir(e *edge) (direction, direction, direction, directio
 			alternativeOppositeDir = Left
 		}
 	case UpperRight:
-		if graphDirection == "LR" {
+		if g.graphDirection == "LR" {
 			preferredDir = Up
 			preferredOppositeDir = Left
 			alternativeDir = Right
@@ -99,7 +99,7 @@ func determineStartAndEndDir(e *edge) (direction, direction, direction, directio
 			alternativeOppositeDir = Left
 		}
 	case LowerLeft:
-		if graphDirection == "LR" {
+		if g.graphDirection == "LR" {
 			// Backwards flow in LR mode - start from Down, arrive at Down
 			preferredDir = Down
 			preferredOppositeDir = Down // Edge goes to bottom of destination
@@ -112,7 +112,7 @@ func determineStartAndEndDir(e *edge) (direction, direction, direction, directio
 			alternativeOppositeDir = Right
 		}
 	case UpperLeft:
-		if graphDirection == "LR" {
+		if g.graphDirection == "LR" {
 			// Backwards flow in LR mode - start from Down, arrive at Down
 			preferredDir = Down
 			preferredOppositeDir = Down // Edge goes to bottom of destination
@@ -128,13 +128,13 @@ func determineStartAndEndDir(e *edge) (direction, direction, direction, directio
 	default:
 		// Handle direct backwards flow cases
 		if isBackwards {
-			if graphDirection == "LR" && d == Left {
+			if g.graphDirection == "LR" && d == Left {
 				// Direct left flow in LR mode - start from Down, arrive at Down
 				preferredDir = Down
 				preferredOppositeDir = Down // Edge goes to bottom of destination
 				alternativeDir = Left
 				alternativeOppositeDir = Right
-			} else if graphDirection == "TD" && d == Up {
+			} else if g.graphDirection == "TD" && d == Up {
 				// Direct up flow in TD mode - start from Right, arrive at Right
 				preferredDir = Right
 				preferredOppositeDir = Right // Edge goes to right of destination
