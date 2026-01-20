@@ -35,6 +35,13 @@ type Config struct {
 	// LabelWrapWidth wraps graph node labels to this width. Zero disables wrapping.
 	LabelWrapWidth int
 
+	// EdgeLabelPolicy controls how graph edge labels are handled.
+	// Use "full" to keep labels, "ellipsis" to truncate, or "drop" to remove them.
+	EdgeLabelPolicy string
+
+	// EdgeLabelMaxWidth is the maximum width for edge labels. Zero disables trimming.
+	EdgeLabelMaxWidth int
+
 	// MaxWidth constrains output width in characters. Zero disables fitting.
 	MaxWidth int
 
@@ -62,14 +69,16 @@ func DefaultConfig() *Config {
 		ShowCoords: false,
 		Verbose:    false,
 		// Graph defaults
-		BoxBorderPadding: 1,
-		PaddingBetweenX:  5,
-		PaddingBetweenY:  5,
-		GraphDirection:   "",
-		StyleType:        "cli",
-		LabelWrapWidth:   0,
-		MaxWidth:         0,
-		FitPolicy:        FitPolicyNone,
+		BoxBorderPadding:  1,
+		PaddingBetweenX:   5,
+		PaddingBetweenY:   5,
+		GraphDirection:    "",
+		StyleType:         "cli",
+		LabelWrapWidth:    0,
+		EdgeLabelPolicy:   EdgeLabelPolicyFull,
+		EdgeLabelMaxWidth: 0,
+		MaxWidth:          0,
+		FitPolicy:         FitPolicyNone,
 		// Sequence diagram defaults
 		SequenceParticipantSpacing: 5,
 		SequenceMessageSpacing:     1,
@@ -91,6 +100,8 @@ func NewConfig(useAscii bool, graphDirection, styleType string) (*Config, error)
 		GraphDirection:             graphDirection,
 		StyleType:                  styleType,
 		LabelWrapWidth:             0,
+		EdgeLabelPolicy:            EdgeLabelPolicyFull,
+		EdgeLabelMaxWidth:          0,
 		MaxWidth:                   0,
 		FitPolicy:                  FitPolicyNone,
 		SequenceParticipantSpacing: 5,
@@ -117,6 +128,8 @@ func NewCLIConfig(useAscii, showCoords, verbose bool, boxBorderPadding, paddingX
 		GraphDirection:             graphDirection,
 		StyleType:                  "cli",
 		LabelWrapWidth:             defaults.LabelWrapWidth,
+		EdgeLabelPolicy:            defaults.EdgeLabelPolicy,
+		EdgeLabelMaxWidth:          defaults.EdgeLabelMaxWidth,
 		MaxWidth:                   defaults.MaxWidth,
 		FitPolicy:                  defaults.FitPolicy,
 		SequenceParticipantSpacing: defaults.SequenceParticipantSpacing,
@@ -143,6 +156,8 @@ func NewWebConfig(useAscii bool, boxBorderPadding, paddingX, paddingY int) (*Con
 		GraphDirection:             "",
 		StyleType:                  "html",
 		LabelWrapWidth:             defaults.LabelWrapWidth,
+		EdgeLabelPolicy:            defaults.EdgeLabelPolicy,
+		EdgeLabelMaxWidth:          defaults.EdgeLabelMaxWidth,
 		MaxWidth:                   defaults.MaxWidth,
 		FitPolicy:                  defaults.FitPolicy,
 		SequenceParticipantSpacing: defaults.SequenceParticipantSpacing,
@@ -188,6 +203,15 @@ func (c *Config) Validate() error {
 	}
 	if c.LabelWrapWidth < 0 {
 		return &ConfigError{Field: "LabelWrapWidth", Value: c.LabelWrapWidth, Message: "must be non-negative"}
+	}
+	if c.EdgeLabelMaxWidth < 0 {
+		return &ConfigError{Field: "EdgeLabelMaxWidth", Value: c.EdgeLabelMaxWidth, Message: "must be non-negative"}
+	}
+	if c.EdgeLabelPolicy != "" &&
+		c.EdgeLabelPolicy != EdgeLabelPolicyFull &&
+		c.EdgeLabelPolicy != EdgeLabelPolicyEllipsis &&
+		c.EdgeLabelPolicy != EdgeLabelPolicyDrop {
+		return &ConfigError{Field: "EdgeLabelPolicy", Value: c.EdgeLabelPolicy, Message: "must be \"full\", \"ellipsis\", or \"drop\""}
 	}
 	if c.GraphDirection != "" && c.GraphDirection != "LR" && c.GraphDirection != "TD" {
 		return &ConfigError{Field: "GraphDirection", Value: c.GraphDirection, Message: "must be \"LR\" or \"TD\""}

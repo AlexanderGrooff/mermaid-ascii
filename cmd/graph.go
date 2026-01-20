@@ -30,23 +30,25 @@ func (g graph) lineToDrawing(line []gridCoord) []drawingCoord {
 }
 
 type graph struct {
-	nodes            []*node
-	edges            []*edge
-	drawing          *drawing
-	grid             map[gridCoord]*node
-	columnWidth      map[int]int
-	rowHeight        map[int]int
-	styleClasses     map[string]styleClass
-	styleType        string
-	paddingX         int
-	paddingY         int
-	graphDirection   string
-	boxBorderPadding int
-	labelWrapWidth   int
-	subgraphs        []*subgraph
-	offsetX          int
-	offsetY          int
-	useAscii         bool
+	nodes             []*node
+	edges             []*edge
+	drawing           *drawing
+	grid              map[gridCoord]*node
+	columnWidth       map[int]int
+	rowHeight         map[int]int
+	styleClasses      map[string]styleClass
+	styleType         string
+	paddingX          int
+	paddingY          int
+	graphDirection    string
+	boxBorderPadding  int
+	labelWrapWidth    int
+	edgeLabelPolicy   string
+	edgeLabelMaxWidth int
+	subgraphs         []*subgraph
+	offsetX           int
+	offsetY           int
+	useAscii          bool
 }
 
 type subgraph struct {

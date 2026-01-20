@@ -91,6 +91,8 @@ func (gd *GraphDiagram) Render(config *diagram.Config) (string, error) {
 	gd.properties.paddingY = config.PaddingBetweenY
 	gd.properties.boxBorderPadding = config.BoxBorderPadding
 	gd.properties.labelWrapWidth = config.LabelWrapWidth
+	gd.properties.edgeLabelPolicy = config.EdgeLabelPolicy
+	gd.properties.edgeLabelMaxWidth = config.EdgeLabelMaxWidth
 
 	return drawMap(gd.properties), nil
 }

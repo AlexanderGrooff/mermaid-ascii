@@ -12,17 +12,19 @@ import (
 )
 
 type graphProperties struct {
-	data             *orderedmap.OrderedMap[string, []textEdge]
-	styleClasses     *map[string]styleClass
-	graphDirection   string
-	styleType        string
-	paddingX         int
-	paddingY         int
-	boxBorderPadding int
-	labelWrapWidth   int
-	subgraphs        []*textSubgraph
-	useAscii         bool
-	nodeAliases      map[string]string
+	data              *orderedmap.OrderedMap[string, []textEdge]
+	styleClasses      *map[string]styleClass
+	graphDirection    string
+	styleType         string
+	paddingX          int
+	paddingY          int
+	boxBorderPadding  int
+	labelWrapWidth    int
+	edgeLabelPolicy   string
+	edgeLabelMaxWidth int
+	subgraphs         []*textSubgraph
+	useAscii          bool
+	nodeAliases       map[string]string
 }
 
 type textNode struct {
@@ -263,16 +265,18 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 	data := orderedmap.NewOrderedMap[string, []textEdge]()
 	styleClasses := make(map[string]styleClass)
 	properties := graphProperties{
-		data:             data,
-		styleClasses:     &styleClasses,
-		graphDirection:   "",
-		styleType:        styleType,
-		paddingX:         paddingBetweenX,
-		paddingY:         paddingBetweenY,
-		boxBorderPadding: boxBorderPadding,
-		labelWrapWidth:   0,
-		subgraphs:        []*textSubgraph{},
-		nodeAliases:      make(map[string]string),
+		data:              data,
+		styleClasses:      &styleClasses,
+		graphDirection:    "",
+		styleType:         styleType,
+		paddingX:          paddingBetweenX,
+		paddingY:          paddingBetweenY,
+		boxBorderPadding:  boxBorderPadding,
+		labelWrapWidth:    0,
+		edgeLabelPolicy:   "full",
+		edgeLabelMaxWidth: 0,
+		subgraphs:         []*textSubgraph{},
+		nodeAliases:       make(map[string]string),
 	}
 
 	// Pick up optional padding directives before the graph definition

@@ -158,6 +158,8 @@ func drawMap(properties *graphProperties) string {
 	g.graphDirection = properties.graphDirection
 	g.boxBorderPadding = properties.boxBorderPadding
 	g.labelWrapWidth = properties.labelWrapWidth
+	g.edgeLabelPolicy = properties.edgeLabelPolicy
+	g.edgeLabelMaxWidth = properties.edgeLabelMaxWidth
 	g.useAscii = properties.useAscii
 	g.setLabelLines()
 	g.setSubgraphs(properties.subgraphs)
