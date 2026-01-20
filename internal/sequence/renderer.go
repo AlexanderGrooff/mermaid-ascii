@@ -85,6 +85,14 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 		config = diagram.DefaultConfig()
 	}
 
+	if config.FitPolicy == diagram.FitPolicyAuto && config.MaxWidth > 0 {
+		return fitSequenceToWidth(sd, config)
+	}
+
+	return renderSequenceBase(sd, config)
+}
+
+func renderSequenceBase(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 	chars := Unicode
 	if config.UseAscii {
 		chars = ASCII
