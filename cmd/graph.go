@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"strings"
 	"errors"
 
 	"github.com/elliotchance/orderedmap/v2"
@@ -111,7 +112,10 @@ func (g *graph) setStyleClasses(properties *graphProperties) {
 
 func (g *graph) setLabelLines() {
 	for _, n := range g.nodes {
-		n.labelLines = wrapLabelLines(n.name, g.labelWrapWidth)
+		// Support <br>, <br/>, and \n for multi-line labels
+		name := strings.ReplaceAll(strings.ReplaceAll(n.name, "<br/>", "\n"), "<br>", "\n")
+		// Always split on \n, wrap only if labelWrapWidth > 0
+		n.labelLines = wrapLabelLines(name, g.labelWrapWidth)
 		n.labelWidth = maxLineWidth(n.labelLines)
 	}
 }

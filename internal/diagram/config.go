@@ -116,7 +116,7 @@ func NewConfig(useAscii bool, graphDirection, styleType string) (*Config, error)
 	return config, nil
 }
 
-func NewCLIConfig(useAscii, showCoords, verbose bool, boxBorderPadding, paddingX, paddingY int, graphDirection string) (*Config, error) {
+func NewCLIConfig(useAscii, showCoords, verbose bool, boxBorderPadding, paddingX, paddingY, maxWidth int, graphDirection string) (*Config, error) {
 	defaults := DefaultConfig()
 	config := &Config{
 		UseAscii:                   useAscii,
@@ -130,7 +130,7 @@ func NewCLIConfig(useAscii, showCoords, verbose bool, boxBorderPadding, paddingX
 		LabelWrapWidth:             defaults.LabelWrapWidth,
 		EdgeLabelPolicy:            defaults.EdgeLabelPolicy,
 		EdgeLabelMaxWidth:          defaults.EdgeLabelMaxWidth,
-		MaxWidth:                   defaults.MaxWidth,
+		MaxWidth:                   maxWidth,
 		FitPolicy:                  defaults.FitPolicy,
 		SequenceParticipantSpacing: defaults.SequenceParticipantSpacing,
 		SequenceMessageSpacing:     defaults.SequenceMessageSpacing,
