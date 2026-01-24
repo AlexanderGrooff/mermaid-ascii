@@ -251,7 +251,8 @@ func drawBox(n *node, g graph) *drawing {
 	maxLines := Min(len(labelLines), innerHeight)
 	for lineIdx := 0; lineIdx < maxLines; lineIdx++ {
 		line := labelLines[lineIdx]
-		lineWidth := len(line)
+		runes := []rune(line)
+		lineWidth := len(runes)
 		startX := innerLeft
 		if innerWidth > lineWidth {
 			startX = innerLeft + (innerWidth-lineWidth)/2
@@ -261,7 +262,7 @@ func drawBox(n *node, g graph) *drawing {
 			if startX+x > innerRight {
 				break
 			}
-			boxDrawing[startX+x][startY+lineIdx] = wrapTextInColor(string(line[x]), n.styleClass.styles["color"], g.styleType)
+			boxDrawing[startX+x][startY+lineIdx] = wrapTextInColor(string(runes[x]), n.styleClass.styles["color"], g.styleType)
 		}
 	}
 
