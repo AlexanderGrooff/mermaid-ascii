@@ -1,3 +1,7 @@
+// Copyright (c) 2023 Alexander Grooff
+// Copyright (c) 2026 Gregory R. Warnes
+// MaxWidth CLI flag added by Gregory R. Warnes
+
 package cmd
 
 import (
@@ -19,6 +23,7 @@ var paddingBetweenY = 5
 var graphDirection = ""
 var useAscii = false
 var maxWidth = 0
+var fitDiagram = false
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -65,6 +70,11 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("Invalid configuration: %v", err)
 		}
+		
+		// Automatically enable fitting if width is specified, or if --fit flag is used
+		if maxWidth > 0 || fitDiagram {
+			config.FitPolicy = diagram.FitPolicyAuto
+		}
 
 		// Render diagram (automatically detects type)
 		output, err := RenderDiagram(string(mermaid), config)
@@ -96,6 +106,7 @@ func init() {
 	rootCmd.PersistentFlags().IntVarP(&paddingBetweenY, "paddingY", "y", paddingBetweenY, "Vertical space between nodes")
 	rootCmd.PersistentFlags().IntVarP(&boxBorderPadding, "borderPadding", "p", boxBorderPadding, "Padding between text and border")
     rootCmd.PersistentFlags().IntVarP(&maxWidth, "maxWidth", "w", maxWidth, "Maximum diagram width in characters (0 = unlimited)")
+	rootCmd.PersistentFlags().BoolVar(&fitDiagram, "fit", false, "Force automatic fitting even without width constraint")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.

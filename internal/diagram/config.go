@@ -1,3 +1,7 @@
+// Copyright (c) 2023 Alexander Grooff
+// Copyright (c) 2026 Gregory R. Warnes
+// MaxWidth configuration parameter added by Gregory R. Warnes
+
 package diagram
 
 import "fmt"

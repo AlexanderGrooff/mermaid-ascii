@@ -97,6 +97,33 @@ func graphFitPlans(base graphFitPlan, maxWidth int) []graphFitPlan {
 	wrapTight.labelWrapWidth = reduceWrapWidth(tight.labelWrapWidth, labelWrapWidthFor(maxWidth, tight.boxBorderPadding))
 	addPlan(wrapTight)
 
+	// TODO: Support splitting long linear chains into multiple rows while preserving LR direction
+	//
+	// This would enable wrapping like:
+	//
+	//     A -> B -> C -> D
+	//                    |
+	//                    v
+	//     +--------------+
+    //     |
+	//     v
+	//     E -> F -> G
+	//
+	// Or:
+	//
+	//     A -> B -> C -> D
+	//                    |
+	//                    v
+	//          G <- F <- E
+	//
+	// instead of flipping to TD direction. 
+    //
+	// Requires:
+	// - Detecting linear chain patterns
+	// - Breaking chain at optimal points based on maxWidth
+	// - Creating multiple horizontal rows with vertical connectors
+	// - Calculating row breaks that minimize total height while respecting width constraint
+
 	flippedDirection := flipGraphDirection(base.graphDirection)
 	if flippedDirection != "" {
 		flipped := base

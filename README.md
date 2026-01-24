@@ -127,6 +127,38 @@ $ mermaid-ascii -f ./test.mermaid
           │   │              
           └───┘              
 
+# Multi-line node labels
+$ cat test.mermaid
+graph LR
+A["First<br/>Second"] --> B["Line 1<br>Line 2<br>Line 3"]
+$ mermaid-ascii -f ./test.mermaid
+┌────────┐     ┌────────┐
+│ First  │     │ Line 1 │
+│ Second ├────►│ Line 2 │
+│        │     │ Line 3 │
+└────────┘     └────────┘
+
+# Control diagram width
+$ cat test.mermaid
+graph LR
+A --> B --> C --> D --> E
+$ mermaid-ascii -f ./test.mermaid -w 50
+┌───┐     ┌───┐     ┌───┐
+│   │     │   │     │   │
+│ A ├────►│ B ├────►│ C │
+│   │     │   │     │   │
+└─┬─┘     └───┘     └───┘
+  │                      
+  │                      
+  │                      
+  │                      
+  ▼                      
+┌───┐     ┌───┐          
+│   │     │   │          
+│ D ├────►│ E │          
+│   │     │   │          
+└───┘     └───┘          
+
 # Top-down layout
 $ cat test.mermaid
 graph TD
@@ -355,10 +387,13 @@ Available Commands:
   web         HTTP server for rendering mermaid diagrams.
 
 Flags:
+  -a, --ascii               Don't use extended character set
   -p, --borderPadding int   Padding between text and border (default 1)
   -c, --coords              Show coordinates
-  -f, --file string         Mermaid file to parse
+  -f, --file string         Mermaid file to parse (use '-' for stdin)
+      --fit                 Force automatic fitting even without width constraint
   -h, --help                help for mermaid-ascii
+  -w, --maxWidth int        Maximum diagram width in characters (0 = unlimited)
   -x, --paddingX int        Horizontal space between nodes (default 5)
   -y, --paddingY int        Vertical space between nodes (default 5)
   -v, --verbose             Verbose output
@@ -509,10 +544,12 @@ Note that with `--coords` enabled, the grid-coords shown show the starting locat
 ### Graphs / Flowcharts ✅
 - [x] Graph directions (`graph LR` and `graph TD`)
 - [x] Labelled edges (like `A -->|label| B`)
+- [x] Multi-line node labels (using `<br/>` or `<br>` tags)
 - [x] Multiple arrows on one line (like `A --> B --> C`)
 - [x] `A & B` syntax
 - [x] `classDef` and `class` for colored output
 - [x] Prevent arrows overlapping nodes
+- [x] Control diagram width (via `-w/--maxWidth` flag)
 - [ ] `subgraph` support
 - [ ] Shapes other than rectangles
 - [ ] Diagonal arrows
@@ -547,9 +584,9 @@ The baseline components for Mermaid work, but there are a lot of things that are
 ### Rendering
 
 - [x] Prevent arrows overlapping nodes
+- [x] Control maximum diagram width (via `-w/--maxWidth` flag)
 - [ ] Diagonal arrows
 - [ ] Place nodes in a more compact way
-- [ ] Prevent rendering more than X characters wide (like default 80 for terminal width)
 
 ### Sequence Diagram Improvements
 

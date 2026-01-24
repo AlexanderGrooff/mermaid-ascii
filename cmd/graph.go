@@ -1,3 +1,7 @@
+// Copyright (c) 2023 Alexander Grooff
+// Copyright (c) 2026 Gregory R. Warnes
+// Multi-line label support (<br/> and <br> tags) added by Gregory R. Warnes
+
 package cmd
 
 import (
