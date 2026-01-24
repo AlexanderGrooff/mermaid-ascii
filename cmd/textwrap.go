@@ -2,7 +2,8 @@ package cmd
 
 import (
 	"strings"
-	"unicode/utf8"
+
+	"github.com/mattn/go-runewidth"
 )
 
 func wrapLabelLines(text string, width int) []string {
@@ -28,7 +29,7 @@ func splitLabelLines(text string) []string {
 }
 
 func wrapLine(line string, width int) []string {
-	if width <= 0 || utf8.RuneCountInString(line) <= width {
+	if width <= 0 || runewidth.StringWidth(line) <= width {
 		return []string{line}
 	}
 	words := strings.Fields(line)
@@ -37,13 +38,13 @@ func wrapLine(line string, width int) []string {
 	}
 	lines := []string{}
 	current := ""
-	currentLen := 0
+	currentWidth := 0
 	for _, word := range words {
-		wordLen := utf8.RuneCountInString(word)
+		wordWidth := runewidth.StringWidth(word)
 		if current == "" {
-			if wordLen <= width {
+			if wordWidth <= width {
 				current = word
-				currentLen = wordLen
+				currentWidth = wordWidth
 				continue
 			}
 			parts := hardWrapWord(word, width)
@@ -51,20 +52,20 @@ func wrapLine(line string, width int) []string {
 				lines = append(lines, parts[:len(parts)-1]...)
 			}
 			current = parts[len(parts)-1]
-			currentLen = utf8.RuneCountInString(current)
+			currentWidth = runewidth.StringWidth(current)
 			continue
 		}
-		if currentLen+1+wordLen <= width {
+		if currentWidth+1+wordWidth <= width {
 			current += " " + word
-			currentLen += 1 + wordLen
+			currentWidth += 1 + wordWidth
 			continue
 		}
 		lines = append(lines, current)
 		current = ""
-		currentLen = 0
-		if wordLen <= width {
+		currentWidth = 0
+		if wordWidth <= width {
 			current = word
-			currentLen = wordLen
+			currentWidth = wordWidth
 			continue
 		}
 		parts := hardWrapWord(word, width)
@@ -72,7 +73,7 @@ func wrapLine(line string, width int) []string {
 			lines = append(lines, parts[:len(parts)-1]...)
 		}
 		current = parts[len(parts)-1]
-		currentLen = utf8.RuneCountInString(current)
+		currentWidth = runewidth.StringWidth(current)
 	}
 	if current != "" {
 		lines = append(lines, current)
@@ -84,18 +85,27 @@ func wrapLine(line string, width int) []string {
 }
 
 func hardWrapWord(word string, width int) []string {
-	if width <= 0 || utf8.RuneCountInString(word) <= width {
+	if width <= 0 || runewidth.StringWidth(word) <= width {
 		return []string{word}
 	}
 	parts := []string{}
 	runes := []rune(word)
-	for len(runes) > width {
-		parts = append(parts, string(runes[:width]))
-		runes = runes[width:]
+	currentPart := []rune{}
+	currentWidth := 0
+	
+	for _, r := range runes {
+		runeW := runewidth.RuneWidth(r)
+		if currentWidth+runeW > width && len(currentPart) > 0 {
+			parts = append(parts, string(currentPart))
+			currentPart = []rune{r}
+			currentWidth = runeW
+		} else {
+			currentPart = append(currentPart, r)
+			currentWidth += runeW
+		}
 	}
-	word = string(runes)
-	if word != "" {
-		parts = append(parts, word)
+	if len(currentPart) > 0 {
+		parts = append(parts, string(currentPart))
 	}
 	if len(parts) == 0 {
 		return []string{""}
@@ -106,7 +116,7 @@ func hardWrapWord(word string, width int) []string {
 func maxLineWidth(lines []string) int {
 	maxWidth := 0
 	for _, line := range lines {
-		lineWidth := utf8.RuneCountInString(line)
+		lineWidth := runewidth.StringWidth(line)
 		if lineWidth > maxWidth {
 			maxWidth = lineWidth
 		}

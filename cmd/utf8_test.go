@@ -6,6 +6,46 @@ import (
 	"github.com/AlexanderGrooff/mermaid-ascii/internal/diagram"
 )
 
+// TestUTF8MultiLineNode tests that multi-line nodes with UTF-8 characters
+// render properly without content being split across multiple boxes.
+func TestUTF8MultiLineNode(t *testing.T) {
+	input := `flowchart TD
+		a["┌─ TIMER<br/>├─> Step 1<br/>└─> Step 2"]
+		b["日本語 🎉"]
+		a --> b`
+	
+	config := diagram.NewTestConfig(true, "cli")
+	output, err := RenderDiagram(input, config)
+	if err != nil {
+		t.Fatalf("RenderDiagram failed: %v", err)
+	}
+
+	// Verify all UTF-8 characters are present
+	expectedChars := []string{"┌─", "├─>", "└─>", "日本語", "🎉"}
+	for _, char := range expectedChars {
+		if !contains(output, char) {
+			t.Errorf("Output missing expected UTF-8 character %q\nGot:\n%s", char, output)
+		}
+	}
+
+	// Verify node content stays together (not split across boxes)
+	// Each line should appear on its own line in the output
+	lines := []string{"TIMER", "Step 1", "Step 2"}
+	for _, line := range lines {
+		if !contains(output, line) {
+			t.Errorf("Output missing expected line content %q\nGot:\n%s", line, output)
+		}
+	}
+
+	// Verify no corruption markers
+	if contains(output, "\ufffd") || contains(output, "ââ") {
+		t.Errorf("Output contains UTF-8 corruption markers\nGot:\n%s", output)
+	}
+
+	// Debug: Print actual output for visual inspection
+	t.Logf("Rendered output:\n%s", output)
+}
+
 // TestUTF8Characters verifies that Unicode characters (including multi-byte UTF-8)
 // are rendered correctly without corruption.
 func TestUTF8Characters(t *testing.T) {

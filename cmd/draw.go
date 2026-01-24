@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gookit/color"
+	"github.com/mattn/go-runewidth"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -249,20 +250,34 @@ func drawBox(n *node, g graph) *drawing {
 		startY = innerTop + (innerHeight-len(labelLines))/2
 	}
 	maxLines := Min(len(labelLines), innerHeight)
+	// Disable centering for multi-line labels to preserve alignment (e.g., tree structures)
+	isMultiLine := len(labelLines) > 1
 	for lineIdx := 0; lineIdx < maxLines; lineIdx++ {
 		line := labelLines[lineIdx]
 		runes := []rune(line)
-		lineWidth := len(runes)
+		// Use display width (accounts for CJK full-width chars, emoji, etc.)
+		lineWidth := runewidth.StringWidth(line)
 		startX := innerLeft
-		if innerWidth > lineWidth {
+		// Only center single-line labels to avoid breaking alignment
+		if !isMultiLine && innerWidth > lineWidth {
 			startX = innerLeft + (innerWidth-lineWidth)/2
 		}
-		maxChars := Min(lineWidth, innerWidth)
-		for x := 0; x < maxChars; x++ {
-			if startX+x > innerRight {
+		// Place characters sequentially - terminal handles the visual width
+		gridPos := 0
+		displayWidth := 0
+		for _, r := range runes {
+			// Check if character will fit in display width
+			charWidth := runewidth.RuneWidth(r)
+			if displayWidth+charWidth > innerWidth {
 				break
 			}
-			boxDrawing[startX+x][startY+lineIdx] = wrapTextInColor(string(runes[x]), n.styleClass.styles["color"], g.styleType)
+			if startX+gridPos > innerRight {
+				break
+			}
+			// Place character at next grid position
+			boxDrawing[startX+gridPos][startY+lineIdx] = wrapTextInColor(string(r), n.styleClass.styles["color"], g.styleType)
+			gridPos++
+			displayWidth += charWidth
 		}
 	}
 
