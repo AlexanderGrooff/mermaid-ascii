@@ -1,3 +1,7 @@
+// Copyright (c) 2023 Alexander Grooff
+// Copyright (c) 2026 Gregory R. Warnes
+// MaxWidth configuration parameter added by Gregory R. Warnes
+
 package diagram
 
 import "fmt"
@@ -32,6 +36,46 @@ type Config struct {
 	// This controls whether graphs use colored output (html) or plain text (cli)
 	StyleType string
 
+	// LabelWrapWidth wraps graph node labels to this width. Zero disables wrapping.
+	LabelWrapWidth int
+
+	// EdgeLabelPolicy controls how graph edge labels are handled.
+	// Use "full" to keep labels, "ellipsis" to truncate, or "drop" to remove them.
+	EdgeLabelPolicy string
+
+	// EdgeLabelMaxWidth is the maximum width for edge labels. Zero disables trimming.
+	EdgeLabelMaxWidth int
+
+	// MaxWidth constrains output width in characters. Zero disables fitting.
+	MaxWidth int
+
+	// FitPolicy controls how the renderer fits diagrams to MaxWidth.
+	// Use FitPolicyNone to disable fitting and FitPolicyAuto for heuristics.
+	FitPolicy string
+
+	// CenterMultiLineLabels controls whether multi-line node labels are centered as a block.
+	// When true, each line is centered individually.
+	// When false, all lines are padded to the same width before centering, so that they will 
+	// be left justified relative to each other, but centered within the block.
+	// For example:
+	//   CenterMultiLineLabels: true:
+	//      +----------------+
+	//      |                |
+	//      | ┌─ TIMER TEXT  |
+	//      | ├─> Step 1     |
+	//      | └─> Step 2     |
+	//      |                |
+	//      +----------------+
+	//   CenterMultiLineLabels: false:
+	//      +----------------+
+	//      |                |
+	//      | ┌─ TIMER TEXT  |
+	//      |   ├─> Step 1   |
+	//      |   └─> Step 2   |
+	//      |                |
+	//      +----------------+
+	CenterMultiLineLabels bool
+
 	// --- Sequence diagram-specific configuration ---
 
 	// SequenceParticipantSpacing is the horizontal space between participants
@@ -52,11 +96,17 @@ func DefaultConfig() *Config {
 		ShowCoords: false,
 		Verbose:    false,
 		// Graph defaults
-		BoxBorderPadding: 1,
-		PaddingBetweenX:  5,
-		PaddingBetweenY:  5,
-		GraphDirection:   "LR",
-		StyleType:        "cli",
+		BoxBorderPadding:  1,
+		PaddingBetweenX:   5,
+		PaddingBetweenY:   5,
+		GraphDirection:    "",
+		StyleType:         "cli",
+		LabelWrapWidth:    0,
+		EdgeLabelPolicy:   EdgeLabelPolicyFull,
+		EdgeLabelMaxWidth:     0,
+		MaxWidth:              0,
+		FitPolicy:             FitPolicyNone,
+		CenterMultiLineLabels: false,
 		// Sequence diagram defaults
 		SequenceParticipantSpacing: 5,
 		SequenceMessageSpacing:     1,
@@ -77,6 +127,11 @@ func NewConfig(useAscii bool, graphDirection, styleType string) (*Config, error)
 		PaddingBetweenY:            5,
 		GraphDirection:             graphDirection,
 		StyleType:                  styleType,
+		LabelWrapWidth:             0,
+		EdgeLabelPolicy:            EdgeLabelPolicyFull,
+		EdgeLabelMaxWidth:          0,
+		MaxWidth:                   0,
+		FitPolicy:                  FitPolicyNone,
 		SequenceParticipantSpacing: 5,
 		SequenceMessageSpacing:     1,
 		SequenceSelfMessageWidth:   4,
@@ -89,7 +144,7 @@ func NewConfig(useAscii bool, graphDirection, styleType string) (*Config, error)
 	return config, nil
 }
 
-func NewCLIConfig(useAscii, showCoords, verbose bool, boxBorderPadding, paddingX, paddingY int, graphDirection string) (*Config, error) {
+func NewCLIConfig(useAscii, showCoords, verbose bool, boxBorderPadding, paddingX, paddingY, maxWidth int, graphDirection string, centerMultiLineLabels bool) (*Config, error) {
 	defaults := DefaultConfig()
 	config := &Config{
 		UseAscii:                   useAscii,
@@ -100,6 +155,12 @@ func NewCLIConfig(useAscii, showCoords, verbose bool, boxBorderPadding, paddingX
 		PaddingBetweenY:            paddingY,
 		GraphDirection:             graphDirection,
 		StyleType:                  "cli",
+		LabelWrapWidth:             defaults.LabelWrapWidth,
+		EdgeLabelPolicy:            defaults.EdgeLabelPolicy,
+		EdgeLabelMaxWidth:          defaults.EdgeLabelMaxWidth,
+		MaxWidth:                   maxWidth,
+		FitPolicy:                  defaults.FitPolicy,
+		CenterMultiLineLabels:      centerMultiLineLabels,
 		SequenceParticipantSpacing: defaults.SequenceParticipantSpacing,
 		SequenceMessageSpacing:     defaults.SequenceMessageSpacing,
 		SequenceSelfMessageWidth:   defaults.SequenceSelfMessageWidth,
@@ -121,8 +182,13 @@ func NewWebConfig(useAscii bool, boxBorderPadding, paddingX, paddingY int) (*Con
 		BoxBorderPadding:           boxBorderPadding,
 		PaddingBetweenX:            paddingX,
 		PaddingBetweenY:            paddingY,
-		GraphDirection:             "LR",
+		GraphDirection:             "",
 		StyleType:                  "html",
+		LabelWrapWidth:             defaults.LabelWrapWidth,
+		EdgeLabelPolicy:            defaults.EdgeLabelPolicy,
+		EdgeLabelMaxWidth:          defaults.EdgeLabelMaxWidth,
+		MaxWidth:                   defaults.MaxWidth,
+		FitPolicy:                  defaults.FitPolicy,
 		SequenceParticipantSpacing: defaults.SequenceParticipantSpacing,
 		SequenceMessageSpacing:     defaults.SequenceMessageSpacing,
 		SequenceSelfMessageWidth:   defaults.SequenceSelfMessageWidth,
@@ -147,6 +213,13 @@ func NewTestConfig(useAscii bool, styleType string) *Config {
 // Validate checks if the configuration values are valid.
 // Returns an error if any values are invalid or would cause rendering issues.
 func (c *Config) Validate() error {
+	if c.MaxWidth < 0 {
+		return &ConfigError{Field: "MaxWidth", Value: c.MaxWidth, Message: "must be non-negative"}
+	}
+	if c.FitPolicy != "" && c.FitPolicy != FitPolicyNone && c.FitPolicy != FitPolicyAuto {
+		return &ConfigError{Field: "FitPolicy", Value: c.FitPolicy, Message: "must be \"none\" or \"auto\""}
+	}
+
 	// Validate graph configuration
 	if c.BoxBorderPadding < 0 {
 		return &ConfigError{Field: "BoxBorderPadding", Value: c.BoxBorderPadding, Message: "must be non-negative"}
@@ -157,7 +230,19 @@ func (c *Config) Validate() error {
 	if c.PaddingBetweenY < 0 {
 		return &ConfigError{Field: "PaddingBetweenY", Value: c.PaddingBetweenY, Message: "must be non-negative"}
 	}
-	if c.GraphDirection != "LR" && c.GraphDirection != "TD" {
+	if c.LabelWrapWidth < 0 {
+		return &ConfigError{Field: "LabelWrapWidth", Value: c.LabelWrapWidth, Message: "must be non-negative"}
+	}
+	if c.EdgeLabelMaxWidth < 0 {
+		return &ConfigError{Field: "EdgeLabelMaxWidth", Value: c.EdgeLabelMaxWidth, Message: "must be non-negative"}
+	}
+	if c.EdgeLabelPolicy != "" &&
+		c.EdgeLabelPolicy != EdgeLabelPolicyFull &&
+		c.EdgeLabelPolicy != EdgeLabelPolicyEllipsis &&
+		c.EdgeLabelPolicy != EdgeLabelPolicyDrop {
+		return &ConfigError{Field: "EdgeLabelPolicy", Value: c.EdgeLabelPolicy, Message: "must be \"full\", \"ellipsis\", or \"drop\""}
+	}
+	if c.GraphDirection != "" && c.GraphDirection != "LR" && c.GraphDirection != "TD" {
 		return &ConfigError{Field: "GraphDirection", Value: c.GraphDirection, Message: "must be \"LR\" or \"TD\""}
 	}
 	if c.StyleType != "cli" && c.StyleType != "html" {

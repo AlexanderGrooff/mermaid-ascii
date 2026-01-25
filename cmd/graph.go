@@ -1,6 +1,11 @@
+// Copyright (c) 2023 Alexander Grooff
+// Copyright (c) 2026 Gregory R. Warnes
+// Multi-line label support (<br/> and <br> tags) added by Gregory R. Warnes
+
 package cmd
 
 import (
+	"strings"
 	"errors"
 
 	"github.com/elliotchance/orderedmap/v2"
@@ -30,20 +35,26 @@ func (g graph) lineToDrawing(line []gridCoord) []drawingCoord {
 }
 
 type graph struct {
-	nodes        []*node
-	edges        []*edge
-	drawing      *drawing
-	grid         map[gridCoord]*node
-	columnWidth  map[int]int
-	rowHeight    map[int]int
-	styleClasses map[string]styleClass
-	styleType    string
-	paddingX     int
-	paddingY     int
-	subgraphs    []*subgraph
-	offsetX      int
-	offsetY      int
-	useAscii     bool
+	nodes                 []*node
+	edges                 []*edge
+	drawing               *drawing
+	grid                  map[gridCoord]*node
+	columnWidth           map[int]int
+	rowHeight             map[int]int
+	styleClasses          map[string]styleClass
+	styleType             string
+	paddingX              int
+	paddingY              int
+	graphDirection        string
+	boxBorderPadding      int
+	labelWrapWidth        int
+	edgeLabelPolicy       string
+	edgeLabelMaxWidth     int
+	subgraphs             []*subgraph
+	offsetX               int
+	offsetY               int
+	useAscii              bool
+	centerMultiLineLabels bool
 }
 
 type subgraph struct {
@@ -101,6 +112,16 @@ func (g *graph) setStyleClasses(properties *graphProperties) {
 			log.Debugf("Setting style class for node %s to %s", n.name, n.styleClassName)
 			(*n).styleClass = g.styleClasses[n.styleClassName]
 		}
+	}
+}
+
+func (g *graph) setLabelLines() {
+	for _, n := range g.nodes {
+		// Support <br>, <br/>, and \n for multi-line labels
+		name := strings.ReplaceAll(strings.ReplaceAll(n.name, "<br/>", "\n"), "<br>", "\n")
+		// Always split on \n, wrap only if labelWrapWidth > 0
+		n.labelLines = wrapLabelLines(name, g.labelWrapWidth)
+		n.labelWidth = maxLineWidth(n.labelLines)
 	}
 }
 
@@ -194,7 +215,7 @@ func (g *graph) createMapping() {
 
 	// Separate root nodes by whether they're in subgraphs, but only if we have both types
 	// AND there are edges in subgraphs (indicating intentional layout structure)
-	shouldSeparate := graphDirection == "LR" && hasExternalRoots && hasSubgraphRootsWithEdges
+	shouldSeparate := g.graphDirection == "LR" && hasExternalRoots && hasSubgraphRootsWithEdges
 
 	externalRootNodes := []*node{}
 	subgraphRootNodes := []*node{}
@@ -214,7 +235,7 @@ func (g *graph) createMapping() {
 	// Place external root nodes first at level 0
 	for _, n := range externalRootNodes {
 		var mappingCoord *gridCoord
-		if graphDirection == "LR" {
+		if g.graphDirection == "LR" {
 			mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: 0, y: highestPositionPerLevel[0]})
 		} else {
 			mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: highestPositionPerLevel[0], y: 0})
@@ -230,7 +251,7 @@ func (g *graph) createMapping() {
 		subgraphLevel := 4
 		for _, n := range subgraphRootNodes {
 			var mappingCoord *gridCoord
-			if graphDirection == "LR" {
+			if g.graphDirection == "LR" {
 				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: subgraphLevel, y: highestPositionPerLevel[subgraphLevel]})
 			} else {
 				mappingCoord = g.reserveSpotInGrid(g.nodes[n.index], &gridCoord{x: highestPositionPerLevel[subgraphLevel], y: subgraphLevel})
@@ -245,7 +266,7 @@ func (g *graph) createMapping() {
 		log.Debugf("Creating mapping for node %s at %v", n.name, n.gridCoord)
 		var childLevel int
 		// Next column is 4 coords further. This is because every node is 3 coords wide + 1 coord inbetween.
-		if graphDirection == "LR" {
+		if g.graphDirection == "LR" {
 			childLevel = n.gridCoord.x + 4
 		} else {
 			childLevel = n.gridCoord.y + 4
@@ -258,7 +279,7 @@ func (g *graph) createMapping() {
 			}
 
 			var mappingCoord *gridCoord
-			if graphDirection == "LR" {
+			if g.graphDirection == "LR" {
 				mappingCoord = g.reserveSpotInGrid(g.nodes[child.index], &gridCoord{x: childLevel, y: highestPosition})
 			} else {
 				mappingCoord = g.reserveSpotInGrid(g.nodes[child.index], &gridCoord{x: highestPosition, y: childLevel})

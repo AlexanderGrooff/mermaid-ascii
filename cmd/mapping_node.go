@@ -6,6 +6,8 @@ import (
 
 type node struct {
 	name           string
+	labelLines     []string
+	labelWidth     int
 	drawing        *drawing
 	drawingCoord   *drawingCoord
 	gridCoord      *gridCoord
@@ -30,16 +32,25 @@ func (n *node) setDrawing(g graph) *drawing {
 }
 
 func (g *graph) setColumnWidth(n *node) {
+	labelLines := n.labelLines
+	if len(labelLines) == 0 {
+		labelLines = []string{n.name}
+	}
+	labelWidth := n.labelWidth
+	if labelWidth == 0 {
+		labelWidth = maxLineWidth(labelLines)
+	}
+
 	// For every node there are three columns:
 	// - 2 lines of border
 	// - 1 line of text
 	// - 2x padding
 	// - 2x margin
 	col1 := 1
-	col2 := 2*boxBorderPadding + len(n.name)
+	col2 := 2*g.boxBorderPadding + labelWidth
 	col3 := 1
 	colsToBePlaced := []int{col1, col2, col3}
-	rowsToBePlaced := []int{1, 1 + 2*boxBorderPadding, 1} // Border, padding + line, border
+	rowsToBePlaced := []int{1, len(labelLines) + 2*g.boxBorderPadding, 1} // Border, padding + line(s), border
 
 	for idx, col := range colsToBePlaced {
 		// Set new width for column if the size increased
@@ -90,7 +101,7 @@ func (g *graph) reserveSpotInGrid(n *node, requestedCoord *gridCoord) *gridCoord
 	if g.grid[*requestedCoord] != nil {
 		log.Debugf("Coord %d,%d is already taken", requestedCoord.x, requestedCoord.y)
 		// Next column is 4 coords further. This is because every node is 3 coords wide + 1 coord inbetween.
-		if graphDirection == "LR" {
+		if g.graphDirection == "LR" {
 			return g.reserveSpotInGrid(n, &gridCoord{x: requestedCoord.x, y: requestedCoord.y + 4})
 		} else {
 			return g.reserveSpotInGrid(n, &gridCoord{x: requestedCoord.x + 4, y: requestedCoord.y})

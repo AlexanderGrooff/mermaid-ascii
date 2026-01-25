@@ -231,6 +231,703 @@ func TestArrowTypeString(t *testing.T) {
 	}
 }
 
+func TestParseNoteQuotedActorSameAsMessage(t *testing.T) {
+	input := `sequenceDiagram
+		"My Service"->>B: Hello
+		Note over "My Service": This is a note`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(sd.Participants) != 2 {
+		t.Fatalf("expected 2 participants, got %d: %v", len(sd.Participants), sd.Participants)
+	}
+
+	if sd.Participants[0].ID != "My Service" {
+		t.Errorf("expected first participant ID to be 'My Service', got %q", sd.Participants[0].ID)
+	}
+
+	if len(sd.Elements) != 2 {
+		t.Fatalf("expected 2 elements, got %d", len(sd.Elements))
+	}
+
+	msg, ok := sd.Elements[0].(*Message)
+	if !ok {
+		t.Fatalf("expected Message, got %T", sd.Elements[0])
+	}
+
+	note, ok := sd.Elements[1].(*Note)
+	if !ok {
+		t.Fatalf("expected Note, got %T", sd.Elements[1])
+	}
+
+	if msg.From != note.Actors[0] {
+		t.Errorf("message From participant (%p, ID=%q) should be same as note actor (%p, ID=%q)",
+			msg.From, msg.From.ID, note.Actors[0], note.Actors[0].ID)
+	}
+}
+
+func TestParseNoteOverSingleActor(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		Note over A: This is a note`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(sd.Elements) != 1 {
+		t.Fatalf("expected 1 element, got %d", len(sd.Elements))
+	}
+
+	note, ok := sd.Elements[0].(*Note)
+	if !ok {
+		t.Fatalf("expected Note, got %T", sd.Elements[0])
+	}
+
+	if note.Position != NoteOver {
+		t.Errorf("expected NoteOver, got %v", note.Position)
+	}
+	if len(note.Actors) != 1 || note.Actors[0].ID != "A" {
+		t.Errorf("expected 1 actor with ID 'A', got %v", note.Actors)
+	}
+	if note.Text != "This is a note" {
+		t.Errorf("expected text 'This is a note', got %q", note.Text)
+	}
+}
+
+func TestParseNoteOverMultipleActors(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		Note over A,B: Spanning note`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(sd.Elements) != 1 {
+		t.Fatalf("expected 1 element, got %d", len(sd.Elements))
+	}
+
+	note, ok := sd.Elements[0].(*Note)
+	if !ok {
+		t.Fatalf("expected Note, got %T", sd.Elements[0])
+	}
+
+	if note.Position != NoteOver {
+		t.Errorf("expected NoteOver, got %v", note.Position)
+	}
+	if len(note.Actors) != 2 {
+		t.Fatalf("expected 2 actors, got %d", len(note.Actors))
+	}
+	if note.Actors[0].ID != "A" || note.Actors[1].ID != "B" {
+		t.Errorf("expected actors A and B, got %v and %v", note.Actors[0].ID, note.Actors[1].ID)
+	}
+	if note.Text != "Spanning note" {
+		t.Errorf("expected text 'Spanning note', got %q", note.Text)
+	}
+}
+
+func TestRenderNoteOver(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		Note over A: Test note`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "Test note") {
+		t.Errorf("output should contain note text:\n%s", output)
+	}
+}
+
+func TestRenderNoteOverLongText(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		Note over A: This is a very long note text that should expand the box`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	longText := "This is a very long note text that should expand the box"
+	if !strings.Contains(output, longText) {
+		t.Errorf("output should contain full note text:\n%s", output)
+	}
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "TopLeft") || strings.Contains(line, "TopRight") {
+			continue
+		}
+		for i, r := range line {
+			if r == '│' || r == '|' {
+				if i > 0 && i < len(line)-1 {
+					prev := rune(line[i-1])
+					next := rune(line[i+1])
+					if (prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z') {
+						t.Errorf("border character at position %d may be overwriting text: %s", i, line)
+					}
+					if (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') {
+						if next != 'T' {
+							t.Errorf("border character at position %d may be adjacent to truncated text: %s", i, line)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestParseNoteLeftRight(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		wantPosition NotePosition
+		wantActorID  string
+		wantText     string
+	}{
+		{
+			name: "note left of",
+			input: `sequenceDiagram
+				participant A
+				Note left of A: Left note`,
+			wantPosition: NoteLeftOf,
+			wantActorID:  "A",
+			wantText:     "Left note",
+		},
+		{
+			name: "note right of",
+			input: `sequenceDiagram
+				participant B
+				Note right of B: Right note`,
+			wantPosition: NoteRightOf,
+			wantActorID:  "B",
+			wantText:     "Right note",
+		},
+		{
+			name: "note left of case insensitive",
+			input: `sequenceDiagram
+				participant C
+				NOTE LEFT OF C: Case test`,
+			wantPosition: NoteLeftOf,
+			wantActorID:  "C",
+			wantText:     "Case test",
+		},
+		{
+			name: "note right of case insensitive",
+			input: `sequenceDiagram
+				participant D
+				note RIGHT OF D: Mixed case`,
+			wantPosition: NoteRightOf,
+			wantActorID:  "D",
+			wantText:     "Mixed case",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sd, err := Parse(tt.input)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(sd.Elements) != 1 {
+				t.Fatalf("expected 1 element, got %d", len(sd.Elements))
+			}
+
+			note, ok := sd.Elements[0].(*Note)
+			if !ok {
+				t.Fatalf("expected Note, got %T", sd.Elements[0])
+			}
+
+			if note.Position != tt.wantPosition {
+				t.Errorf("expected position %v, got %v", tt.wantPosition, note.Position)
+			}
+			if len(note.Actors) != 1 || note.Actors[0].ID != tt.wantActorID {
+				t.Errorf("expected actor %q, got %v", tt.wantActorID, note.Actors)
+			}
+			if note.Text != tt.wantText {
+				t.Errorf("expected text %q, got %q", tt.wantText, note.Text)
+			}
+		})
+	}
+}
+
+func TestRenderNoteRightOf(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		Note right of B: Right note`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "Right note") {
+		t.Errorf("output should contain note text:\n%s", output)
+	}
+}
+
+func TestRenderNoteRightOfEdgeBoundary(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		Note right of A: Hi`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "Hi") {
+		t.Errorf("output should contain note text:\n%s", output)
+	}
+}
+
+func TestRenderNoteLeftOf(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		Note left of A: Left note`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "Left note") {
+		t.Errorf("output should contain note text:\n%s", output)
+	}
+}
+
+func TestParseBlockLoop(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		loop Every minute
+			A->>B: Ping
+			B-->>A: Pong
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(sd.Elements) != 1 {
+		t.Fatalf("expected 1 element, got %d", len(sd.Elements))
+	}
+
+	block, ok := sd.Elements[0].(*Block)
+	if !ok {
+		t.Fatalf("expected Block, got %T", sd.Elements[0])
+	}
+
+	if block.Type != BlockLoop {
+		t.Errorf("expected BlockLoop, got %v", block.Type)
+	}
+	if block.Label != "Every minute" {
+		t.Errorf("expected label 'Every minute', got %q", block.Label)
+	}
+	if len(block.Sections) != 1 {
+		t.Errorf("expected 1 section, got %d", len(block.Sections))
+	}
+	if len(block.Sections[0].Elements) != 2 {
+		t.Errorf("expected 2 elements in section, got %d", len(block.Sections[0].Elements))
+	}
+}
+
+func TestParseBlockAltElse(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		alt Success
+			A->>B: 200 OK
+		else Failure
+			A->>B: 500 Error
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	block, ok := sd.Elements[0].(*Block)
+	if !ok {
+		t.Fatalf("expected Block, got %T", sd.Elements[0])
+	}
+
+	if block.Type != BlockAlt {
+		t.Errorf("expected BlockAlt, got %v", block.Type)
+	}
+	if len(block.Sections) != 2 {
+		t.Errorf("expected 2 sections, got %d", len(block.Sections))
+	}
+	if block.Sections[1].Label != "Failure" {
+		t.Errorf("expected section label 'Failure', got %q", block.Sections[1].Label)
+	}
+}
+
+func TestParseBlockParAnd(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		participant C
+		par Task 1
+			A->>B: Do X
+		and Task 2
+			A->>C: Do Y
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	block, ok := sd.Elements[0].(*Block)
+	if !ok {
+		t.Fatalf("expected Block, got %T", sd.Elements[0])
+	}
+
+	if block.Type != BlockPar {
+		t.Errorf("expected BlockPar, got %v", block.Type)
+	}
+	if len(block.Sections) != 2 {
+		t.Errorf("expected 2 sections, got %d", len(block.Sections))
+	}
+}
+
+func TestParseBlockNested(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		loop Outer
+			alt Check
+				A->>B: Request
+			else Skip
+				A->>B: Skip
+			end
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	outerBlock, ok := sd.Elements[0].(*Block)
+	if !ok {
+		t.Fatalf("expected Block, got %T", sd.Elements[0])
+	}
+
+	if outerBlock.Type != BlockLoop {
+		t.Errorf("expected BlockLoop, got %v", outerBlock.Type)
+	}
+
+	innerBlock, ok := outerBlock.Sections[0].Elements[0].(*Block)
+	if !ok {
+		t.Fatalf("expected nested Block, got %T", outerBlock.Sections[0].Elements[0])
+	}
+
+	if innerBlock.Type != BlockAlt {
+		t.Errorf("expected nested BlockAlt, got %v", innerBlock.Type)
+	}
+}
+
+func TestParseBlockDividerAsFirstContent(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		alt
+		else something
+			A->>B: message
+		end`
+
+	_, err := Parse(input)
+	if err == nil {
+		t.Fatal("expected error for divider as first content")
+	}
+	if !strings.Contains(err.Error(), "divider") || !strings.Contains(err.Error(), "cannot be first content") {
+		t.Errorf("expected error about divider as first content, got: %v", err)
+	}
+}
+
+func TestRenderBlockLoop(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		loop Every minute
+			A->>B: Ping
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "loop") {
+		t.Errorf("output should contain 'loop':\n%s", output)
+	}
+	if !strings.Contains(output, "Every minute") {
+		t.Errorf("output should contain label:\n%s", output)
+	}
+	if !strings.Contains(output, "Ping") {
+		t.Errorf("output should contain message:\n%s", output)
+	}
+}
+
+func TestRenderBlockAltElse(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		alt Success
+			A->>B: OK
+		else Error
+			A->>B: Fail
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "alt") {
+		t.Errorf("output should contain 'alt':\n%s", output)
+	}
+	if !strings.Contains(output, "Error") {
+		t.Errorf("output should contain 'Error' divider:\n%s", output)
+	}
+}
+
+func TestRenderBlockNested(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		loop Retry
+			opt Check
+				A->>B: Verify
+			end
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "loop") {
+		t.Errorf("output should contain 'loop':\n%s", output)
+	}
+	if !strings.Contains(output, "opt") {
+		t.Errorf("output should contain nested 'opt':\n%s", output)
+	}
+}
+
+func TestRenderBlockNestedIndentation(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		loop Outer
+			opt Inner
+				A->>B: Message
+			end
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	lines := strings.Split(output, "\n")
+
+	var outerTopLineIdx, innerTopLineIdx int
+	outerTopLineIdx, innerTopLineIdx = -1, -1
+
+	for i, line := range lines {
+		if strings.Contains(line, "loop Outer") {
+			outerTopLineIdx = i
+		}
+		if strings.Contains(line, "opt Inner") {
+			innerTopLineIdx = i
+		}
+	}
+
+	if outerTopLineIdx == -1 || innerTopLineIdx == -1 {
+		t.Fatalf("could not find block header lines in output:\n%s", output)
+	}
+
+	isTopLeftCorner := func(ch rune) bool {
+		return ch == '┌' || ch == '╭' || ch == '╔' || ch == '╓'
+	}
+	isTopRightCorner := func(ch rune) bool {
+		return ch == '┐' || ch == '╮' || ch == '╗' || ch == '╖'
+	}
+
+	findTopLeftCorner := func(lineIdx int) int {
+		for i := lineIdx; i >= 0; i-- {
+			runes := []rune(lines[i])
+			for j, ch := range runes {
+				if isTopLeftCorner(ch) {
+					return j
+				}
+			}
+		}
+		return -1
+	}
+
+	findTopRightCorner := func(lineIdx int) int {
+		for i := lineIdx; i >= 0; i-- {
+			runes := []rune(lines[i])
+			for j := len(runes) - 1; j >= 0; j-- {
+				if isTopRightCorner(runes[j]) {
+					return j
+				}
+			}
+		}
+		return -1
+	}
+
+	outerLeft := findTopLeftCorner(outerTopLineIdx)
+	innerLeft := findTopLeftCorner(innerTopLineIdx)
+
+	outerStartLine := -1
+	for i := outerTopLineIdx; i >= 0; i-- {
+		runes := []rune(lines[i])
+		hasLeft, hasRight := false, false
+		for _, ch := range runes {
+			if isTopLeftCorner(ch) {
+				hasLeft = true
+			}
+			if isTopRightCorner(ch) {
+				hasRight = true
+			}
+		}
+		if hasLeft && hasRight {
+			outerStartLine = i
+			break
+		}
+	}
+	outerRight := findTopRightCorner(outerStartLine + 1)
+
+	innerStartLine := -1
+	for i := innerTopLineIdx; i >= 0; i-- {
+		runes := []rune(lines[i])
+		count := 0
+		for _, ch := range runes {
+			if isTopLeftCorner(ch) {
+				count++
+			}
+		}
+		if count >= 1 {
+			innerStartLine = i
+			break
+		}
+	}
+	runes := []rune(lines[innerStartLine])
+	innerRight := -1
+	for j := len(runes) - 1; j >= 0; j-- {
+		if isTopRightCorner(runes[j]) {
+			innerRight = j
+			break
+		}
+	}
+
+	if outerLeft == -1 || innerLeft == -1 || outerRight == -1 || innerRight == -1 {
+		t.Fatalf("could not find block boundaries (outer: %d-%d, inner: %d-%d) in output:\n%s",
+			outerLeft, outerRight, innerLeft, innerRight, output)
+	}
+
+	if innerLeft <= outerLeft {
+		t.Errorf("inner block left edge (%d) should be greater than outer block left edge (%d) - inner block should be indented inward.\nOutput:\n%s", innerLeft, outerLeft, output)
+	}
+
+	if innerRight >= outerRight {
+		t.Errorf("inner block right edge (%d) should be less than outer block right edge (%d) - inner block should be contained within outer.\nOutput:\n%s", innerRight, outerRight, output)
+	}
+}
+
+func TestRenderBlockEmpty(t *testing.T) {
+	input := `sequenceDiagram
+		participant A
+		participant B
+		loop Empty
+		end`
+
+	sd, err := Parse(input)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	output, err := Render(sd, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if !strings.Contains(output, "loop Empty") {
+		t.Errorf("output should contain 'loop Empty' label:\n%s", output)
+	}
+	if !strings.Contains(output, "┌") || !strings.Contains(output, "┐") {
+		t.Errorf("output should contain block box corners:\n%s", output)
+	}
+	if !strings.Contains(output, "└") || !strings.Contains(output, "┘") {
+		t.Errorf("output should contain block box bottom corners:\n%s", output)
+	}
+}
+
 func FuzzParseSequenceDiagram(f *testing.F) {
 	f.Add("sequenceDiagram\nA->>B: Hello")
 	f.Add("sequenceDiagram\nparticipant Alice\nAlice->>Bob: Hi")

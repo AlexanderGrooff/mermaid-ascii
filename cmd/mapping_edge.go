@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/AlexanderGrooff/mermaid-ascii/internal/diagram"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -21,7 +22,7 @@ func (g *graph) determinePath(e *edge) {
 	var preferredPath, alternativePath []gridCoord
 	var from, to gridCoord
 	var err error
-	preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir := determineStartAndEndDir(e)
+	preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir := g.determineStartAndEndDir(e)
 
 	from = e.from.gridCoord.Direction(preferredDir)
 	to = e.to.gridCoord.Direction(preferredOppositeDir)
@@ -70,6 +71,7 @@ func (g *graph) determinePath(e *edge) {
 
 func (g *graph) determineLabelLine(e *edge) {
 	// What line on the path should the label be placed?
+	e.text = g.applyEdgeLabelPolicy(e.text)
 	lenLabel := len(e.text)
 	if lenLabel == 0 {
 		return
@@ -113,4 +115,32 @@ func (g graph) calculateLineWidth(line []gridCoord) int {
 		totalSize += g.columnWidth[c.x]
 	}
 	return totalSize
+}
+
+func (g *graph) applyEdgeLabelPolicy(label string) string {
+	if label == "" {
+		return ""
+	}
+	switch g.edgeLabelPolicy {
+	case "", diagram.EdgeLabelPolicyFull:
+		return label
+	case diagram.EdgeLabelPolicyDrop:
+		return ""
+	case diagram.EdgeLabelPolicyEllipsis:
+		return g.ellipsisLabel(label)
+	default:
+		return label
+	}
+}
+
+func (g *graph) ellipsisLabel(label string) string {
+	maxWidth := g.edgeLabelMaxWidth
+	if maxWidth <= 0 || len(label) <= maxWidth {
+		return label
+	}
+	ellipsis := "..."
+	if len(ellipsis) >= maxWidth {
+		return ellipsis[:maxWidth]
+	}
+	return label[:maxWidth-len(ellipsis)] + ellipsis
 }

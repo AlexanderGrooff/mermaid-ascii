@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gookit/color"
+	"github.com/mattn/go-runewidth"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -155,7 +156,14 @@ func drawMap(properties *graphProperties) string {
 	g.setStyleClasses(properties)
 	g.paddingX = properties.paddingX
 	g.paddingY = properties.paddingY
+	g.graphDirection = properties.graphDirection
+	g.boxBorderPadding = properties.boxBorderPadding
+	g.labelWrapWidth = properties.labelWrapWidth
+	g.edgeLabelPolicy = properties.edgeLabelPolicy
+	g.edgeLabelMaxWidth = properties.edgeLabelMaxWidth
 	g.useAscii = properties.useAscii
+	g.centerMultiLineLabels = properties.centerMultiLineLabels
+	g.setLabelLines()
 	g.setSubgraphs(properties.subgraphs)
 	g.createMapping()
 	d := g.draw()
@@ -228,10 +236,81 @@ func drawBox(n *node, g graph) *drawing {
 		boxDrawing[to.x][to.y] = "+"     // Bottom right corner
 	}
 	// Draw text
-	textY := from.y + h/2
-	textX := from.x + w/2 - CeilDiv(len(n.name), 2) + 1
-	for x := 0; x < len(n.name); x++ {
-		boxDrawing[textX+x][textY] = wrapTextInColor(string(n.name[x]), n.styleClass.styles["color"], g.styleType)
+	labelLines := n.labelLines
+	if len(labelLines) == 0 {
+		labelLines = []string{n.name}
+	}
+	innerLeft := from.x + 1
+	innerRight := to.x - 1
+	innerTop := from.y + 1
+	innerBottom := to.y - 1
+	innerWidth := innerRight - innerLeft + 1
+	innerHeight := innerBottom - innerTop + 1
+	startY := innerTop
+	if innerHeight > len(labelLines) {
+		startY = innerTop + (innerHeight-len(labelLines))/2
+	}
+	maxLines := Min(len(labelLines), innerHeight)
+	isMultiLine := len(labelLines) > 1
+	
+	// When centerMultiLineLabels is false and we have multiple lines,
+	// pad all lines to the same width before centering as a block
+	linesToDraw := labelLines
+	if isMultiLine && !g.centerMultiLineLabels {
+		// Find max line width accounting for character widths
+		maxLineWidth := 0
+		for _, line := range labelLines[:maxLines] {
+			lineWidth := runewidth.StringWidth(line)
+			if lineWidth > maxLineWidth {
+				maxLineWidth = lineWidth
+			}
+		}
+		// Pad each line to max width with trailing spaces
+		linesToDraw = make([]string, len(labelLines))
+		for i, line := range labelLines {
+			lineWidth := runewidth.StringWidth(line)
+			if lineWidth < maxLineWidth {
+				linesToDraw[i] = line + strings.Repeat(" ", maxLineWidth-lineWidth)
+			} else {
+				linesToDraw[i] = line
+			}
+		}
+	}
+	
+	for lineIdx := 0; lineIdx < maxLines; lineIdx++ {
+		line := linesToDraw[lineIdx]
+		runes := []rune(line)
+		// Use display width (accounts for CJK full-width chars, emoji, etc.)
+		lineWidth := runewidth.StringWidth(line)
+		
+		startX := innerLeft
+		// Center single-line labels, or multi-line when centerMultiLineLabels is true
+		if (!isMultiLine || g.centerMultiLineLabels) && innerWidth > lineWidth {
+			startX = innerLeft + (innerWidth-lineWidth)/2
+		} else if isMultiLine && !g.centerMultiLineLabels && innerWidth > lineWidth {
+			// Block centering: center the entire padded block
+			startX = innerLeft + (innerWidth-lineWidth)/2
+		}
+		
+		// Place characters at display positions - wide chars (CJK, emoji) occupy 2 display columns
+		displayPos := 0
+		for _, r := range runes {
+			charWidth := runewidth.RuneWidth(r)
+			// Check if character will fit in remaining display width
+			if displayPos+charWidth > innerWidth {
+				break
+			}
+			if startX+displayPos > innerRight {
+				break
+			}
+			// Place character at its display position
+			boxDrawing[startX+displayPos][startY+lineIdx] = wrapTextInColor(string(r), n.styleClass.styles["color"], g.styleType)
+			// For wide characters, clear the next cell (the character spans it visually)
+			if charWidth > 1 && startX+displayPos+1 <= innerRight {
+				boxDrawing[startX+displayPos+1][startY+lineIdx] = ""
+			}
+			displayPos += charWidth
+		}
 	}
 
 	return &boxDrawing

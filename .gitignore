@@ -15,3 +15,9 @@ mermaid-ascii
 *.tar.gz
 *.tar.zst
 result
+mermaid-ascii-fork
+mermaid-ascii-go
+mermaid-ascii-patched
+
+# Backup files
+*.bak
