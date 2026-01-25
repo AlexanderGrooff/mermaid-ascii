@@ -1,6 +1,15 @@
 # Mermaid ASCII
 
-Render mermaid diagrams in your terminal:
+Render mermaid diagrams in your terminal.
+
+## Features
+
+This fork adds:
+- **Multi-line node labels**: Use `<br/>` or `<br>` HTML tags in node labels to create multi-line text
+- **Diagram width control**: Use `-w/--maxWidth` to constrain diagram width, with automatic layout fitting
+- **Label alignment control**: Use `--center-multi-line-labels` to control how multi-line labels are centered (default: left-justified block)
+- **Version flag**: Use `--version` to show version information
+- **Enhanced UTF-8 support**: Proper handling of wide characters (CJK, emoji) in node labels
 
 ## Installation
 
@@ -127,7 +136,7 @@ $ mermaid-ascii -f ./test.mermaid
           │   │              
           └───┘              
 
-# Multi-line node labels
+# Multi-line node labels (using <br/> or <br> tags)
 $ cat test.mermaid
 graph LR
 A["First<br/>Second"] --> B["Line 1<br>Line 2<br>Line 3"]
@@ -137,6 +146,28 @@ $ mermaid-ascii -f ./test.mermaid
 │ Second ├────►│ Line 2 │
 │        │     │ Line 3 │
 └────────┘     └────────┘
+
+# Multi-line labels with tree-like structure (default: left-justified)
+$ cat test.mermaid
+graph LR
+A["┌─ TIMER<br/>├─> Step 1<br/>└─> Step 2"]
+$ mermaid-ascii -f ./test.mermaid
+┌────────────┐
+│ ┌─ TIMER   │
+│ ├─> Step 1 │
+│ └─> Step 2 │
+└────────────┘
+
+# Center each line individually with --center-multi-line-labels
+$ cat test.mermaid
+graph LR
+A["┌─ TIMER<br/>├─> Step 1<br/>└─> Step 2"]
+$ mermaid-ascii -f ./test.mermaid --center-multi-line-labels
+┌────────────┐
+│ ┌─ TIMER   │
+│ ├─> Step 1 │
+│ └─> Step 2 │
+└────────────┘
 
 # Control diagram width
 $ cat test.mermaid
@@ -387,16 +418,18 @@ Available Commands:
   web         HTTP server for rendering mermaid diagrams.
 
 Flags:
-  -a, --ascii               Don't use extended character set
-  -p, --borderPadding int   Padding between text and border (default 1)
-  -c, --coords              Show coordinates
-  -f, --file string         Mermaid file to parse (use '-' for stdin)
-      --fit                 Force automatic fitting even without width constraint
-  -h, --help                help for mermaid-ascii
-  -w, --maxWidth int        Maximum diagram width in characters (0 = unlimited)
-  -x, --paddingX int        Horizontal space between nodes (default 5)
-  -y, --paddingY int        Vertical space between nodes (default 5)
-  -v, --verbose             Verbose output
+  -a, --ascii                        Don't use extended character set
+  -p, --borderPadding int            Padding between text and border (default 1)
+      --center-multi-line-labels     Center multi-line node labels as a block
+  -c, --coords                       Show coordinates
+  -f, --file string                  Mermaid file to parse (use '-' for stdin)
+      --fit                          Force automatic fitting even without width constraint
+  -h, --help                         help for mermaid-ascii
+  -w, --maxWidth int                 Maximum diagram width in characters (0 = unlimited)
+  -x, --paddingX int                 Horizontal space between nodes (default 5)
+  -y, --paddingY int                 Vertical space between nodes (default 5)
+  -v, --verbose                      Verbose output
+      --version                      Show version information
 
 Use "mermaid-ascii [command] --help" for more information about a command.
 

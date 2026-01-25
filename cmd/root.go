@@ -14,6 +14,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version of mermaid-ascii
+const Version = "1.0.0-fccdata"
+
 // Global flags
 var Verbose bool
 var Coords bool
@@ -24,12 +27,20 @@ var graphDirection = ""
 var useAscii = false
 var maxWidth = 0
 var fitDiagram = false
+var centerMultiLineLabels = false
+var showVersion bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "mermaid-ascii",
 	Short: "Generate ASCII diagrams from mermaid code.",
 	Run: func(cmd *cobra.Command, args []string) {
+		// Handle version flag
+		if showVersion {
+			fmt.Printf("mermaid-ascii version %s\n", Version)
+			return
+		}
+
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		} else {
@@ -64,13 +75,14 @@ var rootCmd = &cobra.Command{
 			boxBorderPadding,
 			paddingBetweenX,
 			paddingBetweenY,
-				maxWidth,
+			maxWidth,
 			graphDirection,
+			centerMultiLineLabels,
 		)
 		if err != nil {
 			log.Fatalf("Invalid configuration: %v", err)
 		}
-		
+
 		// Automatically enable fitting if width is specified, or if --fit flag is used
 		if maxWidth > 0 || fitDiagram {
 			config.FitPolicy = diagram.FitPolicyAuto
@@ -99,14 +111,16 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
+	rootCmd.Flags().BoolVar(&showVersion, "version", false, "Show version information")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Verbose output")
 	rootCmd.PersistentFlags().BoolVarP(&useAscii, "ascii", "a", false, "Don't use extended character set")
 	rootCmd.PersistentFlags().BoolVarP(&Coords, "coords", "c", false, "Show coordinates")
 	rootCmd.PersistentFlags().IntVarP(&paddingBetweenX, "paddingX", "x", paddingBetweenX, "Horizontal space between nodes")
 	rootCmd.PersistentFlags().IntVarP(&paddingBetweenY, "paddingY", "y", paddingBetweenY, "Vertical space between nodes")
 	rootCmd.PersistentFlags().IntVarP(&boxBorderPadding, "borderPadding", "p", boxBorderPadding, "Padding between text and border")
-    rootCmd.PersistentFlags().IntVarP(&maxWidth, "maxWidth", "w", maxWidth, "Maximum diagram width in characters (0 = unlimited)")
+	rootCmd.PersistentFlags().IntVarP(&maxWidth, "maxWidth", "w", maxWidth, "Maximum diagram width in characters (0 = unlimited)")
 	rootCmd.PersistentFlags().BoolVar(&fitDiagram, "fit", false, "Force automatic fitting even without width constraint")
+	rootCmd.PersistentFlags().BoolVar(&centerMultiLineLabels, "center-multi-line-labels", false, "Center multi-line node labels as a block")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.

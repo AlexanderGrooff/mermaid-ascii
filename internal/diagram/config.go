@@ -53,6 +53,29 @@ type Config struct {
 	// Use FitPolicyNone to disable fitting and FitPolicyAuto for heuristics.
 	FitPolicy string
 
+	// CenterMultiLineLabels controls whether multi-line node labels are centered as a block.
+	// When true, each line is centered individually.
+	// When false, all lines are padded to the same width before centering, so that they will 
+	// be left justified relative to each other, but centered within the block.
+	// For example:
+	//   CenterMultiLineLabels: true:
+	//      +----------------+
+	//      |                |
+	//      | ┌─ TIMER TEXT  |
+	//      | ├─> Step 1     |
+	//      | └─> Step 2     |
+	//      |                |
+	//      +----------------+
+	//   CenterMultiLineLabels: false:
+	//      +----------------+
+	//      |                |
+	//      | ┌─ TIMER TEXT  |
+	//      |   ├─> Step 1   |
+	//      |   └─> Step 2   |
+	//      |                |
+	//      +----------------+
+	CenterMultiLineLabels bool
+
 	// --- Sequence diagram-specific configuration ---
 
 	// SequenceParticipantSpacing is the horizontal space between participants
@@ -80,9 +103,10 @@ func DefaultConfig() *Config {
 		StyleType:         "cli",
 		LabelWrapWidth:    0,
 		EdgeLabelPolicy:   EdgeLabelPolicyFull,
-		EdgeLabelMaxWidth: 0,
-		MaxWidth:          0,
-		FitPolicy:         FitPolicyNone,
+		EdgeLabelMaxWidth:     0,
+		MaxWidth:              0,
+		FitPolicy:             FitPolicyNone,
+		CenterMultiLineLabels: false,
 		// Sequence diagram defaults
 		SequenceParticipantSpacing: 5,
 		SequenceMessageSpacing:     1,
@@ -120,7 +144,7 @@ func NewConfig(useAscii bool, graphDirection, styleType string) (*Config, error)
 	return config, nil
 }
 
-func NewCLIConfig(useAscii, showCoords, verbose bool, boxBorderPadding, paddingX, paddingY, maxWidth int, graphDirection string) (*Config, error) {
+func NewCLIConfig(useAscii, showCoords, verbose bool, boxBorderPadding, paddingX, paddingY, maxWidth int, graphDirection string, centerMultiLineLabels bool) (*Config, error) {
 	defaults := DefaultConfig()
 	config := &Config{
 		UseAscii:                   useAscii,
@@ -136,6 +160,7 @@ func NewCLIConfig(useAscii, showCoords, verbose bool, boxBorderPadding, paddingX
 		EdgeLabelMaxWidth:          defaults.EdgeLabelMaxWidth,
 		MaxWidth:                   maxWidth,
 		FitPolicy:                  defaults.FitPolicy,
+		CenterMultiLineLabels:      centerMultiLineLabels,
 		SequenceParticipantSpacing: defaults.SequenceParticipantSpacing,
 		SequenceMessageSpacing:     defaults.SequenceMessageSpacing,
 		SequenceSelfMessageWidth:   defaults.SequenceSelfMessageWidth,

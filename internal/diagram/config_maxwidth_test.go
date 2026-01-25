@@ -45,6 +45,7 @@ false, // verbose
 5,     // paddingY
 tt.maxWidth,
 "LR", // graphDirection
+false, // centerMultiLineLabels
 )
 
 if err != nil {
