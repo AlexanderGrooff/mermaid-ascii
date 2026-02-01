@@ -8,6 +8,7 @@ import (
 
 	"github.com/AlexanderGrooff/mermaid-ascii/internal/diagram"
 	"github.com/AlexanderGrooff/mermaid-ascii/internal/diagram/testutil"
+	"github.com/mattn/go-runewidth"
 )
 
 // getTestDataPath returns the absolute path to testdata directory.
@@ -120,6 +121,38 @@ func TestSequenceDiagramRendering_ASCIISmokeTest(t *testing.T) {
 			if strings.ContainsAny(output, "┌┐└┘├┤┬┴┼│─►◄┈") {
 				t.Error("ASCII output contains Unicode box-drawing characters")
 			}
+		})
+	}
+}
+
+// TestSequenceDiagramRendering_EastAsian tests Unicode rendering with East Asian locale settings.
+// This ensures proper spacing between participant boxes when runewidth treats
+// box-drawing characters as double-width (EastAsianWidth=true).
+func TestSequenceDiagramRendering_EastAsian(t *testing.T) {
+	// Save original condition
+	origCond := runewidth.DefaultCondition
+
+	// Set East Asian width mode directly (more reliable than environment variable)
+	eastAsianCond := runewidth.NewCondition()
+	eastAsianCond.EastAsianWidth = true
+	runewidth.DefaultCondition = eastAsianCond
+
+	// Restore original settings after test
+	defer func() {
+		runewidth.DefaultCondition = origCond
+	}()
+
+	testDataPath := filepath.Join(getTestDataPath(), "sequence")
+
+	testFiles := []string{
+		"simple_two_participants.txt",
+		"three_participants.txt",
+		"four_participants.txt",
+	}
+
+	for _, testFile := range testFiles {
+		t.Run(testFile, func(t *testing.T) {
+			verifySequenceDiagramWithCharset(t, filepath.Join(testDataPath, testFile), false)
 		})
 	}
 }

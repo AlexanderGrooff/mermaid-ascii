@@ -134,7 +134,7 @@ func buildLine(participants []*Participant, layout *diagramLayout, draw func(int
 		boxWidth := layout.participantWidths[i] + boxBorderWidth
 		left := layout.participantCenters[i] - boxWidth/2
 
-		needed := left - runewidth.StringWidth(sb.String())
+		needed := left - len([]rune(sb.String()))
 		if needed > 0 {
 			sb.WriteString(strings.Repeat(" ", needed))
 		}
