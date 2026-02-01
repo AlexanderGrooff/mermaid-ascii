@@ -1,7 +1,6 @@
 package sequence
 
 import (
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -130,26 +129,16 @@ func TestSequenceDiagramRendering_ASCIISmokeTest(t *testing.T) {
 // This ensures proper spacing between participant boxes when runewidth treats
 // box-drawing characters as double-width (EastAsianWidth=true).
 func TestSequenceDiagramRendering_EastAsian(t *testing.T) {
-	// Save original environment and condition
-	origEnv := os.Getenv("RUNEWIDTH_EASTASIAN")
+	// Save original condition
 	origCond := runewidth.DefaultCondition
 
-	// Set East Asian width mode
-	os.Setenv("RUNEWIDTH_EASTASIAN", "1")
-	runewidth.DefaultCondition = runewidth.NewCondition()
-
-	// Verify East Asian mode is active
-	if !runewidth.DefaultCondition.EastAsianWidth {
-		t.Fatal("Failed to enable East Asian width mode")
-	}
+	// Set East Asian width mode directly (more reliable than environment variable)
+	eastAsianCond := runewidth.NewCondition()
+	eastAsianCond.EastAsianWidth = true
+	runewidth.DefaultCondition = eastAsianCond
 
 	// Restore original settings after test
 	defer func() {
-		if origEnv == "" {
-			os.Unsetenv("RUNEWIDTH_EASTASIAN")
-		} else {
-			os.Setenv("RUNEWIDTH_EASTASIAN", origEnv)
-		}
 		runewidth.DefaultCondition = origCond
 	}()
 
