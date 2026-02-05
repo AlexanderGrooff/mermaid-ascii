@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gookit/color"
+	"github.com/mattn/go-runewidth"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -48,10 +49,19 @@ func (g *graph) drawEdge(e *edge) (*drawing, *drawing, *drawing, *drawing, *draw
 
 func (d *drawing) drawText(start drawingCoord, text string) {
 	// Increase dimensions if necessary.
-	d.increaseSize(start.x+len(text), start.y)
-	log.Debug("Drawing '", text, "' from ", start, " to ", drawingCoord{x: start.x + len(text), y: start.y})
-	for x := 0; x < len(text); x++ {
-		(*d)[x+start.x][start.y] = string(text[x])
+	// Use display width for proper CJK/Unicode character support
+	textWidth := runewidth.StringWidth(text)
+	d.increaseSize(start.x+textWidth, start.y)
+	log.Debug("Drawing '", text, "' from ", start, " to ", drawingCoord{x: start.x + textWidth, y: start.y})
+	pos := 0
+	for _, char := range text {
+		(*d)[start.x+pos][start.y] = string(char)
+		charWidth := runewidth.RuneWidth(char)
+		// Fill subsequent positions with empty string for wide characters
+		for i := 1; i < charWidth; i++ {
+			(*d)[start.x+pos+i][start.y] = ""
+		}
+		pos += charWidth
 	}
 }
 
@@ -228,10 +238,19 @@ func drawBox(n *node, g graph) *drawing {
 		boxDrawing[to.x][to.y] = "+"     // Bottom right corner
 	}
 	// Draw text
+	// Use display width for proper CJK/Unicode character support
+	nameWidth := runewidth.StringWidth(n.name)
 	textY := from.y + h/2
-	textX := from.x + w/2 - CeilDiv(len(n.name), 2) + 1
-	for x := 0; x < len(n.name); x++ {
-		boxDrawing[textX+x][textY] = wrapTextInColor(string(n.name[x]), n.styleClass.styles["color"], g.styleType)
+	textX := from.x + w/2 - CeilDiv(nameWidth, 2) + 1
+	pos := 0
+	for _, char := range n.name {
+		boxDrawing[textX+pos][textY] = wrapTextInColor(string(char), n.styleClass.styles["color"], g.styleType)
+		charWidth := runewidth.RuneWidth(char)
+		// Fill subsequent positions with empty string for wide characters
+		for i := 1; i < charWidth; i++ {
+			boxDrawing[textX+pos+i][textY] = ""
+		}
+		pos += charWidth
 	}
 
 	return &boxDrawing
@@ -317,15 +336,26 @@ func drawSubgraphLabel(sg *subgraph, g graph) (*drawing, drawingCoord) {
 	labelDrawing := *(mkDrawing(width, height))
 
 	// Draw label centered at top
+	// Use display width for proper CJK/Unicode character support
+	nameWidth := runewidth.StringWidth(sg.name)
 	labelY := from.y + 1
-	labelX := from.x + width/2 - len(sg.name)/2
+	labelX := from.x + width/2 - nameWidth/2
 	if labelX < from.x+1 {
 		labelX = from.x + 1
 	}
-	for i, char := range sg.name {
-		if labelX+i < to.x {
-			labelDrawing[labelX+i][labelY] = string(char)
+	pos := 0
+	for _, char := range sg.name {
+		if labelX+pos < to.x {
+			labelDrawing[labelX+pos][labelY] = string(char)
+			charWidth := runewidth.RuneWidth(char)
+			// Fill subsequent positions with empty string for wide characters
+			for i := 1; i < charWidth; i++ {
+				if labelX+pos+i < to.x {
+					labelDrawing[labelX+pos+i][labelY] = ""
+				}
+			}
 		}
+		pos += runewidth.RuneWidth(char)
 	}
 
 	// Return label drawing and its offset position
