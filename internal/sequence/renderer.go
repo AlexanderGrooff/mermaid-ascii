@@ -173,24 +173,41 @@ func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string
 	if label != "" {
 		start := min(from, to) + labelLeftMargin
 		labelWidth := widthCondition.StringWidth(label)
-		w := max(layout.totalWidth, start+labelWidth) + labelBufferSpace
-		line := []rune(buildLifeline(layout, chars))
-		if len(line) < w {
-			padding := make([]rune, w-len(line))
-			for k := range padding {
-				padding[k] = ' '
+		totalW := max(layout.totalWidth, start+labelWidth) + labelBufferSpace
+
+		// Build the line using display width positioning
+		var sb strings.Builder
+		pos := 0 // current display position
+		labelRunes := []rune(label)
+		labelIdx := 0
+
+		for pos < totalW {
+			// Label takes priority over lifelines (overwrites them)
+			if pos >= start && labelIdx < len(labelRunes) {
+				r := labelRunes[labelIdx]
+				sb.WriteRune(r)
+				pos += widthCondition.RuneWidth(r)
+				labelIdx++
+			} else {
+				// Check if current position is a lifeline
+				isLifeline := false
+				for _, c := range layout.participantCenters {
+					if pos == c {
+						isLifeline = true
+						break
+					}
+				}
+
+				if isLifeline {
+					sb.WriteRune(chars.Vertical)
+				} else {
+					sb.WriteRune(' ')
+				}
+				pos++
 			}
-			line = append(line, padding...)
 		}
 
-		col := start
-		for _, r := range label {
-			if col < len(line) {
-				line[col] = r
-				col++
-			}
-		}
-		lines = append(lines, strings.TrimRight(string(line), " "))
+		lines = append(lines, strings.TrimRight(sb.String(), " "))
 	}
 
 	line := []rune(buildLifeline(layout, chars))
