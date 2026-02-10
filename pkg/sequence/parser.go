@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/AlexanderGrooff/mermaid-ascii/internal/diagram"
+	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
 )
 
 const (

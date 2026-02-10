@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/AlexanderGrooff/mermaid-ascii/internal/diagram"
-	"github.com/AlexanderGrooff/mermaid-ascii/internal/diagram/testutil"
+	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
+	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram/testutil"
 	log "github.com/sirupsen/logrus"
 )
 
