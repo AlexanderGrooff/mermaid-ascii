@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/AlexanderGrooff/mermaid-ascii/internal/diagram"
+	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/gin-gonic/gin"

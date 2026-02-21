@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/AlexanderGrooff/mermaid-ascii/internal/diagram"
-	"github.com/AlexanderGrooff/mermaid-ascii/internal/sequence"
+	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
+	"github.com/AlexanderGrooff/mermaid-ascii/pkg/sequence"
 )
 
 // ExampleParse demonstrates basic sequence diagram parsing and rendering.
