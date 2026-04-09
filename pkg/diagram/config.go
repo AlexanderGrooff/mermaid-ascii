@@ -28,8 +28,7 @@ type Config struct {
 	// GraphDirection is the direction of graph layout ("LR" or "TD")
 	GraphDirection string
 
-	// StyleType determines output format for graph diagrams ("cli" or "html")
-	// This controls whether graphs use colored output (html) or plain text (cli)
+	// StyleType determines output format for graph diagrams ("cli", "html", or "xterm")
 	StyleType string
 
 	// --- Sequence diagram-specific configuration ---
@@ -122,7 +121,7 @@ func NewWebConfig(useAscii bool, boxBorderPadding, paddingX, paddingY int) (*Con
 		PaddingBetweenX:            paddingX,
 		PaddingBetweenY:            paddingY,
 		GraphDirection:             "LR",
-		StyleType:                  "html",
+		StyleType:                  "xterm",
 		SequenceParticipantSpacing: defaults.SequenceParticipantSpacing,
 		SequenceMessageSpacing:     defaults.SequenceMessageSpacing,
 		SequenceSelfMessageWidth:   defaults.SequenceSelfMessageWidth,
@@ -136,7 +135,7 @@ func NewWebConfig(useAscii bool, boxBorderPadding, paddingX, paddingY int) (*Con
 }
 
 // NewTestConfig creates a Config for testing with sensible defaults.
-// The styleType parameter determines output format ("cli" or "html").
+// The styleType parameter determines output format ("cli", "html", or "xterm").
 func NewTestConfig(useAscii bool, styleType string) *Config {
 	config := DefaultConfig()
 	config.UseAscii = useAscii
@@ -160,8 +159,8 @@ func (c *Config) Validate() error {
 	if c.GraphDirection != "LR" && c.GraphDirection != "TD" {
 		return &ConfigError{Field: "GraphDirection", Value: c.GraphDirection, Message: "must be \"LR\" or \"TD\""}
 	}
-	if c.StyleType != "cli" && c.StyleType != "html" {
-		return &ConfigError{Field: "StyleType", Value: c.StyleType, Message: "must be \"cli\" or \"html\""}
+	if c.StyleType != "cli" && c.StyleType != "html" && c.StyleType != "xterm" {
+		return &ConfigError{Field: "StyleType", Value: c.StyleType, Message: "must be \"cli\", \"html\", or \"xterm\""}
 	}
 
 	// Validate sequence diagram configuration

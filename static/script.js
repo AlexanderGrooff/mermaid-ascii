@@ -32,27 +32,120 @@ function setExample(example) {
     }
 }
 
-// Handle HTMX before swap to preserve whitespace and HTML
+// Global terminal state
+let term;
+let fitAddon;
+let lastRenderedContent = '';
+
+function stripAnsi(text) {
+    return text.replace(/\u001b\[[0-9;]*m/g, '');
+}
+
+// Copy terminal content
+function copyTerminalContent() {
+    if (!lastRenderedContent) {
+        return;
+    }
+
+    const btn = document.getElementById('copy-button');
+    const originalText = btn.textContent;
+
+    navigator.clipboard.writeText(lastRenderedContent).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+            btn.textContent = originalText;
+        }, 2000);
+    });
+}
+
+function fitTerminal() {
+    if (!term || !fitAddon) return;
+    fitAddon.fit();
+}
+
+function renderTerminal(content) {
+    if (!term) return;
+
+    const normalizedContent = content.replace(/\r\n/g, '\n');
+    lastRenderedContent = stripAnsi(normalizedContent);
+    term.reset();
+    fitTerminal();
+    term.write(normalizedContent.replace(/\n/g, '\r\n'));
+    term.scrollToTop();
+}
+
+// Update terminal theme
+function updateTerminalTheme(isDark) {
+    if (!term) return;
+    
+    if (isDark) {
+        term.options.theme = {
+            background: '#1a1a1a',
+            foreground: '#e9ecef',
+            cursor: '#e9ecef',
+            cursorAccent: '#1a1a1a',
+            selection: 'rgba(77, 171, 247, 0.3)',
+        };
+    } else {
+        term.options.theme = {
+            background: '#e9ecef',
+            foreground: '#212529',
+            cursor: '#212529',
+            cursorAccent: '#e9ecef',
+            selection: 'rgba(0, 123, 255, 0.3)',
+        };
+    }
+}
+
+// Handle HTMX before swap to write to terminal
 document.addEventListener('DOMContentLoaded', function() {
     initializeSliderValues();
     
-    // Fix for preserving leading whitespace in HTMX responses
+    // Initialize xterm.js terminal
+    const terminalContainer = document.getElementById('terminal-container');
+    if (terminalContainer && typeof Terminal !== 'undefined') {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || 
+                       (!document.documentElement.getAttribute('data-theme') && 
+                        window.matchMedia('(prefers-color-scheme: dark)').matches);
+        
+        term = new Terminal({
+            fontFamily: "'Roboto Mono', 'Courier New', monospace",
+            fontSize: 13,
+            lineHeight: 1.15,
+            letterSpacing: 0,
+            scrollback: 1000,
+            disableStdin: true,
+            convertEol: true,
+            cursorWidth: 0,
+            theme: isDark ? {
+                background: '#1a1a1a',
+                foreground: '#e9ecef',
+                cursor: '#e9ecef',
+                cursorAccent: '#1a1a1a',
+                selection: 'rgba(77, 171, 247, 0.3)',
+            } : {
+                background: '#e9ecef',
+                foreground: '#212529',
+                cursor: '#212529',
+                cursorAccent: '#e9ecef',
+                selection: 'rgba(0, 123, 255, 0.3)',
+            }
+        });
+
+        fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(terminalContainer);
+        const resizeObserver = new ResizeObserver(() => {
+            fitTerminal();
+        });
+        resizeObserver.observe(terminalContainer);
+        fitTerminal();
+    }
+
     document.body.addEventListener('htmx:beforeSwap', function(evt) {
         if (evt.detail.target.id === 'result-code') {
-            // Don't use default swap behavior
             evt.preventDefault();
-            
-            // Get the response
-            let content = evt.detail.xhr.responseText;
-            
-            // Check if the content has HTML color spans
-            if (content.includes('<span')) {
-                // For colored content, use innerHTML
-                evt.detail.target.innerHTML = content;
-            } else {
-                // For plain text, use textContent to preserve everything exactly
-                evt.detail.target.textContent = content;
-            }
+            renderTerminal(evt.detail.xhr.responseText);
         }
     });
 
@@ -113,6 +206,7 @@ function applyTheme(theme, isSystemPreference = false) {
         root.setAttribute('data-theme', theme);
     }
     updateThemeToggleIcon(theme);
+    updateTerminalTheme(theme === 'dark');
 }
 
 function updateThemeToggleIcon(theme) {
