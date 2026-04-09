@@ -263,21 +263,35 @@ textarea::placeholder {
     min-height: 400px;
 }
 
-.code-block {
+#terminal-container {
     width: 100%;
     height: 100%;
-    padding: 15px;
     background-color: var(--bg-tertiary);
     border: 2px solid var(--border-color);
     border-radius: var(--radius-sm);
-    font-family: 'Roboto Mono', monospace;
-    font-size: 0.9rem;
-    white-space: pre;
-    line-height: 1;
-    overflow: auto;
-    color: var(--text-primary);
-    cursor: default;
-    user-select: text;
+    overflow: hidden;
+}
+
+#terminal-container .xterm {
+    height: 100%;
+    padding: 10px;
+}
+
+#terminal-container .xterm-viewport {
+    background-color: transparent !important;
+    overflow: auto !important;
+}
+
+#terminal-container .xterm-screen {
+    background-color: transparent !important;
+}
+
+#terminal-container .xterm-helper-textarea {
+    opacity: 0;
+}
+
+#terminal-container .xterm-cursor {
+    visibility: hidden !important;
 }
 
 .copy-button {
