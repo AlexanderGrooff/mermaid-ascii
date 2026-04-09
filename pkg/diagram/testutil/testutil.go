@@ -35,7 +35,9 @@ func ReadTestCase(filePath string) (*TestCase, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	scanner := bufio.NewScanner(file)
 	var mermaid, expected strings.Builder

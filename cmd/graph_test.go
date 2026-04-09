@@ -113,4 +113,38 @@ A --> B`
 	}
 }
 
+func TestWrapTextInColorXterm(t *testing.T) {
+	got := wrapTextInColor("X", "#ff00ff", "xterm")
+	want := "\x1b[38;2;255;0;255mX\x1b[39m"
+	if got != want {
+		t.Fatalf("unexpected xterm color output: got %q want %q", got, want)
+	}
+}
+
+func TestUnicodeNodeWidth(t *testing.T) {
+	mermaidInput := `graph TD
+감각 --> 사고
+사고 --> 행동`
+
+	config := &diagram.Config{
+		UseAscii:         false,
+		BoxBorderPadding: 1,
+		PaddingBetweenX:  5,
+		PaddingBetweenY:  5,
+		GraphDirection:   "TD",
+		StyleType:        "cli",
+	}
+
+	output, err := RenderDiagram(mermaidInput, config)
+	if err != nil {
+		t.Fatalf("Failed to render unicode graph: %v", err)
+	}
+
+	for _, label := range []string{"감각", "사고", "행동"} {
+		if !strings.Contains(output, label) {
+			t.Fatalf("expected output to contain %q, got:\n%s", label, output)
+		}
+	}
+}
+
 // Sequence diagram tests moved to sequence_test.go

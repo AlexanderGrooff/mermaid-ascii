@@ -37,64 +37,8 @@ let term;
 let fitAddon;
 let lastRenderedContent = '';
 
-function escapeAnsi(text) {
-    return text.replace(/\u001b/g, '');
-}
-
-function rgbToAnsi(color) {
-    const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-    if (!match) return '';
-    return `\u001b[38;2;${match[1]};${match[2]};${match[3]}m`;
-}
-
-function htmlToTerminalContent(content) {
-    if (!content.includes('<')) {
-        return {
-            ansi: content,
-            plainText: content,
-        };
-    }
-
-    const root = document.createElement('div');
-    root.innerHTML = content;
-    let ansi = '';
-    let plainText = '';
-
-    function walk(node, activeColor = '') {
-        if (node.nodeType === Node.TEXT_NODE) {
-            const text = node.textContent || '';
-            ansi += activeColor + text;
-            plainText += text;
-            return;
-        }
-
-        if (node.nodeType !== Node.ELEMENT_NODE) {
-            return;
-        }
-
-        const element = node;
-        const nextColor = element.style?.color ? rgbToAnsi(element.style.color) : activeColor;
-
-        for (const child of element.childNodes) {
-            walk(child, nextColor);
-        }
-
-        if (element.style?.color && nextColor) {
-            ansi += '\u001b[39m';
-            if (activeColor) {
-                ansi += activeColor;
-            }
-        }
-    }
-
-    for (const child of root.childNodes) {
-        walk(child);
-    }
-
-    return {
-        ansi,
-        plainText: escapeAnsi(plainText),
-    };
+function stripAnsi(text) {
+    return text.replace(/\u001b\[[0-9;]*m/g, '');
 }
 
 // Copy terminal content
@@ -123,11 +67,10 @@ function renderTerminal(content) {
     if (!term) return;
 
     const normalizedContent = content.replace(/\r\n/g, '\n');
-    const rendered = htmlToTerminalContent(normalizedContent);
-    lastRenderedContent = rendered.plainText;
+    lastRenderedContent = stripAnsi(normalizedContent);
     term.reset();
     fitTerminal();
-    term.write(rendered.ansi.replace(/\n/g, '\r\n'));
+    term.write(normalizedContent.replace(/\n/g, '\r\n'));
     term.scrollToTop();
 }
 
