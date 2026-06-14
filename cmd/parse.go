@@ -214,19 +214,7 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 			},
 		},
 		{
-			regex: regexp.MustCompile(`(?s)^(.+)\s+-->\s+(.+)$`),
-			handler: func(match []string) ([]textNode, error) {
-				if lhs, err = gp.parseString(match[0]); err != nil {
-					lhs = []textNode{parseNode(match[0])}
-				}
-				if rhs, err = gp.parseString(match[1]); err != nil {
-					rhs = []textNode{parseNode(match[1])}
-				}
-				return setArrow(lhs, rhs, gp), nil
-			},
-		},
-		{
-			regex: regexp.MustCompile(`(?s)^(.+)\s+-->\|(.+)\|\s+(.+)$`),
+			regex: regexp.MustCompile(`(?s)^(.+)\s*-->\|(.+)\|\s*(.+)$`),
 			handler: func(match []string) ([]textNode, error) {
 				if lhs, err = gp.parseString(match[0]); err != nil {
 					lhs = []textNode{parseNode(match[0])}
@@ -235,6 +223,18 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 					rhs = []textNode{parseNode(match[2])}
 				}
 				return setArrowWithLabel(lhs, rhs, match[1], gp), nil
+			},
+		},
+		{
+			regex: regexp.MustCompile(`(?s)^(.+)\s*-->\s*(.+)$`),
+			handler: func(match []string) ([]textNode, error) {
+				if lhs, err = gp.parseString(match[0]); err != nil {
+					lhs = []textNode{parseNode(match[0])}
+				}
+				if rhs, err = gp.parseString(match[1]); err != nil {
+					rhs = []textNode{parseNode(match[1])}
+				}
+				return setArrow(lhs, rhs, gp), nil
 			},
 		},
 		{
