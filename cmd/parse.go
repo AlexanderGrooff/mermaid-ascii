@@ -214,7 +214,7 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 			},
 		},
 		{
-			regex: regexp.MustCompile(`(?s)^(.+)\s*-->\|(.+)\|\s*(.+)$`),
+			regex: regexp.MustCompile(`(?s)^(.+)\s*-->\s*\|(.+)\|\s*(.+)$`),
 			handler: func(match []string) ([]textNode, error) {
 				if lhs, err = gp.parseString(match[0]); err != nil {
 					lhs = []textNode{parseNode(match[0])}
