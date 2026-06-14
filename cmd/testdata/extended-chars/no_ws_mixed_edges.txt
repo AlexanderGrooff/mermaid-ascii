@@ -1,8 +1,8 @@
 graph TD
 A-->B
-B-->C
+B-->  C
 C-->|back1|A
-C-->|back2|B
+C  -->|back2|B
 ---
 ┌───┐       
 │   │       
