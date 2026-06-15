@@ -153,9 +153,9 @@ func (g *graph) determineLabelLine(e *edge) {
 	}
 
 	middleX := labelMiddleX(largestLine)
-	labelPadding := 2 // Wrap with dashes + end arrowhead
+	labelPadding := 3 // Wrap with -{label}-> (dashes + end arrowhead, 3 char)
 	if e.isBidirectional {
-		labelPadding *= 2 // Also reserve space for start arrowhead + dash
+		labelPadding = 4 // Wrap with <-{label}-> (start arrowhead+ dashes + end arrowhead, 4 char)
 	}
 	log.Debugf("Increasing column width for column %v from size %v to %v", middleX, g.columnWidth[middleX], lenLabel+labelPadding)
 	g.columnWidth[middleX] = Max(g.columnWidth[middleX], lenLabel+labelPadding)

@@ -338,8 +338,9 @@ func (g *graph) drawArrowLabel(e *edge) *drawing {
 	log.Debugf("Drawing text '%s' on gridline %v", e.text, e.labelLine)
 	line := g.lineToDrawing(e.labelLine)
 	if e.isBidirectional {
-		// Each end reserves an arrowhead and a dash (<- ... ->); inset 2 per side so the label centers between both dashes.
-		line = insetLine(line, 2, 2)
+		line = insetLine(line, 2, 2) // reserve for label placement calc: <- (2 char) + {label} + -> (2 char)
+	} else {
+		line = insetLine(line, 1, 2) // reserve for label placement calc: - (1 char) + {label} + -> (2 char)
 	}
 	d.drawTextOnLine(line, e.text)
 	return d
