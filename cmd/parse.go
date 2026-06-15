@@ -38,9 +38,10 @@ type graphNodeSpec struct {
 }
 
 type textEdge struct {
-	parent textNode
-	child  textNode
-	label  string
+	parent         textNode
+	child          textNode
+	label          string
+	isBidirectional bool
 }
 
 type textSubgraph struct {
@@ -144,18 +145,22 @@ func parseStyleClass(matchedLine []string) styleClass {
 	return styleClass{className, styleMap}
 }
 
-func setArrowWithLabel(lhs, rhs []textNode, label string, gp *graphProperties) []textNode {
+func setArrowWithLabel(lhs, rhs []textNode, label string, isBidirectional bool, gp *graphProperties) []textNode {
 	log.Debug("Setting arrow from ", lhs, " to ", rhs, " with label ", label)
 	for _, l := range lhs {
 		for _, r := range rhs {
-			setData(l, textEdge{l, r, label}, gp.data, gp.nodeSpecs)
+			setData(l, textEdge{l, r, label, isBidirectional}, gp.data, gp.nodeSpecs)
 		}
 	}
 	return rhs
 }
 
 func setArrow(lhs, rhs []textNode, gp *graphProperties) []textNode {
-	return setArrowWithLabel(lhs, rhs, "", gp)
+	return setArrowWithLabel(lhs, rhs, "", false, gp)
+}
+
+func setBidirectionalArrow(lhs, rhs []textNode, gp *graphProperties) []textNode {
+	return setArrowWithLabel(lhs, rhs, "", true, gp)
 }
 
 func rememberNode(node textNode, nodeSpecs map[string]graphNodeSpec) {
@@ -214,6 +219,30 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 			},
 		},
 		{
+			regex: regexp.MustCompile(`(?s)^(.+)\s*<-->\s*\|(.+)\|\s*(.+)$`),
+			handler: func(match []string) ([]textNode, error) {
+				if lhs, err = gp.parseString(match[0]); err != nil {
+					lhs = []textNode{parseNode(match[0])}
+				}
+				if rhs, err = gp.parseString(match[2]); err != nil {
+					rhs = []textNode{parseNode(match[2])}
+				}
+				return setArrowWithLabel(lhs, rhs, match[1], true, gp), nil
+			},
+		},
+		{
+			regex: regexp.MustCompile(`(?s)^(.+)\s*<-->\s*(.+)$`),
+			handler: func(match []string) ([]textNode, error) {
+				if lhs, err = gp.parseString(match[0]); err != nil {
+					lhs = []textNode{parseNode(match[0])}
+				}
+				if rhs, err = gp.parseString(match[1]); err != nil {
+					rhs = []textNode{parseNode(match[1])}
+				}
+				return setBidirectionalArrow(lhs, rhs, gp), nil
+			},
+		},
+		{
 			regex: regexp.MustCompile(`(?s)^(.+)\s*-->\s*\|(.+)\|\s*(.+)$`),
 			handler: func(match []string) ([]textNode, error) {
 				if lhs, err = gp.parseString(match[0]); err != nil {
@@ -222,7 +251,7 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 				if rhs, err = gp.parseString(match[2]); err != nil {
 					rhs = []textNode{parseNode(match[2])}
 				}
-				return setArrowWithLabel(lhs, rhs, match[1], gp), nil
+				return setArrowWithLabel(lhs, rhs, match[1], false, gp), nil
 			},
 		},
 		{
