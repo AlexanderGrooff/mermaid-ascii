@@ -25,7 +25,7 @@ We need to...
 # 📖 REQUIRED READING
 
 **ALWAYS read the user-level copilot-instructions.md file first:**
-- **Location**: `/home/warnes/src/vscode-config/copilot-instructions.md`
+- **Location**: `/home/warnes/src/agent-config/copilot-instructions.md`
 - **Contains**: Communication style, token monitoring, cross-project development patterns
 - **Why**: Establishes baseline behavior and standards across all projects
 
