@@ -336,8 +336,43 @@ func (g *graph) drawArrowLabel(e *edge) *drawing {
 	}
 
 	log.Debugf("Drawing text '%s' on gridline %v", e.text, e.labelLine)
-	d.drawTextOnLine(g.lineToDrawing(e.labelLine), e.text)
+	line := g.lineToDrawing(e.labelLine)
+	if e.isBidirectional {
+		// Each end reserves an arrowhead and a dash (<- ... ->); inset 2 per side so the label centers between both dashes.
+		line = insetLine(line, 2, 2)
+	}
+	d.drawTextOnLine(line, e.text)
 	return d
+}
+
+// insetLine returns a sub-segment with each endpoint moved inward along the line.
+func insetLine(line []drawingCoord, insetStart, insetEnd int) []drawingCoord {
+	if len(line) < 2 || (insetStart == 0 && insetEnd == 0) {
+		return line
+	}
+	endInset := insetEnd
+	if insetEnd > 0 {
+		endInset = insetEnd - 1 // drawTextOnLine span is exclusive; keeps the trailing dash before the arrowhead
+	}
+	dir := determineDirection(genericCoord(line[0]), genericCoord(line[1]))
+	a, b := line[0], line[1]
+	switch dir {
+	case Right:
+		a.x += insetStart
+		b.x -= endInset
+	case Left:
+		a.x -= insetStart
+		b.x += endInset
+	case Down:
+		a.y += insetStart
+		b.y -= endInset
+	case Up:
+		a.y -= insetStart
+		b.y += endInset
+	default:
+		return line
+	}
+	return []drawingCoord{a, b}
 }
 
 func (d *drawing) drawTextOnLine(line []drawingCoord, label string) {

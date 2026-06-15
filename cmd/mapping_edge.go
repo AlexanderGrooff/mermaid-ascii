@@ -153,8 +153,12 @@ func (g *graph) determineLabelLine(e *edge) {
 	}
 
 	middleX := labelMiddleX(largestLine)
-	log.Debugf("Increasing column width for column %v from size %v to %v", middleX, g.columnWidth[middleX], lenLabel+2)
-	g.columnWidth[middleX] = Max(g.columnWidth[middleX], lenLabel+2) // Wrap with dashes + arrowhead
+	labelPadding := 2 // Wrap with dashes + end arrowhead
+	if e.isBidirectional {
+		labelPadding *= 2 // Also reserve space for start arrowhead + dash
+	}
+	log.Debugf("Increasing column width for column %v from size %v to %v", middleX, g.columnWidth[middleX], lenLabel+labelPadding)
+	g.columnWidth[middleX] = Max(g.columnWidth[middleX], lenLabel+labelPadding)
 	log.Debugf("New column sizes: %v", g.columnWidth)
 	e.labelLine = largestLine
 }
