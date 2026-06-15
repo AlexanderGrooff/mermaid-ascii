@@ -114,8 +114,23 @@ func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) (*drawing, *dra
 	dPath, linesDrawn, lineDirs := g.drawPath(e.path)
 	dBoxStart := g.drawBoxStart(e.path, linesDrawn[0])
 	dArrowHead := g.drawArrowHead(linesDrawn[len(linesDrawn)-1], lineDirs[len(lineDirs)-1])
+	if e.isBidirectional && len(linesDrawn) > 0 {
+		dStartArrowHead := g.drawArrowHead(reverseDrawingLine(linesDrawn[0]), lineDirs[0].getOpposite())
+		dArrowHead = g.mergeDrawings(dArrowHead, drawingCoord{0, 0}, dStartArrowHead)
+	}
 	dCorners := g.drawCorners(e.path)
 	return dPath, dBoxStart, dArrowHead, dCorners, dLabel
+}
+
+func reverseDrawingLine(line []drawingCoord) []drawingCoord {
+	if len(line) == 0 {
+		return line
+	}
+	reversed := make([]drawingCoord, len(line))
+	for i, coord := range line {
+		reversed[len(line)-1-i] = coord
+	}
+	return reversed
 }
 
 func mergePath(path []gridCoord) []gridCoord {
