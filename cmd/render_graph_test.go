@@ -146,6 +146,28 @@ func TestRenderGraphSeparatesBidirectionalEdgeLabelsTD(t *testing.T) {
 	}
 }
 
+func TestRenderGraphRendersCyrillicNodeAndEdgeLabels(t *testing.T) {
+	config := diagram.NewTestConfig(true, "cli")
+	output, err := RenderDiagram("graph LR\nA[Привет]-->|метка|B[Мир]", config)
+	if err != nil {
+		t.Fatalf("RenderDiagram() error = %v", err)
+	}
+
+	for _, want := range []string{"Привет", "метка", "Мир"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain Cyrillic label %q\noutput:\n%s", want, output)
+		}
+	}
+
+	// The replacement character indicates a multibyte rune was split into
+	// invalid byte fragments during rendering.
+	if strings.ContainsRune(output, '\uFFFD') {
+		t.Fatalf("expected no replacement characters in Cyrillic output\noutput:\n%s", output)
+	}
+
+	assertUniformDisplayWidth(t, output)
+}
+
 func assertUniformDisplayWidth(t *testing.T, output string) {
 	t.Helper()
 

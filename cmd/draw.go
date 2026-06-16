@@ -48,11 +48,21 @@ func (g *graph) drawEdge(e *edge) (*drawing, *drawing, *drawing, *drawing, *draw
 }
 
 func (d *drawing) drawText(start drawingCoord, text string) {
-	// Increase dimensions if necessary.
-	d.increaseSize(start.x+len(text), start.y)
-	log.Debug("Drawing '", text, "' from ", start, " to ", drawingCoord{x: start.x + len(text), y: start.y})
-	for x := 0; x < len(text); x++ {
-		(*d)[x+start.x][start.y] = string(text[x])
+	// Increase dimensions if necessary. Use the visual width so multibyte
+	// (e.g. Cyrillic, CJK) runes reserve the correct number of cells.
+	textWidth := runewidth.StringWidth(text)
+	d.increaseSize(start.x+textWidth, start.y)
+	log.Debug("Drawing '", text, "' from ", start, " to ", drawingCoord{x: start.x + textWidth, y: start.y})
+	// Iterate over runes (not bytes) so multibyte characters are placed in a
+	// single cell instead of being split into invalid byte fragments.
+	textX := start.x
+	for _, r := range text {
+		runeWidth := Max(runewidth.RuneWidth(r), 1)
+		(*d)[textX][start.y] = string(r)
+		for offset := 1; offset < runeWidth; offset++ {
+			(*d)[textX+offset][start.y] = ""
+		}
+		textX += runeWidth
 	}
 }
 
