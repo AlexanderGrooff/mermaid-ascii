@@ -64,6 +64,25 @@ func TestExtendedChars(t *testing.T) {
 	}
 }
 
+// TestMultibyte verifies that multibyte UTF-8 labels (Cyrillic, Greek, accented
+// Latin, etc.) render correctly without splitting runes into invalid byte
+// fragments. Test cases are loaded from testdata/multibyte/*.txt.
+func TestMultibyte(t *testing.T) {
+	dir := "testdata/multibyte"
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("Failed to read directory %s: %v", dir, err)
+	}
+
+	for _, file := range files {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".txt") {
+			t.Run(file.Name(), func(t *testing.T) {
+				verifyMap(t, filepath.Join(dir, file.Name()), true)
+			})
+		}
+	}
+}
+
 // TestGraphUseAsciiConfig tests that RenderDiagram respects config.UseAscii for graphs
 func TestGraphUseAsciiConfig(t *testing.T) {
 	mermaidInput := `graph LR
