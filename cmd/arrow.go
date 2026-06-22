@@ -353,7 +353,7 @@ func insetLine(line []drawingCoord, insetStart, insetEnd int) []drawingCoord {
 	}
 	endInset := insetEnd
 	if insetEnd > 0 {
-		endInset = insetEnd - 1 // drawTextOnLine span is exclusive; keeps the trailing dash before the arrowhead
+			endInset = insetEnd - 1 // shift label right ~1 char so the start dash survives the centered placement
 	}
 	dir := determineDirection(genericCoord(line[0]), genericCoord(line[1]))
 	a, b := line[0], line[1]
