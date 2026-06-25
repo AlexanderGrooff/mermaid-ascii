@@ -114,8 +114,23 @@ func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) (*drawing, *dra
 	dPath, linesDrawn, lineDirs := g.drawPath(e.path)
 	dBoxStart := g.drawBoxStart(e.path, linesDrawn[0])
 	dArrowHead := g.drawArrowHead(linesDrawn[len(linesDrawn)-1], lineDirs[len(lineDirs)-1])
+	if e.isBidirectional && len(linesDrawn) > 0 {
+		dStartArrowHead := g.drawArrowHead(reverseDrawingLine(linesDrawn[0]), lineDirs[0].getOpposite())
+		dArrowHead = g.mergeDrawings(dArrowHead, drawingCoord{0, 0}, dStartArrowHead)
+	}
 	dCorners := g.drawCorners(e.path)
 	return dPath, dBoxStart, dArrowHead, dCorners, dLabel
+}
+
+func reverseDrawingLine(line []drawingCoord) []drawingCoord {
+	if len(line) == 0 {
+		return line
+	}
+	reversed := make([]drawingCoord, len(line))
+	for i, coord := range line {
+		reversed[len(line)-1-i] = coord
+	}
+	return reversed
 }
 
 func mergePath(path []gridCoord) []gridCoord {
@@ -321,8 +336,44 @@ func (g *graph) drawArrowLabel(e *edge) *drawing {
 	}
 
 	log.Debugf("Drawing text '%s' on gridline %v", e.text, e.labelLine)
-	d.drawTextOnLine(g.lineToDrawing(e.labelLine), e.text)
+	line := g.lineToDrawing(e.labelLine)
+	if e.isBidirectional {
+		line = insetLine(line, 2, 2) // reserve for label placement calc: <- (2 char) + {label} + -> (2 char)
+	} else {
+		line = insetLine(line, 1, 2) // reserve for label placement calc: - (1 char) + {label} + -> (2 char)
+	}
+	d.drawTextOnLine(line, e.text)
 	return d
+}
+
+// insetLine returns a sub-segment with each endpoint moved inward along the line.
+func insetLine(line []drawingCoord, insetStart, insetEnd int) []drawingCoord {
+	if len(line) < 2 || (insetStart == 0 && insetEnd == 0) {
+		return line
+	}
+	endInset := insetEnd
+	if insetEnd > 0 {
+			endInset = insetEnd - 1 // shift label right ~1 char so the start dash survives the centered placement
+	}
+	dir := determineDirection(genericCoord(line[0]), genericCoord(line[1]))
+	a, b := line[0], line[1]
+	switch dir {
+	case Right:
+		a.x += insetStart
+		b.x -= endInset
+	case Left:
+		a.x -= insetStart
+		b.x += endInset
+	case Down:
+		a.y += insetStart
+		b.y -= endInset
+	case Up:
+		a.y -= insetStart
+		b.y += endInset
+	default:
+		return line
+	}
+	return []drawingCoord{a, b}
 }
 
 func (d *drawing) drawTextOnLine(line []drawingCoord, label string) {

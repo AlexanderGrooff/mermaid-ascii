@@ -101,7 +101,12 @@ func mkGraph(data *orderedmap.OrderedMap[string, []textEdge], nodeSpecs map[stri
 				g.appendNode(childNode)
 				index += 1
 			}
-			e := edge{from: parentNode, to: childNode, text: textEdge.label}
+			e := edge{
+				from:            parentNode,
+				to:              childNode,
+				text:            textEdge.label,
+				isBidirectional: textEdge.isBidirectional,
+			}
 			g.edges = append(g.edges, &e)
 		}
 	}

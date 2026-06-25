@@ -7,13 +7,14 @@ import (
 )
 
 type edge struct {
-	from      *node
-	to        *node
-	text      string
-	path      []gridCoord
-	labelLine []gridCoord
-	startDir  direction
-	endDir    direction
+	from            *node
+	to              *node
+	text            string
+	isBidirectional bool
+	path            []gridCoord
+	labelLine       []gridCoord
+	startDir        direction
+	endDir          direction
 }
 
 func (g *graph) determinePath(e *edge) {
@@ -152,8 +153,12 @@ func (g *graph) determineLabelLine(e *edge) {
 	}
 
 	middleX := labelMiddleX(largestLine)
-	log.Debugf("Increasing column width for column %v from size %v to %v", middleX, g.columnWidth[middleX], lenLabel+2)
-	g.columnWidth[middleX] = Max(g.columnWidth[middleX], lenLabel+2) // Wrap with dashes + arrowhead
+	labelPadding := 3 // Wrap with -{label}-> (dashes + end arrowhead, 3 char)
+	if e.isBidirectional {
+		labelPadding = 4 // Wrap with <-{label}-> (start arrowhead+ dashes + end arrowhead, 4 char)
+	}
+	log.Debugf("Increasing column width for column %v from size %v to %v", middleX, g.columnWidth[middleX], lenLabel+labelPadding)
+	g.columnWidth[middleX] = Max(g.columnWidth[middleX], lenLabel+labelPadding)
 	log.Debugf("New column sizes: %v", g.columnWidth)
 	e.labelLine = largestLine
 }
