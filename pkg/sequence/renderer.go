@@ -18,6 +18,7 @@ const (
 	labelLeftMargin           = 2
 	labelBufferSpace          = 10
 	frameIndent               = 2 // columns reserved per nested fragment level
+	frameLabelInset           = 2 // columns from the left corner to the "[label]" tab
 )
 
 type diagramLayout struct {
@@ -154,8 +155,15 @@ func renderEvents(events []Event, layout *diagramLayout, chars BoxChars) []strin
 			continue
 		}
 
-		// EventMessage. (EventFragmentEnd is always consumed as the boundary
-		// found by matchingFragmentEnd, so it never reaches this branch.)
+		// A lone EventFragmentEnd is normally consumed by matchingFragmentEnd,
+		// so it only reaches here if given an unbalanced event stream; skip it
+		// defensively rather than nil-deref on ev.Message below.
+		if ev.Kind == EventFragmentEnd {
+			i++
+			continue
+		}
+
+		// EventMessage.
 		msg := ev.Message
 		for s := 0; s < layout.messageSpacing; s++ {
 			lines = append(lines, buildLifeline(layout, chars))
@@ -224,7 +232,7 @@ func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars Bo
 	if leftCol < 0 {
 		leftCol = 0
 	}
-	rightCol := layout.participantCenters[rightIdx] + 2
+	rightCol := layout.participantCenters[rightIdx] + frameIndent
 
 	// Message labels can extend well past the rightmost lifeline, so widen the
 	// frame to clear the longest inner line.
@@ -239,9 +247,9 @@ func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars Bo
 		label += " " + frag.Label
 	}
 
-	// The label tab ("[label]") sits two cells in from the left corner; make
-	// sure the frame is wide enough to hold it without truncation.
-	if labelEnd := leftCol + 2 + len([]rune("["+label+"]")) + 1; labelEnd > rightCol {
+	// The label tab ("[label]") sits frameLabelInset cells in from the left
+	// corner; make sure the frame is wide enough to hold it without truncation.
+	if labelEnd := leftCol + frameLabelInset + len([]rune("["+label+"]")) + 1; labelEnd > rightCol {
 		rightCol = labelEnd
 	}
 
@@ -296,7 +304,7 @@ func fragmentBorder(layout *diagramLayout, chars BoxChars, leftCol, rightCol int
 	line[rightCol] = rightCorner
 
 	if label != "" {
-		col := leftCol + 2
+		col := leftCol + frameLabelInset
 		for _, r := range "[" + label + "]" {
 			if col < rightCol {
 				line[col] = r
