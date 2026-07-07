@@ -1,0 +1,15 @@
+sequenceDiagram
+    A->>B: hi
+    loop nothing here
+    end
+---
++---+     +---+
+| A |     | B |
++-+-+     +-+-+
+  |         |
+  | hi      |
+  +-------->|
++-[loop nothing here]-+
+| |         |         |
++---------------------+
+  |         |

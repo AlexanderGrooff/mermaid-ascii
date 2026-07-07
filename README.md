@@ -326,6 +326,32 @@ $ mermaid-ascii -f sequence.mermaid
     │◄┈┈┈┈┈┈┈┈┈┈┈┤
     │            │
 
+# Loop and opt blocks are drawn as labelled frames (and can be nested)
+$ cat sequence.mermaid
+sequenceDiagram
+Alice->>Bob: Hello
+loop every minute
+Alice->>Bob: Ping
+Bob-->>Alice: Pong
+end
+$ mermaid-ascii -f sequence.mermaid
+┌───────┐     ┌─────┐
+│ Alice │     │ Bob │
+└───┬───┘     └──┬──┘
+    │            │
+    │ Hello      │
+    ├───────────►│
+  ┌─[loop every minute]─┐
+  │ │            │      │
+  │ │ Ping       │      │
+  │ ├───────────►│      │
+  │ │            │      │
+  │ │ Pong       │      │
+  │ │◄┈┈┈┈┈┈┈┈┈┈┈┤      │
+  │ │            │      │
+  └─────────────────────┘
+    │            │
+
 # ASCII mode for sequence diagrams
 $ cat sequence.mermaid | mermaid-ascii --ascii
 +-------+     +-----+
@@ -525,9 +551,11 @@ Note that with `--coords` enabled, the grid-coords shown show the starting locat
 - [x] Participant aliases (`participant A as Alice`)
 - [x] Unicode support (emojis, CJK characters, etc.)
 - [x] Both ASCII and Unicode rendering modes
+- [x] `loop` and `opt` blocks (incl. nesting)
+- [x] `autonumber`
 - [ ] Activation boxes
 - [ ] Notes (`Note left of Alice: text`)
-- [ ] Loops, alt, opt blocks
+- [ ] `alt`/`else`, `par`, `critical`, `break`, `rect` blocks
 
 ## TODOs
 
@@ -555,7 +583,8 @@ The baseline components for Mermaid work, but there are a lot of things that are
 
 - [ ] Activation boxes (activate/deactivate)
 - [ ] Notes (`Note left of Alice: text`)
-- [ ] Loops, alt, opt, and par blocks
+- [x] `loop` and `opt` blocks
+- [ ] `alt`, `par`, `critical`, `break`, and `rect` blocks
 
 ### General
 

@@ -1,0 +1,27 @@
+sequenceDiagram
+    Alice->>Bob: Hello
+    loop every minute
+        Alice->>Bob: Ping
+        Bob-->>Alice: Pong
+    end
+    Alice->>Bob: Bye
+---
++-------+     +-----+
+| Alice |     | Bob |
++---+---+     +--+--+
+    |            |
+    | Hello      |
+    +----------->|
+  +-[loop every minute]-+
+  | |            |      |
+  | | Ping       |      |
+  | +----------->|      |
+  | |            |      |
+  | | Pong       |      |
+  | |<...........+      |
+  | |            |      |
+  +---------------------+
+    |            |
+    | Bye        |
+    +----------->|
+    |            |
