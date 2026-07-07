@@ -17,6 +17,7 @@ const (
 	boxBorderWidth            = 2
 	labelLeftMargin           = 2
 	labelBufferSpace          = 10
+	frameIndent               = 2 // columns reserved per nested fragment level
 )
 
 type diagramLayout struct {
@@ -91,6 +92,27 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 	}
 
 	layout := calculateLayout(sd, config)
+
+	// Fall back to a message-only body for diagrams built without an event
+	// stream (e.g. constructed by hand rather than via Parse).
+	events := sd.Events
+	if len(events) == 0 {
+		for _, msg := range sd.Messages {
+			events = append(events, Event{Kind: EventMessage, Message: msg})
+		}
+	}
+
+	// Nested fragment frames stack their left borders in a gutter to the left of
+	// the first participant. A single (unnested) fragment already fits with its
+	// border at column 0, so only levels beyond the first need reserved columns;
+	// shift the whole diagram right so the borders never overlap the lifelines.
+	if gutter := (fragmentDepth(events) - 1) * frameIndent; gutter > 0 {
+		for i := range layout.participantCenters {
+			layout.participantCenters[i] += gutter
+		}
+		layout.totalWidth += gutter
+	}
+
 	var lines []string
 
 	lines = append(lines, buildLine(sd.Participants, layout, func(i int) string {
@@ -112,20 +134,195 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 			string(chars.BottomRight)
 	}))
 
-	for _, msg := range sd.Messages {
-		for i := 0; i < layout.messageSpacing; i++ {
-			lines = append(lines, buildLifeline(layout, chars))
+	lines = append(lines, renderEvents(events, layout, chars)...)
+
+	lines = append(lines, buildLifeline(layout, chars))
+	return strings.Join(lines, "\n") + "\n", nil
+}
+
+// renderEvents paints the ordered body of the diagram — messages and fragment
+// frames — into text lines. It recurses into each loop/opt block, so nested
+// fragments (a loop containing an opt, say) render correctly.
+func renderEvents(events []Event, layout *diagramLayout, chars BoxChars) []string {
+	var lines []string
+	for i := 0; i < len(events); {
+		ev := events[i]
+		if ev.Kind == EventFragmentStart {
+			end := matchingFragmentEnd(events, i)
+			lines = append(lines, wrapFragment(ev.Fragment, events[i+1:end], layout, chars)...)
+			i = end + 1
+			continue
 		}
 
+		// EventMessage. (EventFragmentEnd is always consumed as the boundary
+		// found by matchingFragmentEnd, so it never reaches this branch.)
+		msg := ev.Message
+		for s := 0; s < layout.messageSpacing; s++ {
+			lines = append(lines, buildLifeline(layout, chars))
+		}
 		if msg.From == msg.To {
 			lines = append(lines, renderSelfMessage(msg, layout, chars)...)
 		} else {
 			lines = append(lines, renderMessage(msg, layout, chars)...)
 		}
+		i++
+	}
+	return lines
+}
+
+// fragmentDepth returns the maximum fragment nesting depth within events (0 if
+// there are no fragments).
+func fragmentDepth(events []Event) int {
+	maxDepth, cur := 0, 0
+	for _, ev := range events {
+		switch ev.Kind {
+		case EventFragmentStart:
+			cur++
+			if cur > maxDepth {
+				maxDepth = cur
+			}
+		case EventFragmentEnd:
+			cur--
+		}
+	}
+	return maxDepth
+}
+
+// matchingFragmentEnd returns the index of the EventFragmentEnd that closes the
+// fragment opened at start, accounting for nested fragments.
+func matchingFragmentEnd(events []Event, start int) int {
+	depth := 0
+	for i := start; i < len(events); i++ {
+		switch events[i].Kind {
+		case EventFragmentStart:
+			depth++
+		case EventFragmentEnd:
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return len(events) // unreachable: the parser guarantees balanced fragments
+}
+
+// wrapFragment renders a loop/opt block: it paints the inner body, then draws a
+// labelled frame around the participants the block touches.
+func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars BoxChars) []string {
+	// Render the inner body first. A trailing lifeline gives breathing room
+	// above the bottom border.
+	body := renderEvents(inner, layout, chars)
+	body = append(body, buildLifeline(layout, chars))
+
+	// The frame spans from just left of the leftmost involved lifeline to just
+	// right of the rightmost — the same participants the block's messages touch.
+	// Its left border is pushed further left by the depth of frames nested
+	// inside it, so each enclosing frame sits outside its children (the gutter
+	// reserved in Render guarantees there is room).
+	leftIdx, rightIdx := involvedParticipants(inner, layout)
+	leftCol := layout.participantCenters[leftIdx] - frameIndent*(fragmentDepth(inner)+1)
+	if leftCol < 0 {
+		leftCol = 0
+	}
+	rightCol := layout.participantCenters[rightIdx] + 2
+
+	// Message labels can extend well past the rightmost lifeline, so widen the
+	// frame to clear the longest inner line.
+	for _, l := range body {
+		if w := len([]rune(l)) + 1; w > rightCol {
+			rightCol = w
+		}
 	}
 
-	lines = append(lines, buildLifeline(layout, chars))
-	return strings.Join(lines, "\n") + "\n", nil
+	label := frag.Type.String()
+	if frag.Label != "" {
+		label += " " + frag.Label
+	}
+
+	// The label tab ("[label]") sits two cells in from the left corner; make
+	// sure the frame is wide enough to hold it without truncation.
+	if labelEnd := leftCol + 2 + len([]rune("["+label+"]")) + 1; labelEnd > rightCol {
+		rightCol = labelEnd
+	}
+
+	out := []string{fragmentBorder(layout, chars, leftCol, rightCol, label, true)}
+	for _, l := range body {
+		out = append(out, overlayFrameSides(l, chars, leftCol, rightCol))
+	}
+	out = append(out, fragmentBorder(layout, chars, leftCol, rightCol, "", false))
+	return out
+}
+
+// involvedParticipants returns the smallest and largest participant indices
+// referenced by the messages in events. If there are no messages it falls back
+// to spanning every participant.
+func involvedParticipants(events []Event, layout *diagramLayout) (int, int) {
+	minIdx, maxIdx := -1, -1
+	note := func(idx int) {
+		if minIdx == -1 || idx < minIdx {
+			minIdx = idx
+		}
+		if maxIdx == -1 || idx > maxIdx {
+			maxIdx = idx
+		}
+	}
+	for _, ev := range events {
+		if ev.Kind == EventMessage {
+			note(ev.Message.From.Index)
+			note(ev.Message.To.Index)
+		}
+	}
+	if minIdx == -1 {
+		return 0, len(layout.participantCenters) - 1
+	}
+	return minIdx, maxIdx
+}
+
+// fragmentBorder builds a top or bottom frame border on top of a lifeline row,
+// so participant lines outside the frame stay continuous. When top is true and
+// label is non-empty, the label is embedded as a "[label]" tab near the left
+// corner.
+func fragmentBorder(layout *diagramLayout, chars BoxChars, leftCol, rightCol int, label string, top bool) string {
+	line := padRunes(buildLifeline(layout, chars), rightCol+1)
+
+	leftCorner, rightCorner := chars.BottomLeft, chars.BottomRight
+	if top {
+		leftCorner, rightCorner = chars.TopLeft, chars.TopRight
+	}
+	line[leftCol] = leftCorner
+	for c := leftCol + 1; c < rightCol; c++ {
+		line[c] = chars.Horizontal
+	}
+	line[rightCol] = rightCorner
+
+	if label != "" {
+		col := leftCol + 2
+		for _, r := range "[" + label + "]" {
+			if col < rightCol {
+				line[col] = r
+				col++
+			}
+		}
+	}
+	return strings.TrimRight(string(line), " ")
+}
+
+// overlayFrameSides draws the left and right vertical borders of a frame onto an
+// already-rendered content line.
+func overlayFrameSides(line string, chars BoxChars, leftCol, rightCol int) string {
+	r := padRunes(line, rightCol+1)
+	r[leftCol] = chars.Vertical
+	r[rightCol] = chars.Vertical
+	return strings.TrimRight(string(r), " ")
+}
+
+// padRunes returns s as a rune slice right-padded with spaces to at least width.
+func padRunes(s string, width int) []rune {
+	r := []rune(s)
+	for len(r) < width {
+		r = append(r, ' ')
+	}
+	return r
 }
 
 func buildLine(participants []*Participant, layout *diagramLayout, draw func(int) string) string {
