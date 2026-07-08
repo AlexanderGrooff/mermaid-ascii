@@ -38,9 +38,9 @@ type graphNodeSpec struct {
 }
 
 type textEdge struct {
-	parent         textNode
-	child          textNode
-	label          string
+	parent          textNode
+	child           textNode
+	label           string
 	isBidirectional bool
 }
 
@@ -371,14 +371,33 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 		return &properties, errors.New("missing graph definition")
 	}
 
-	// First line should either say "graph TD" or "graph LR"
-	switch lines[0] {
-	case "graph LR", "flowchart LR":
-		properties.graphDirection = "LR"
-	case "graph TD", "flowchart TD", "graph TB", "flowchart TB":
-		properties.graphDirection = "TD"
-	default:
-		return &properties, fmt.Errorf("unsupported graph type '%s'. Supported types: graph TD, graph TB, graph LR, flowchart TD, flowchart TB, flowchart LR", lines[0])
+	// The first line declares the diagram: "graph" or "flowchart" followed by an
+	// optional direction (e.g. "flowchart LR", "graph TD", or a bare "graph").
+	// strings.Fields collapses any surrounding or repeated whitespace, so
+	// indented or trailing-padded declarations parse correctly; TrimRight drops a
+	// trailing separator (mermaid allows "graph TD;").
+	fields := strings.Fields(strings.TrimRight(lines[0], "; \t\r"))
+	if len(fields) == 0 || (fields[0] != "graph" && fields[0] != "flowchart") {
+		return &properties, fmt.Errorf("unsupported graph type '%s'. Supported types: 'graph' or 'flowchart' with an optional direction (TD, TB, BT, LR, RL)", strings.TrimSpace(lines[0]))
+	}
+	if len(fields) > 2 {
+		return &properties, fmt.Errorf("unexpected tokens after graph direction: %q", strings.Join(fields[2:], " "))
+	}
+
+	// Mermaid defaults to top-down when no direction is given. The renderer only
+	// lays out along the horizontal (LR) or vertical (TD) axis; the reverse
+	// directions RL and BT are accepted but drawn on their axis without the
+	// reversal (RL renders left-to-right, BT top-down).
+	properties.graphDirection = "TD"
+	if len(fields) == 2 {
+		switch fields[1] {
+		case "LR", "RL":
+			properties.graphDirection = "LR"
+		case "TD", "TB", "BT":
+			properties.graphDirection = "TD"
+		default:
+			return &properties, fmt.Errorf("unsupported graph direction '%s'. Supported directions: TD, TB, BT, LR, RL", fields[1])
+		}
 	}
 	lines = lines[1:]
 
