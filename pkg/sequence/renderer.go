@@ -395,7 +395,7 @@ func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string
 
 	line := []rune(buildLifeline(layout, chars))
 	style := chars.SolidLine
-	if msg.ArrowType == DottedArrow {
+	if msg.ArrowType.isDotted() {
 		style = chars.DottedLine
 	}
 
@@ -404,11 +404,19 @@ func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string
 		for i := from + 1; i < to; i++ {
 			line[i] = style
 		}
-		line[to-1] = chars.ArrowRight
+		// Open arrows (-> / -->) have no head: draw the line right up to the
+		// target lifeline instead of an arrowhead.
+		line[to-1] = style
+		if msg.ArrowType.hasHead() {
+			line[to-1] = chars.ArrowRight
+		}
 		line[to] = chars.Vertical
 	} else {
 		line[to] = chars.Vertical
-		line[to+1] = chars.ArrowLeft
+		line[to+1] = style
+		if msg.ArrowType.hasHead() {
+			line[to+1] = chars.ArrowLeft
+		}
 		for i := to + 2; i < from; i++ {
 			line[i] = style
 		}
@@ -463,10 +471,18 @@ func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []st
 		lines = append(lines, strings.TrimRight(string(line), " "))
 	}
 
+	// Solid arrows keep the solid horizontal glyph; dotted arrows (-->>/-->) use
+	// the dotted line. For solid arrows style == chars.Horizontal, so output is
+	// unchanged from before.
+	style := chars.Horizontal
+	if msg.ArrowType.isDotted() {
+		style = chars.DottedLine
+	}
+
 	l1 := ensureWidth(buildLifeline(layout, chars))
 	l1[center] = chars.TeeRight
 	for i := 1; i < width; i++ {
-		l1[center+i] = chars.Horizontal
+		l1[center+i] = style
 	}
 	l1[center+width-1] = chars.SelfTopRight
 	lines = append(lines, strings.TrimRight(string(l1), " "))
@@ -477,9 +493,13 @@ func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []st
 
 	l3 := ensureWidth(buildLifeline(layout, chars))
 	l3[center] = chars.Vertical
-	l3[center+1] = chars.ArrowLeft
+	// Open arrows have no head.
+	l3[center+1] = style
+	if msg.ArrowType.hasHead() {
+		l3[center+1] = chars.ArrowLeft
+	}
 	for i := 2; i < width-1; i++ {
-		l3[center+i] = chars.Horizontal
+		l3[center+i] = style
 	}
 	l3[center+width-1] = chars.SelfBottom
 	lines = append(lines, strings.TrimRight(string(l3), " "))
