@@ -18,8 +18,12 @@ var (
 	// participantRegex matches participant declarations: participant [ID] [as Label]
 	participantRegex = regexp.MustCompile(`^\s*participant\s+(?:"([^"]+)"|(\S+))(?:\s+as\s+(.+))?$`)
 
-	// messageRegex matches messages: [From]->>[To]: [Label]
-	messageRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([^\s\->]+))\s*(-->>|->>)\s*(?:"([^"]+)"|([^\s\->]+))\s*:\s*(.*)$`)
+	// messageRegex matches messages: [From][arrow][To]: [Label]. The arrow is one
+	// of ->>, -->>, -> or -->. Unquoted participant names exclude the arrow
+	// characters (- > <) so an unsupported arrow such as the bidirectional
+	// "<<->>" cannot be silently absorbed into a name — it fails to match and is
+	// reported as invalid syntax rather than rendered wrongly.
+	messageRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([^\s<>-]+))\s*(-->>|-->|->>|->)\s*(?:"([^"]+)"|([^\s<>-]+))\s*:\s*(.*)$`)
 
 	// autonumberRegex matches the autonumber directive
 	autonumberRegex = regexp.MustCompile(`^\s*autonumber\s*$`)
@@ -109,9 +113,23 @@ type Message struct {
 type ArrowType int
 
 const (
-	SolidArrow ArrowType = iota
-	DottedArrow
+	SolidArrow  ArrowType = iota // ->>  solid line with an arrowhead
+	DottedArrow                  // -->> dotted line with an arrowhead
+	SolidOpen                    // ->   solid line, no arrowhead
+	DottedOpen                   // -->  dotted line, no arrowhead
 )
+
+// isDotted reports whether the arrow is drawn with a dotted (rather than solid)
+// line.
+func (a ArrowType) isDotted() bool {
+	return a == DottedArrow || a == DottedOpen
+}
+
+// hasHead reports whether the arrow terminates in an arrowhead. The open forms
+// (-> and -->) are drawn as a plain line touching the target lifeline.
+func (a ArrowType) hasHead() bool {
+	return a == SolidArrow || a == DottedArrow
+}
 
 func (a ArrowType) String() string {
 	switch a {
@@ -119,8 +137,12 @@ func (a ArrowType) String() string {
 		return "solid"
 	case DottedArrow:
 		return "dotted"
+	case SolidOpen:
+		return "solid-open"
+	case DottedOpen:
+		return "dotted-open"
 	default:
-		return fmt.Sprintf("ArrowType(%d)", a)
+		return fmt.Sprintf("ArrowType(%d)", int(a))
 	}
 }
 
@@ -282,9 +304,16 @@ func (sd *SequenceDiagram) parseMessage(line string, participants map[string]*Pa
 	from := sd.getParticipant(fromID, participants)
 	to := sd.getParticipant(toID, participants)
 
-	aType := DottedArrow
-	if arrow == SolidArrowSyntax {
+	var aType ArrowType
+	switch arrow {
+	case "->>":
 		aType = SolidArrow
+	case "-->>":
+		aType = DottedArrow
+	case "->":
+		aType = SolidOpen
+	case "-->":
+		aType = DottedOpen
 	}
 
 	msgNumber := 0
