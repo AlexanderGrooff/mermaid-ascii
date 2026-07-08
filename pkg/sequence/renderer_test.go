@@ -38,6 +38,9 @@ func TestSequenceDiagramRendering(t *testing.T) {
 		"loop_empty.txt",
 		"messages_without_labels.txt",
 		"multiword_labels.txt",
+		"note_over_single.txt",
+		"note_over_span.txt",
+		"note_in_loop.txt",
 		"opt_basic.txt",
 		"opt_no_label.txt",
 		"self_message.txt",
@@ -59,6 +62,7 @@ func TestSequenceDiagramRendering_ASCII(t *testing.T) {
 	testDataPath := filepath.Join(getTestDataPath(), "sequence-ascii")
 
 	goldenFiles := []string{
+		"note_over_single.txt",
 		"arrow_types.txt",
 		"autonumber.txt",
 		"dotted_arrows_only.txt",
@@ -96,6 +100,9 @@ func TestSequenceDiagramRendering_ASCIISmokeTest(t *testing.T) {
 		"loop_empty.txt",
 		"messages_without_labels.txt",
 		"multiword_labels.txt",
+		"note_over_single.txt",
+		"note_over_span.txt",
+		"note_in_loop.txt",
 		"opt_basic.txt",
 		"opt_no_label.txt",
 		"self_message.txt",
