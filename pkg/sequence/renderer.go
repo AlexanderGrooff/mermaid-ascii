@@ -108,10 +108,14 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 	// border at column 0, so only levels beyond the first need reserved columns;
 	// shift the whole diagram right so the borders never overlap the lifelines.
 	if gutter := (fragmentDepth(events) - 1) * frameIndent; gutter > 0 {
-		for i := range layout.participantCenters {
-			layout.participantCenters[i] += gutter
-		}
-		layout.totalWidth += gutter
+		shiftLayoutRight(layout, gutter)
+	}
+
+	// A "left of" note on the leftmost participant, or a wide "over" note,
+	// extends past column 0. Reserve an additional left gutter so no note box is
+	// clamped on top of lifelines it shouldn't cover.
+	if gutter := noteLeftGutter(events, layout); gutter > 0 {
+		shiftLayoutRight(layout, gutter)
 	}
 
 	var lines []string
@@ -159,6 +163,15 @@ func renderEvents(events []Event, layout *diagramLayout, chars BoxChars) []strin
 		// so it only reaches here if given an unbalanced event stream; skip it
 		// defensively rather than nil-deref on ev.Message below.
 		if ev.Kind == EventFragmentEnd {
+			i++
+			continue
+		}
+
+		if ev.Kind == EventNote {
+			for s := 0; s < layout.messageSpacing; s++ {
+				lines = append(lines, buildLifeline(layout, chars))
+			}
+			lines = append(lines, renderNote(ev.Note, layout, chars)...)
 			i++
 			continue
 		}
@@ -214,6 +227,132 @@ func matchingFragmentEnd(events []Event, start int) int {
 	return len(events) // unreachable: the parser guarantees balanced fragments
 }
 
+// renderNote draws a note annotation as a bordered box positioned over or
+// beside its participant lifelines. The box obscures any lifelines it covers,
+// while lifelines outside it stay continuous.
+// shiftLayoutRight moves every participant (and the total width) right by n
+// columns, reserving a left gutter for content that extends past column 0.
+func shiftLayoutRight(layout *diagramLayout, n int) {
+	for i := range layout.participantCenters {
+		layout.participantCenters[i] += n
+	}
+	layout.totalWidth += n
+}
+
+// noteLeftGutter returns how many columns the diagram must shift right so that
+// every note box — and the border of each fragment frame enclosing it — fits at
+// or right of column 0. A note nested d fragments deep needs room for its box
+// plus one border column per enclosing frame plus a one-column margin.
+func noteLeftGutter(events []Event, layout *diagramLayout) int {
+	gutter, depth := 0, 0
+	for _, ev := range events {
+		switch ev.Kind {
+		case EventFragmentStart:
+			depth++
+		case EventFragmentEnd:
+			depth--
+		case EventNote:
+			left, _ := noteBoxColumns(ev.Note, layout)
+			// A top-level note only needs its own box at column 0. A note d
+			// frames deep also needs the outermost enclosing border, which sits
+			// 1+(d-1)*frameIndent columns to its left (see wrapFragment's stagger).
+			extra := 0
+			if depth > 0 {
+				extra = 1 + (depth-1)*frameIndent
+			}
+			if need := -left + extra; need > gutter {
+				gutter = need
+			}
+		}
+	}
+	return gutter
+}
+
+// noteRunes returns a note's display text with mermaid line breaks collapsed to
+// spaces (ASCII output is single-line).
+func noteRunes(note *Note) []rune {
+	text := note.Text
+	for _, br := range []string{"<br/>", "<br />", "<br>"} {
+		text = strings.ReplaceAll(text, br, " ")
+	}
+	return []rune(text)
+}
+
+// noteBoxColumns returns the [left, right] columns a note's box occupies. For
+// `over`, the box always spans its participants (first..last) and widens
+// symmetrically to fit the text; for left/right of it sits beside the lifeline.
+// left may be negative when a left-of box extends past column 0 — Render
+// reserves a gutter so that never happens at draw time.
+func noteBoxColumns(note *Note, layout *diagramLayout) (int, int) {
+	boxW := len(noteRunes(note)) + 4 // "│ text │"
+	centers := layout.participantCenters
+	first := centers[note.Participants[0].Index]
+	last := centers[note.Participants[len(note.Participants)-1].Index]
+
+	switch note.Placement {
+	case NoteRightOf:
+		left := first + 2
+		return left, left + boxW - 1
+	case NoteLeftOf:
+		right := first - 2
+		return right - boxW + 1, right
+	default: // NoteOver: span the named participants, widen for text, keep centred
+		lo, hi := first, last
+		if hi < lo {
+			lo, hi = hi, lo
+		}
+		left, right := lo-1, hi+1
+		if extra := boxW - (right - left + 1); extra > 0 {
+			left -= extra / 2
+			right += extra - extra/2
+		}
+		return left, right
+	}
+}
+
+// renderNote draws a note annotation as a bordered box positioned over or
+// beside its participant lifelines. The box obscures any lifelines it covers,
+// while lifelines outside it stay continuous.
+func renderNote(note *Note, layout *diagramLayout, chars BoxChars) []string {
+	runes := noteRunes(note)
+	left, right := noteBoxColumns(note, layout)
+	if left < 0 { // safety; Render's note gutter should already prevent this
+		left = 0
+	}
+
+	border := func(l, r rune) string {
+		line := padRunes(buildLifeline(layout, chars), right+1)
+		line[left] = l
+		for c := left + 1; c < right; c++ {
+			line[c] = chars.Horizontal
+		}
+		line[right] = r
+		return strings.TrimRight(string(line), " ")
+	}
+
+	mid := padRunes(buildLifeline(layout, chars), right+1)
+	for c := left; c <= right; c++ { // clear covered lifelines
+		mid[c] = ' '
+	}
+	mid[left] = chars.Vertical
+	mid[right] = chars.Vertical
+	// Centre the text within the box interior [left+1, right-1].
+	inner := right - left - 1
+	col := left + 1 + (inner-len(runes))/2
+	for _, ch := range runes {
+		if col > left && col < right {
+			mid[col] = ch
+		}
+		col++
+	}
+
+	return []string{
+		border(chars.TopLeft, chars.TopRight),
+		strings.TrimRight(string(mid), " "),
+		border(chars.BottomLeft, chars.BottomRight),
+	}
+}
+
 // wrapFragment renders a loop/opt block: it paints the inner body, then draws a
 // labelled frame around the participants the block touches.
 func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars BoxChars) []string {
@@ -229,10 +368,34 @@ func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars Bo
 	// reserved in Render guarantees there is room).
 	leftIdx, rightIdx := involvedParticipants(inner, layout)
 	leftCol := layout.participantCenters[leftIdx] - frameIndent*(fragmentDepth(inner)+1)
+	rightCol := layout.participantCenters[rightIdx] + frameIndent
+
+	// A note in the body can extend beyond the participant span (a "left of"
+	// note, or one wider than its span). Widen this frame to contain any note
+	// box so its border never cuts through it. The margin scales with the note's
+	// depth *relative to this frame* (rd) so that when several frames enclose the
+	// same note, each outer frame lands frameIndent columns further out than the
+	// one inside it (rather than all collapsing onto the note's edge).
+	rd := 0
+	for _, ev := range inner {
+		switch ev.Kind {
+		case EventFragmentStart:
+			rd++
+		case EventFragmentEnd:
+			rd--
+		case EventNote:
+			nl, nr := noteBoxColumns(ev.Note, layout)
+			if x := nl - 1 - rd*frameIndent; x < leftCol {
+				leftCol = x
+			}
+			if x := nr + 1 + rd*frameIndent; x > rightCol {
+				rightCol = x
+			}
+		}
+	}
 	if leftCol < 0 {
 		leftCol = 0
 	}
-	rightCol := layout.participantCenters[rightIdx] + frameIndent
 
 	// Message labels can extend well past the rightmost lifeline, so widen the
 	// frame to clear the longest inner line.

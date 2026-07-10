@@ -1,0 +1,19 @@
+sequenceDiagram
+    A->>B: request
+    Note over B: processing
+    B-->>A: response
+---
++---+     +---+
+| A |     | B |
++-+-+     +-+-+
+  |         |
+  | request |
+  +-------->|
+  |         |
+  |   +------------+
+  |   | processing |
+  |   +------------+
+  |         |
+  | response|
+  |<........+
+  |         |

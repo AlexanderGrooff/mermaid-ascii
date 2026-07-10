@@ -35,6 +35,11 @@ var (
 
 	// fragmentEndRegex matches the "end" line that closes a fragment.
 	fragmentEndRegex = regexp.MustCompile(`^\s*end\s*$`)
+
+	// noteRegex matches note annotations: "Note over A: text", "note left of A:
+	// text", "Note over A,B: text" (case-insensitive keyword). Group 1 is the
+	// placement, group 2 the participant list, group 3 the text.
+	noteRegex = regexp.MustCompile(`^\s*[Nn]ote\s+(right of|left of|over)\s+([^:]+?)\s*:\s*(.*)$`)
 )
 
 // SequenceDiagram represents a parsed sequence diagram.
@@ -85,15 +90,34 @@ const (
 	EventMessage       EventKind = iota // a message arrow
 	EventFragmentStart                  // the opening line of a loop/opt block
 	EventFragmentEnd                    // the matching "end" line
+	EventNote                           // a note annotation
 )
 
 // Event is one item in the diagram body. Exactly one payload field is set:
-// Message when Kind is EventMessage, Fragment when Kind is EventFragmentStart.
-// An EventFragmentEnd carries no payload; it just marks where a block closes.
+// Message when Kind is EventMessage, Fragment when Kind is EventFragmentStart,
+// Note when Kind is EventNote. An EventFragmentEnd carries no payload; it just
+// marks where a block closes.
 type Event struct {
 	Kind     EventKind
 	Message  *Message
 	Fragment *Fragment
+	Note     *Note
+}
+
+// NotePlacement describes where a note box sits relative to its participant(s).
+type NotePlacement int
+
+const (
+	NoteOver    NotePlacement = iota // note over A  /  note over A,B
+	NoteLeftOf                       // note left of A
+	NoteRightOf                      // note right of A
+)
+
+// Note is an annotation box drawn over or beside participant lifelines.
+type Note struct {
+	Placement    NotePlacement
+	Participants []*Participant // one participant, or two for "over A,B"
+	Text         string
 }
 
 type Participant struct {
@@ -195,6 +219,43 @@ func Parse(input string) (*SequenceDiagram, error) {
 		// Check for autonumber directive
 		if autonumberRegex.MatchString(trimmed) {
 			sd.Autonumber = true
+			continue
+		}
+
+		// Notes carry no arrow, so they never collide with messages; a
+		// placement keyword is required, so a participant named "Note" (e.g.
+		// "Note->>B: hi") still parses as a message further down.
+		if m := noteRegex.FindStringSubmatch(trimmed); m != nil {
+			placement := NoteOver
+			switch m[1] {
+			case "left of":
+				placement = NoteLeftOf
+			case "right of":
+				placement = NoteRightOf
+			}
+			var parts []*Participant
+			for _, id := range strings.Split(m[2], ",") {
+				id = strings.Trim(strings.TrimSpace(id), `"`)
+				if id != "" {
+					parts = append(parts, sd.getParticipant(id, participantMap))
+				}
+			}
+			if len(parts) == 0 {
+				return nil, fmt.Errorf("line %d: note without a participant", i+2)
+			}
+			// Mermaid allows an optional wrap:/nowrap: prefix on note text;
+			// wrapping is irrelevant for single-line ASCII, so just strip it.
+			text := strings.TrimSpace(m[3])
+			for _, pre := range []string{"nowrap:", "wrap:"} {
+				if strings.HasPrefix(text, pre) {
+					text = strings.TrimSpace(text[len(pre):])
+					break
+				}
+			}
+			sd.Events = append(sd.Events, Event{
+				Kind: EventNote,
+				Note: &Note{Placement: placement, Participants: parts, Text: text},
+			})
 			continue
 		}
 
