@@ -6,6 +6,7 @@ import (
 
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
 	"github.com/mattn/go-runewidth"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -159,10 +160,13 @@ func renderEvents(events []Event, layout *diagramLayout, chars BoxChars) []strin
 			continue
 		}
 
-		// A lone EventFragmentEnd is normally consumed by matchingFragmentEnd,
-		// so it only reaches here if given an unbalanced event stream; skip it
-		// defensively rather than nil-deref on ev.Message below.
-		if ev.Kind == EventFragmentEnd {
+		// EventFragmentEnd is consumed by matchingFragmentEnd, and top-level
+		// EventFragmentDivider is consumed by wrapFragment's section split, so
+		// neither should reach here — skip defensively rather than nil-deref on
+		// ev.Message below. Log to stderr (never stdout, which carries the
+		// diagram) so an unbalanced event stream is diagnosable under -v.
+		if ev.Kind == EventFragmentEnd || ev.Kind == EventFragmentDivider {
+			log.Debugf("renderEvents: unexpected %v at index %d skipped (unbalanced event stream?)", ev.Kind, i)
 			i++
 			continue
 		}
@@ -356,9 +360,21 @@ func renderNote(note *Note, layout *diagramLayout, chars BoxChars) []string {
 // wrapFragment renders a loop/opt block: it paints the inner body, then draws a
 // labelled frame around the participants the block touches.
 func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars BoxChars) []string {
-	// Render the inner body first. A trailing lifeline gives breathing room
-	// above the bottom border.
-	body := renderEvents(inner, layout, chars)
+	// An alt block is split into sections by top-level "else" dividers (dividers
+	// nested inside child fragments belong to those fragments). Render each
+	// section, leaving a placeholder line where each divider will be drawn once
+	// the frame width is known.
+	sections, dividerLabels := splitSections(inner)
+	var body []string
+	dividerAt := map[int]string{}
+	for i, sec := range sections {
+		if i > 0 {
+			dividerAt[len(body)] = dividerLabels[i-1]
+			body = append(body, "") // placeholder for the divider line
+		}
+		body = append(body, renderEvents(sec, layout, chars)...)
+	}
+	// A trailing lifeline gives breathing room above the bottom border.
 	body = append(body, buildLifeline(layout, chars))
 
 	// The frame spans from just left of the leftmost involved lifeline to just
@@ -411,17 +427,79 @@ func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars Bo
 	}
 
 	// The label tab ("[label]") sits frameLabelInset cells in from the left
-	// corner; make sure the frame is wide enough to hold it without truncation.
-	if labelEnd := leftCol + frameLabelInset + len([]rune("["+label+"]")) + 1; labelEnd > rightCol {
-		rightCol = labelEnd
+	// corner; make sure the frame is wide enough to hold it (and every "else"
+	// divider label) without truncation.
+	widen := func(text string) {
+		if end := leftCol + frameLabelInset + len([]rune("["+text+"]")) + 1; end > rightCol {
+			rightCol = end
+		}
+	}
+	widen(label)
+	for _, l := range dividerLabels {
+		if l != "" {
+			widen(l)
+		}
 	}
 
 	out := []string{fragmentBorder(layout, chars, leftCol, rightCol, label, true)}
-	for _, l := range body {
-		out = append(out, overlayFrameSides(l, chars, leftCol, rightCol))
+	for idx, l := range body {
+		if dl, ok := dividerAt[idx]; ok {
+			out = append(out, fragmentDivider(layout, chars, leftCol, rightCol, dl))
+		} else {
+			out = append(out, overlayFrameSides(l, chars, leftCol, rightCol))
+		}
 	}
 	out = append(out, fragmentBorder(layout, chars, leftCol, rightCol, "", false))
 	return out
+}
+
+// splitSections divides a fragment body at its top-level "else" dividers,
+// returning the section event-slices and the label of the divider preceding
+// each section after the first. Dividers nested inside child fragments are left
+// in place (they belong to those fragments).
+func splitSections(inner []Event) ([][]Event, []string) {
+	var sections [][]Event
+	var labels []string
+	cur := []Event{}
+	depth := 0
+	for _, ev := range inner {
+		switch ev.Kind {
+		case EventFragmentStart:
+			depth++
+		case EventFragmentEnd:
+			depth--
+		case EventFragmentDivider:
+			if depth == 0 {
+				sections = append(sections, cur)
+				labels = append(labels, ev.Fragment.Label)
+				cur = []Event{}
+				continue
+			}
+		}
+		cur = append(cur, ev)
+	}
+	return append(sections, cur), labels
+}
+
+// fragmentDivider draws an alt "else" divider: a dashed line spanning the frame
+// and joined to its side borders, with an optional [label] tab near the left.
+func fragmentDivider(layout *diagramLayout, chars BoxChars, leftCol, rightCol int, label string) string {
+	line := padRunes(buildLifeline(layout, chars), rightCol+1)
+	line[leftCol] = chars.TeeRight
+	for c := leftCol + 1; c < rightCol; c++ {
+		line[c] = chars.DottedLine
+	}
+	line[rightCol] = chars.TeeLeft
+	if label != "" {
+		col := leftCol + frameLabelInset
+		for _, r := range "[" + label + "]" {
+			if col < rightCol {
+				line[col] = r
+				col++
+			}
+		}
+	}
+	return strings.TrimRight(string(line), " ")
 }
 
 // involvedParticipants returns the smallest and largest participant indices
