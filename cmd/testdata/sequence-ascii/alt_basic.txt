@@ -1,0 +1,25 @@
+sequenceDiagram
+    A->>B: request
+    alt is valid
+        B-->>A: success
+    else is invalid
+        B-->>A: error
+    end
+---
++---+     +---+
+| A |     | B |
++-+-+     +-+-+
+  |         |
+  | request |
+  +-------->|
++-[alt is valid]-+
+| |         |    |
+| | success |    |
+| |<........+    |
++.[is invalid]...+
+| |         |    |
+| | error   |    |
+| |<........+    |
+| |         |    |
++----------------+
+  |         |

@@ -29,9 +29,13 @@ var (
 	autonumberRegex = regexp.MustCompile(`^\s*autonumber\s*$`)
 
 	// fragmentStartRegex matches the opening line of a control-flow fragment,
-	// e.g. "loop every minute" or "opt is premium". Group 1 is the keyword,
-	// group 2 is the (optional) label describing the condition.
-	fragmentStartRegex = regexp.MustCompile(`^\s*(loop|opt)\b\s*(.*)$`)
+	// e.g. "loop every minute", "opt is premium", "alt is valid". Group 1 is the
+	// keyword, group 2 is the (optional) label describing the condition.
+	fragmentStartRegex = regexp.MustCompile(`^\s*(loop|opt|alt)\b\s*(.*)$`)
+
+	// fragmentElseRegex matches an "else" divider inside an alt block. Group 1 is
+	// the (optional) condition label for the following section.
+	fragmentElseRegex = regexp.MustCompile(`^\s*else\b\s*(.*)$`)
 
 	// fragmentEndRegex matches the "end" line that closes a fragment.
 	fragmentEndRegex = regexp.MustCompile(`^\s*end\s*$`)
@@ -63,6 +67,7 @@ type FragmentType int
 const (
 	FragmentLoop FragmentType = iota // loop ... end
 	FragmentOpt                      // opt ... end
+	FragmentAlt                      // alt ... else ... end
 )
 
 func (f FragmentType) String() string {
@@ -71,6 +76,8 @@ func (f FragmentType) String() string {
 		return "loop"
 	case FragmentOpt:
 		return "opt"
+	case FragmentAlt:
+		return "alt"
 	default:
 		return fmt.Sprintf("FragmentType(%d)", int(f))
 	}
@@ -87,11 +94,29 @@ type Fragment struct {
 type EventKind int
 
 const (
-	EventMessage       EventKind = iota // a message arrow
-	EventFragmentStart                  // the opening line of a loop/opt block
-	EventFragmentEnd                    // the matching "end" line
-	EventNote                           // a note annotation
+	EventMessage         EventKind = iota // a message arrow
+	EventFragmentStart                    // the opening line of a loop/opt/alt block
+	EventFragmentDivider                  // an "else" section divider within an alt
+	EventFragmentEnd                      // the matching "end" line
+	EventNote                             // a note annotation
 )
+
+func (k EventKind) String() string {
+	switch k {
+	case EventMessage:
+		return "message"
+	case EventFragmentStart:
+		return "fragment-start"
+	case EventFragmentDivider:
+		return "fragment-divider"
+	case EventFragmentEnd:
+		return "fragment-end"
+	case EventNote:
+		return "note"
+	default:
+		return fmt.Sprintf("EventKind(%d)", int(k))
+	}
+}
 
 // Event is one item in the diagram body. Exactly one payload field is set:
 // Message when Kind is EventMessage, Fragment when Kind is EventFragmentStart,
@@ -205,10 +230,10 @@ func Parse(input string) (*SequenceDiagram, error) {
 		Autonumber:   false,
 	}
 	participantMap := make(map[string]*Participant)
-	// openFragments counts how many loop/opt blocks are currently open so we can
-	// reject an "end" with no matching opener and, at the very end, an opener
-	// with no matching "end".
-	openFragments := 0
+	// openFragments is a stack of the fragment types currently open, so we can
+	// reject an "end"/"else" with no matching opener, validate that "else" only
+	// appears inside an "alt", and detect an opener with no matching "end".
+	var openFragments []FragmentType
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -274,35 +299,44 @@ func Parse(input string) (*SequenceDiagram, error) {
 			continue
 		}
 
-		// A fragment opener ("loop"/"opt") starts a framed block.
+		// A fragment opener ("loop"/"opt"/"alt") starts a framed block.
 		if match := fragmentStartRegex.FindStringSubmatch(trimmed); match != nil {
-			fType := FragmentLoop
-			if match[1] == "opt" {
-				fType = FragmentOpt
-			}
+			fType := map[string]FragmentType{"loop": FragmentLoop, "opt": FragmentOpt, "alt": FragmentAlt}[match[1]]
 			sd.Events = append(sd.Events, Event{
 				Kind:     EventFragmentStart,
 				Fragment: &Fragment{Type: fType, Label: strings.TrimSpace(match[2])},
 			})
-			openFragments++
+			openFragments = append(openFragments, fType)
+			continue
+		}
+
+		// "else" divides an alt block into sections.
+		if match := fragmentElseRegex.FindStringSubmatch(trimmed); match != nil {
+			if len(openFragments) == 0 || openFragments[len(openFragments)-1] != FragmentAlt {
+				return nil, fmt.Errorf("line %d: %q outside an alt block", i+2, trimmed)
+			}
+			sd.Events = append(sd.Events, Event{
+				Kind:     EventFragmentDivider,
+				Fragment: &Fragment{Type: FragmentAlt, Label: strings.TrimSpace(match[1])},
+			})
 			continue
 		}
 
 		// "end" closes the most recently opened fragment.
 		if fragmentEndRegex.MatchString(trimmed) {
-			if openFragments == 0 {
-				return nil, fmt.Errorf("line %d: %q without matching loop/opt", i+2, trimmed)
+			if len(openFragments) == 0 {
+				return nil, fmt.Errorf("line %d: %q without matching loop/opt/alt", i+2, trimmed)
 			}
 			sd.Events = append(sd.Events, Event{Kind: EventFragmentEnd})
-			openFragments--
+			openFragments = openFragments[:len(openFragments)-1]
 			continue
 		}
 
 		return nil, fmt.Errorf("line %d: invalid syntax: %q", i+2, trimmed)
 	}
 
-	if openFragments > 0 {
-		return nil, fmt.Errorf("unclosed loop/opt fragment: missing %d \"end\"", openFragments)
+	if len(openFragments) > 0 {
+		return nil, fmt.Errorf("unclosed fragment: missing %d \"end\"", len(openFragments))
 	}
 
 	if len(sd.Participants) == 0 {
