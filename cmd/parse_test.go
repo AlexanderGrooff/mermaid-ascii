@@ -201,6 +201,7 @@ func TestGraphTypeDetection(t *testing.T) {
 		{"CRLF line ending", "graph TD\r\nA --> B", "TD", false},
 		{"tab separator", "graph\tLR\nA --> B", "LR", false},
 		{"lowercase direction errors", "graph td\nA --> B", "", true},
+		{"uppercase graph keyword errors", "GRAPH TD\nA --> B", "", true}, // flowchart stays case-sensitive (mermaid parity)
 		{"extra tokens error", "graph TD foo\nA --> B", "", true},
 		{"unknown type errors", "sequenceDiagram\nA->>B: x", "", true},
 		{"unknown direction errors", "graph SIDEWAYS\nA --> B", "", true},
