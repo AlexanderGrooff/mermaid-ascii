@@ -31,11 +31,16 @@ var (
 	// fragmentStartRegex matches the opening line of a control-flow fragment,
 	// e.g. "loop every minute", "opt is premium", "alt is valid". Group 1 is the
 	// keyword, group 2 is the (optional) label describing the condition.
-	fragmentStartRegex = regexp.MustCompile(`(?i)^\s*(loop|opt|alt)\b\s*(.*)$`)
+	fragmentStartRegex = regexp.MustCompile(`(?i)^\s*(loop|opt|alt|par|critical|break|rect)\b\s*(.*)$`)
 
-	// fragmentElseRegex matches an "else" divider inside an alt block. Group 1 is
-	// the (optional) condition label for the following section.
-	fragmentElseRegex = regexp.MustCompile(`(?i)^\s*else\b\s*(.*)$`)
+	// fragmentDividerRegex matches a section divider inside a fragment: "else"
+	// (alt), "and" (par), or "option" (critical). Group 1 is the keyword, group 2
+	// the (optional) label for the following section.
+	fragmentDividerRegex = regexp.MustCompile(`(?i)^\s*(else|and|option)\b\s*(.*)$`)
+
+	// rectColorRegex strips a leading rgb()/rgba() colour argument from a rect's
+	// label (ASCII can't render the fill; PR6 draws a plain frame).
+	rectColorRegex = regexp.MustCompile(`(?i)^\s*rgba?\([^)]*\)\s*`)
 
 	// fragmentEndRegex matches the "end" line that closes a fragment.
 	fragmentEndRegex = regexp.MustCompile(`(?i)^\s*end\s*$`)
@@ -65,9 +70,13 @@ type SequenceDiagram struct {
 type FragmentType int
 
 const (
-	FragmentLoop FragmentType = iota // loop ... end
-	FragmentOpt                      // opt ... end
-	FragmentAlt                      // alt ... else ... end
+	FragmentLoop     FragmentType = iota // loop ... end
+	FragmentOpt                          // opt ... end
+	FragmentAlt                          // alt ... else ... end
+	FragmentPar                          // par ... and ... end
+	FragmentCritical                     // critical ... option ... end
+	FragmentBreak                        // break ... end
+	FragmentRect                         // rect ... end
 )
 
 func (f FragmentType) String() string {
@@ -78,9 +87,30 @@ func (f FragmentType) String() string {
 		return "opt"
 	case FragmentAlt:
 		return "alt"
+	case FragmentPar:
+		return "par"
+	case FragmentCritical:
+		return "critical"
+	case FragmentBreak:
+		return "break"
+	case FragmentRect:
+		return "rect"
 	default:
 		return fmt.Sprintf("FragmentType(%d)", int(f))
 	}
+}
+
+// fragmentKeywords maps an opener keyword to its fragment type.
+var fragmentKeywords = map[string]FragmentType{
+	"loop": FragmentLoop, "opt": FragmentOpt, "alt": FragmentAlt,
+	"par": FragmentPar, "critical": FragmentCritical,
+	"break": FragmentBreak, "rect": FragmentRect,
+}
+
+// dividerKeywords maps a section-divider keyword to the fragment type it must
+// appear inside.
+var dividerKeywords = map[string]FragmentType{
+	"else": FragmentAlt, "and": FragmentPar, "option": FragmentCritical,
 }
 
 // Fragment describes the opening of a control-flow block: its kind and the
@@ -313,25 +343,33 @@ func Parse(input string) (*SequenceDiagram, error) {
 			continue
 		}
 
-		// A fragment opener ("loop"/"opt"/"alt") starts a framed block.
+		// A fragment opener (loop/opt/alt/par/critical/break/rect) starts a block.
 		if match := fragmentStartRegex.FindStringSubmatch(trimmed); match != nil {
-			fType := map[string]FragmentType{"loop": FragmentLoop, "opt": FragmentOpt, "alt": FragmentAlt}[strings.ToLower(match[1])]
+			fType := fragmentKeywords[strings.ToLower(match[1])]
+			label := strings.TrimSpace(match[2])
+			// rect's argument is a fill colour we can't render in ASCII; drop it
+			// so the frame is drawn plain (colour support is a follow-up).
+			if fType == FragmentRect {
+				label = strings.TrimSpace(rectColorRegex.ReplaceAllString(label, ""))
+			}
 			sd.Events = append(sd.Events, Event{
 				Kind:     EventFragmentStart,
-				Fragment: &Fragment{Type: fType, Label: strings.TrimSpace(match[2])},
+				Fragment: &Fragment{Type: fType, Label: label},
 			})
 			openFragments = append(openFragments, fType)
 			continue
 		}
 
-		// "else" divides an alt block into sections.
-		if match := fragmentElseRegex.FindStringSubmatch(trimmed); match != nil {
-			if len(openFragments) == 0 || openFragments[len(openFragments)-1] != FragmentAlt {
-				return nil, fmt.Errorf("line %d: %q outside an alt block", i+2, trimmed)
+		// A section divider: "else" (alt), "and" (par), "option" (critical). It
+		// must sit directly inside the matching fragment type.
+		if match := fragmentDividerRegex.FindStringSubmatch(trimmed); match != nil {
+			want := dividerKeywords[strings.ToLower(match[1])]
+			if len(openFragments) == 0 || openFragments[len(openFragments)-1] != want {
+				return nil, fmt.Errorf("line %d: %q outside a matching %s block", i+2, trimmed, want)
 			}
 			sd.Events = append(sd.Events, Event{
 				Kind:     EventFragmentDivider,
-				Fragment: &Fragment{Type: FragmentAlt, Label: strings.TrimSpace(match[1])},
+				Fragment: &Fragment{Type: want, Label: strings.TrimSpace(match[2])},
 			})
 			continue
 		}
@@ -339,7 +377,7 @@ func Parse(input string) (*SequenceDiagram, error) {
 		// "end" closes the most recently opened fragment.
 		if fragmentEndRegex.MatchString(trimmed) {
 			if len(openFragments) == 0 {
-				return nil, fmt.Errorf("line %d: %q without matching loop/opt/alt", i+2, trimmed)
+				return nil, fmt.Errorf("line %d: %q without a matching fragment opener", i+2, trimmed)
 			}
 			sd.Events = append(sd.Events, Event{Kind: EventFragmentEnd})
 			openFragments = openFragments[:len(openFragments)-1]

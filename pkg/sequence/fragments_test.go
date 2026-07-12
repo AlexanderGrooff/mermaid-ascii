@@ -145,7 +145,7 @@ func TestParseFragmentErrors(t *testing.T) {
 		{
 			name:    "end without opener",
 			input:   "sequenceDiagram\n A->>B: x\n end",
-			wantErr: "without matching",
+			wantErr: "without a matching fragment opener",
 		},
 		{
 			name:    "unclosed nested opt",
