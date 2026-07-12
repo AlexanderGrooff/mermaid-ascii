@@ -71,8 +71,8 @@ func TestParseAltErrors(t *testing.T) {
 	tests := []struct {
 		name, input, wantErr string
 	}{
-		{"else at top level", "sequenceDiagram\n A->>B: x\n else\n", "outside an alt"},
-		{"else inside loop", "sequenceDiagram\n loop x\n  A->>B: y\n else\n end", "outside an alt"},
+		{"else at top level", "sequenceDiagram\n A->>B: x\n else\n", "outside a matching alt"},
+		{"else inside loop", "sequenceDiagram\n loop x\n  A->>B: y\n else\n end", "outside a matching alt"},
 		{"unclosed alt", "sequenceDiagram\n alt x\n  A->>B: y", "unclosed"},
 	}
 	for _, tt := range tests {

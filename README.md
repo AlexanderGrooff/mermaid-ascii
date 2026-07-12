@@ -556,7 +556,7 @@ Note that with `--coords` enabled, the grid-coords shown show the starting locat
 - [x] Notes (`Note over A`, `Note over A,B`, `Note left of A`, `Note right of A`)
 - [ ] Activation boxes
 - [x] `alt`/`else` blocks (incl. multiple else, nesting)
-- [ ] `par`, `critical`, `break`, `rect` blocks
+- [x] `par`/`and`, `critical`/`option`, `break`, `rect` blocks
 
 ## TODOs
 
@@ -586,7 +586,7 @@ The baseline components for Mermaid work, but there are a lot of things that are
 - [x] Notes (`Note over`/`left of`/`right of`)
 - [x] `loop` and `opt` blocks
 - [x] `alt`/`else` blocks
-- [ ] `par`, `critical`, `break`, and `rect` blocks
+- [x] `par`, `critical`, `break`, and `rect` blocks
 
 ### General
 

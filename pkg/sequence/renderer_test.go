@@ -28,6 +28,9 @@ func TestSequenceDiagramRendering(t *testing.T) {
 		"adjacent_participants_communication.txt",
 		"alt_basic.txt",
 		"alt_multiple_else.txt",
+		"par_basic.txt",
+		"critical_basic.txt",
+		"break_rect.txt",
 		"arrow_types.txt",
 		"autonumber.txt",
 		"bidirectional_messages.txt",
@@ -65,6 +68,7 @@ func TestSequenceDiagramRendering_ASCII(t *testing.T) {
 
 	goldenFiles := []string{
 		"alt_basic.txt",
+		"par_basic.txt",
 		"note_over_single.txt",
 		"arrow_types.txt",
 		"autonumber.txt",
@@ -93,6 +97,9 @@ func TestSequenceDiagramRendering_ASCIISmokeTest(t *testing.T) {
 		"adjacent_participants_communication.txt",
 		"alt_basic.txt",
 		"alt_multiple_else.txt",
+		"par_basic.txt",
+		"critical_basic.txt",
+		"break_rect.txt",
 		"arrow_types.txt",
 		"autonumber.txt",
 		"bidirectional_messages.txt",
