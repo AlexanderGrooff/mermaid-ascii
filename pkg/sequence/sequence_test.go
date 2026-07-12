@@ -57,6 +57,9 @@ func TestIsSequenceDiagram(t *testing.T) {
 		want  bool
 	}{
 		{"sequenceDiagram\nA->>B: Hello", true},
+		{"SEQUENCEDIAGRAM\nA->>B: Hello", true}, // case-insensitive dispatch
+		{"SequenceDiagram\nA->>B: Hello", true}, // mixed case
+		{"sequenceDiagramFoo-->B", false},       // token boundary: a node id, not the keyword
 		{"graph LR\nA-->B", false},
 		{"graph TD\nA-->B", false},
 		{"", false},

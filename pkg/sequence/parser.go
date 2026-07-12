@@ -16,7 +16,7 @@ const (
 
 var (
 	// participantRegex matches participant declarations: participant [ID] [as Label]
-	participantRegex = regexp.MustCompile(`^\s*participant\s+(?:"([^"]+)"|(\S+))(?:\s+as\s+(.+))?$`)
+	participantRegex = regexp.MustCompile(`(?i)^\s*participant\s+(?:"([^"]+)"|(\S+))(?:\s+as\s+(.+))?$`)
 
 	// messageRegex matches messages: [From][arrow][To]: [Label]. The arrow is one
 	// of ->>, -->>, -> or -->. Unquoted participant names exclude the arrow
@@ -26,24 +26,24 @@ var (
 	messageRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([^\s<>-]+))\s*(-->>|-->|->>|->)\s*(?:"([^"]+)"|([^\s<>-]+))\s*:\s*(.*)$`)
 
 	// autonumberRegex matches the autonumber directive
-	autonumberRegex = regexp.MustCompile(`^\s*autonumber\s*$`)
+	autonumberRegex = regexp.MustCompile(`(?i)^\s*autonumber\s*$`)
 
 	// fragmentStartRegex matches the opening line of a control-flow fragment,
 	// e.g. "loop every minute", "opt is premium", "alt is valid". Group 1 is the
 	// keyword, group 2 is the (optional) label describing the condition.
-	fragmentStartRegex = regexp.MustCompile(`^\s*(loop|opt|alt)\b\s*(.*)$`)
+	fragmentStartRegex = regexp.MustCompile(`(?i)^\s*(loop|opt|alt)\b\s*(.*)$`)
 
 	// fragmentElseRegex matches an "else" divider inside an alt block. Group 1 is
 	// the (optional) condition label for the following section.
-	fragmentElseRegex = regexp.MustCompile(`^\s*else\b\s*(.*)$`)
+	fragmentElseRegex = regexp.MustCompile(`(?i)^\s*else\b\s*(.*)$`)
 
 	// fragmentEndRegex matches the "end" line that closes a fragment.
-	fragmentEndRegex = regexp.MustCompile(`^\s*end\s*$`)
+	fragmentEndRegex = regexp.MustCompile(`(?i)^\s*end\s*$`)
 
 	// noteRegex matches note annotations: "Note over A: text", "note left of A:
 	// text", "Note over A,B: text" (case-insensitive keyword). Group 1 is the
 	// placement, group 2 the participant list, group 3 the text.
-	noteRegex = regexp.MustCompile(`^\s*[Nn]ote\s+(right of|left of|over)\s+([^:]+?)\s*:\s*(.*)$`)
+	noteRegex = regexp.MustCompile(`(?i)^\s*note\s+(right of|left of|over)\s+([^:]+?)\s*:\s*(.*)$`)
 )
 
 // SequenceDiagram represents a parsed sequence diagram.
@@ -202,9 +202,23 @@ func IsSequenceDiagram(input string) bool {
 		if trimmed == "" || strings.HasPrefix(trimmed, "%%") {
 			continue
 		}
-		return strings.HasPrefix(trimmed, SequenceDiagramKeyword)
+		return hasSequenceKeyword(trimmed)
 	}
 	return false
+}
+
+// hasSequenceKeyword reports whether a line is the sequenceDiagram declaration,
+// case-insensitively (mermaid's sequence grammar is case-insensitive). The
+// keyword must stand as a whole token — followed by whitespace or end of line —
+// so a node id like "sequenceDiagramFoo" in a flowchart isn't misrouted here.
+func hasSequenceKeyword(line string) bool {
+	lower := strings.ToLower(strings.TrimSpace(line))
+	kw := strings.ToLower(SequenceDiagramKeyword)
+	if !strings.HasPrefix(lower, kw) {
+		return false
+	}
+	rest := lower[len(kw):]
+	return rest == "" || rest[0] == ' ' || rest[0] == '\t'
 }
 
 func Parse(input string) (*SequenceDiagram, error) {
@@ -219,7 +233,7 @@ func Parse(input string) (*SequenceDiagram, error) {
 		return nil, fmt.Errorf("no content found")
 	}
 
-	if !strings.HasPrefix(strings.TrimSpace(lines[0]), SequenceDiagramKeyword) {
+	if !hasSequenceKeyword(strings.TrimSpace(lines[0])) {
 		return nil, fmt.Errorf("expected %q keyword", SequenceDiagramKeyword)
 	}
 	lines = lines[1:]
@@ -252,7 +266,7 @@ func Parse(input string) (*SequenceDiagram, error) {
 		// "Note->>B: hi") still parses as a message further down.
 		if m := noteRegex.FindStringSubmatch(trimmed); m != nil {
 			placement := NoteOver
-			switch m[1] {
+			switch strings.ToLower(m[1]) { // keyword may be any case
 			case "left of":
 				placement = NoteLeftOf
 			case "right of":
@@ -272,7 +286,7 @@ func Parse(input string) (*SequenceDiagram, error) {
 			// wrapping is irrelevant for single-line ASCII, so just strip it.
 			text := strings.TrimSpace(m[3])
 			for _, pre := range []string{"nowrap:", "wrap:"} {
-				if strings.HasPrefix(text, pre) {
+				if strings.HasPrefix(strings.ToLower(text), pre) {
 					text = strings.TrimSpace(text[len(pre):])
 					break
 				}
@@ -301,7 +315,7 @@ func Parse(input string) (*SequenceDiagram, error) {
 
 		// A fragment opener ("loop"/"opt"/"alt") starts a framed block.
 		if match := fragmentStartRegex.FindStringSubmatch(trimmed); match != nil {
-			fType := map[string]FragmentType{"loop": FragmentLoop, "opt": FragmentOpt, "alt": FragmentAlt}[match[1]]
+			fType := map[string]FragmentType{"loop": FragmentLoop, "opt": FragmentOpt, "alt": FragmentAlt}[strings.ToLower(match[1])]
 			sd.Events = append(sd.Events, Event{
 				Kind:     EventFragmentStart,
 				Fragment: &Fragment{Type: fType, Label: strings.TrimSpace(match[2])},
