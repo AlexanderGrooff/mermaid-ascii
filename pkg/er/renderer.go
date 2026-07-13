@@ -101,3 +101,19 @@ func renderEntity(e *Entity, g glyphs) []string {
 	out = append(out, rule(g.bl, g.teeU, g.br))
 	return out
 }
+
+// Render lays out the entity tables in 2D and draws the relationships between
+// them. (Stage 3: placement + stamping; connectors added in stage 4.)
+func Render(d *ErDiagram, useAscii bool) string {
+	g := unicodeGlyphs
+	if useAscii {
+		g = asciiGlyphs
+	}
+	_, placed := placeEntities(d, g)
+
+	c := &canvas{}
+	for _, p := range placed {
+		c.stamp(p.x, p.y, p.lines)
+	}
+	return c.String()
+}
