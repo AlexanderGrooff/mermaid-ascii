@@ -109,11 +109,12 @@ func Render(d *ErDiagram, useAscii bool) string {
 	if useAscii {
 		g = asciiGlyphs
 	}
-	_, placed := placeEntities(d, g)
+	byName, placed := placeEntities(d, g)
 
 	c := &canvas{}
 	for _, p := range placed {
 		c.stamp(p.x, p.y, p.lines)
 	}
+	drawConnectors(c, byName, d, g)
 	return c.String()
 }
