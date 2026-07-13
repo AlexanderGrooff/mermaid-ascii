@@ -59,9 +59,28 @@ var (
 	leftCard  = map[string]Cardinality{"||": OnlyOne, "|o": ZeroOrOne, "}o": ZeroOrMore, "}|": OneOrMore}
 	rightCard = map[string]Cardinality{"||": OnlyOne, "o|": ZeroOrOne, "o{": ZeroOrMore, "|{": OneOrMore}
 
-	// relationshipRegex matches "ENTITY1 <lcard><line><rcard> ENTITY2 : label".
+	// relationshipRegex matches "ENTITY1 <lcard><line><rcard> ENTITY2 : label"
+	// where line is -- (identifying), .. / -. / .- (non-identifying).
 	relationshipRegex = regexp.MustCompile(
-		`^\s*(?:"([^"]+)"|(\S+))\s+([|}o]{2})(--|\.\.)([|o{]{2})\s+(?:"([^"]+)"|(\S+))\s*:\s*(.*)$`)
+		`^\s*(?:"([^"]+)"|(\S+))\s+([|}o]{2})(--|\.\.|-\.|\.-)([|o{]{2})\s+(?:"([^"]+)"|(\S+))\s*:\s*(.*)$`)
+
+	// textRelRegex matches the word-alias form: "E1 <cardphrase> to|optionally to
+	// <cardphrase> E2 : label" (e.g. "PERSON many optionally to one CAR : owns").
+	textRelRegex = regexp.MustCompile(
+		`^\s*(\S+)\s+(.+?)\s+(optionally to|to)\s+(.+?)\s+(\S+)\s*:\s*(.*)$`)
+
+	// cardPhrase maps mermaid's word/short cardinality aliases to a Cardinality.
+	cardPhrase = map[string]Cardinality{
+		"zero or one": ZeroOrOne, "one or zero": ZeroOrOne,
+		"zero or more": ZeroOrMore, "zero or many": ZeroOrMore, "0+": ZeroOrMore,
+		"many": ZeroOrMore, "many(0)": ZeroOrMore,
+		"one or more": OneOrMore, "one or many": OneOrMore, "1+": OneOrMore, "many(1)": OneOrMore,
+		"only one": OnlyOne, "one": OnlyOne, "1": OnlyOne,
+	}
+
+	// styleLineRegex matches visual-styling / accessibility lines that carry no
+	// ASCII meaning; they're skipped so a stray one doesn't fail a diagram.
+	styleLineRegex = regexp.MustCompile(`(?i)^\s*(classDef|class|style|accTitle|accDescr)\b`)
 
 	// entityHeaderRegex matches the opening of an attribute block: `NAME {`.
 	entityHeaderRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|(\S+))\s*\{\s*$`)
@@ -116,6 +135,11 @@ func Parse(input string) (*ErDiagram, error) {
 			continue
 		}
 
+		// Visual styling / accessibility lines carry no ASCII meaning — skip.
+		if styleLineRegex.MatchString(line) {
+			continue
+		}
+
 		// Entity attribute block: NAME { ... }
 		if m := entityHeaderRegex.FindStringSubmatch(line); m != nil {
 			name := firstNonEmpty(m[1], m[2])
@@ -124,8 +148,8 @@ func Parse(input string) (*ErDiagram, error) {
 			if err != nil {
 				return nil, fmt.Errorf("entity %q: %w", name, err)
 			}
-			e.Attributes = attrs
-			i = next // parseAttributeBlock returns the index of the closing "}"
+			e.Attributes = append(e.Attributes, attrs...) // multiple blocks accumulate
+			i = next                                      // index of the closing "}"
 			continue
 		}
 
@@ -144,6 +168,25 @@ func Parse(input string) (*ErDiagram, error) {
 				Label:       strings.TrimSpace(m[8]),
 			})
 			continue
+		}
+
+		// Relationship, word-alias form: E1 <cardphrase> to <cardphrase> E2 : lbl
+		if m := textRelRegex.FindStringSubmatch(line); m != nil {
+			lc, lok := cardPhrase[strings.ToLower(m[2])]
+			rc, rok := cardPhrase[strings.ToLower(m[4])]
+			if lok && rok {
+				d.entity(m[1])
+				d.entity(m[5])
+				d.Relationships = append(d.Relationships, &Relationship{
+					Left:        m[1],
+					Right:       m[5],
+					LeftCard:    lc,
+					RightCard:   rc,
+					Identifying: strings.EqualFold(m[3], "to"),
+					Label:       strings.TrimSpace(m[6]),
+				})
+				continue
+			}
 		}
 
 		// A bare entity name declares an entity with no attributes.
@@ -192,7 +235,7 @@ func parseAttribute(line string) (Attribute, error) {
 			line = strings.TrimSpace(line[:idx])
 		}
 	}
-	fields := strings.Fields(line)
+	fields := splitAttrTokens(line)
 	if len(fields) < 2 {
 		return Attribute{}, fmt.Errorf("attribute needs a type and name: %q", line)
 	}
@@ -213,4 +256,36 @@ func firstNonEmpty(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// splitAttrTokens splits on whitespace but keeps parenthesised groups intact, so
+// a type like "decimal(10, 2)" or "varchar(255)" stays a single token.
+func splitAttrTokens(s string) []string {
+	var toks []string
+	var cur strings.Builder
+	depth := 0
+	flush := func() {
+		if cur.Len() > 0 {
+			toks = append(toks, cur.String())
+			cur.Reset()
+		}
+	}
+	for _, r := range s {
+		switch {
+		case r == '(':
+			depth++
+			cur.WriteRune(r)
+		case r == ')':
+			if depth > 0 {
+				depth--
+			}
+			cur.WriteRune(r)
+		case (r == ' ' || r == '\t') && depth == 0:
+			flush()
+		default:
+			cur.WriteRune(r)
+		}
+	}
+	flush()
+	return toks
 }
