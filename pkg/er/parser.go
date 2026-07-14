@@ -58,37 +58,28 @@ type ErDiagram struct {
 }
 
 var (
-	// cardToken maps every crow's-foot token to a Cardinality. mermaid accepts
-	// any of these on either side of a relationship.
-	cardToken = map[string]Cardinality{
+	// cardAny maps every cardinality form mermaid accepts — crow's-foot tokens
+	// (either side), numeric shorthands, and word phrases — to a Cardinality.
+	cardAny = map[string]Cardinality{
+		// crow's-foot tokens (accepted on either side)
 		"||": OnlyOne,
 		"|o": ZeroOrOne, "o|": ZeroOrOne,
 		"}o": ZeroOrMore, "o{": ZeroOrMore,
 		"}|": OneOrMore, "|{": OneOrMore,
+		// numeric / word shorthands
+		"1": OnlyOne, "only one": OnlyOne, "one": OnlyOne,
+		"zero or one": ZeroOrOne, "one or zero": ZeroOrOne,
+		"0+": ZeroOrMore, "zero or more": ZeroOrMore, "zero or many": ZeroOrMore,
+		"many": ZeroOrMore, "many(0)": ZeroOrMore,
+		"1+": OneOrMore, "one or more": OneOrMore, "one or many": OneOrMore, "many(1)": OneOrMore,
 	}
 
-	// relationshipRegex matches "ENTITY1 <lcard><line><rcard> ENTITY2 : label".
-	// A cardinality token may appear on either side; line is -- (identifying) or
-	// .. / -. / .- (non-identifying).
-	relationshipRegex = regexp.MustCompile(
-		`^\s*(?:"([^"]+)"|(\S+))\s+([|o{}]{2})(--|\.\.|-\.|\.-)([|o{}]{2})\s+(?:"([^"]+)"|(\S+))\s*:\s*(.*)$`)
+	// lineOpRegex matches the relationship line operator (a 2-char run of - and
+	// . — entity names use single dashes, so this uniquely marks the connector).
+	lineOpRegex = regexp.MustCompile(`[-.]{2}`)
 
 	// directionRegex matches the optional "direction TB|LR|..." layout directive.
 	directionRegex = regexp.MustCompile(`(?i)^\s*direction\s+\S+\s*$`)
-
-	// textRelRegex matches the word-alias form: "E1 <cardphrase> to|optionally to
-	// <cardphrase> E2 : label" (e.g. "PERSON many optionally to one CAR : owns").
-	textRelRegex = regexp.MustCompile(
-		`^\s*(\S+)\s+(.+?)\s+(optionally to|to)\s+(.+?)\s+(\S+)\s*:\s*(.*)$`)
-
-	// cardPhrase maps mermaid's word/short cardinality aliases to a Cardinality.
-	cardPhrase = map[string]Cardinality{
-		"zero or one": ZeroOrOne, "one or zero": ZeroOrOne,
-		"zero or more": ZeroOrMore, "zero or many": ZeroOrMore, "0+": ZeroOrMore,
-		"many": ZeroOrMore, "many(0)": ZeroOrMore,
-		"one or more": OneOrMore, "one or many": OneOrMore, "1+": OneOrMore, "many(1)": OneOrMore,
-		"only one": OnlyOne, "one": OnlyOne, "1": OnlyOne,
-	}
 
 	// styleLineRegex matches visual-styling / accessibility lines that carry no
 	// ASCII meaning; they're skipped so a stray one doesn't fail a diagram.
@@ -100,7 +91,7 @@ var (
 
 	// loneEntityRegex matches an entity declared on its own (no block/relation),
 	// with an optional alias: `NAME`, `NAME alias`, or `NAME["Alias Label"]`.
-	loneEntityRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([A-Za-z0-9_-]+))(?:\s*\["([^"]+)"\]|\s+(\S+))?\s*$`)
+	loneEntityRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([A-Za-z0-9_.-]+))(?:\s*\["([^"]+)"\]|\s+(\S+))?\s*$`)
 
 	// attrKeyRegex matches a PK/FK/UK key token (possibly comma-separated).
 	attrKeyRegex = regexp.MustCompile(`^(?:PK|FK|UK)(?:\s*,\s*(?:PK|FK|UK))*$`)
@@ -171,44 +162,9 @@ func Parse(input string) (*ErDiagram, error) {
 			continue
 		}
 
-		// Relationship: ENTITY1 ||--o{ ENTITY2 : label
-		if m := relationshipRegex.FindStringSubmatch(line); m != nil {
-			lc, lok := cardToken[m[3]]
-			rc, rok := cardToken[m[5]]
-			if lok && rok {
-				left := firstNonEmpty(m[1], m[2])
-				right := firstNonEmpty(m[6], m[7])
-				d.entity(left)
-				d.entity(right)
-				d.Relationships = append(d.Relationships, &Relationship{
-					Left:        left,
-					Right:       right,
-					LeftCard:    lc,
-					RightCard:   rc,
-					Identifying: m[4] == "--",
-					Label:       strings.TrimSpace(m[8]),
-				})
-				continue
-			}
-		}
-
-		// Relationship, word-alias form: E1 <cardphrase> to <cardphrase> E2 : lbl
-		if m := textRelRegex.FindStringSubmatch(line); m != nil {
-			lc, lok := cardPhrase[strings.ToLower(m[2])]
-			rc, rok := cardPhrase[strings.ToLower(m[4])]
-			if lok && rok {
-				d.entity(m[1])
-				d.entity(m[5])
-				d.Relationships = append(d.Relationships, &Relationship{
-					Left:        m[1],
-					Right:       m[5],
-					LeftCard:    lc,
-					RightCard:   rc,
-					Identifying: strings.EqualFold(m[3], "to"),
-					Label:       strings.TrimSpace(m[6]),
-				})
-				continue
-			}
+		// Relationship (any cardinality form: crow's-foot, numeric, or words).
+		if d.parseRelationship(line) {
+			continue
 		}
 
 		// A bare entity name (with optional alias) declares an entity.
@@ -284,6 +240,72 @@ func firstNonEmpty(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// parseRelationship parses any relationship form and appends it to d, returning
+// true if the line was a relationship. Cardinality on each side may be a
+// crow's-foot token (||, o{, …), a numeric shorthand (1, 0+, 1+), or a word
+// phrase (only one, one or more, …); the connector is -- / .. / -. / .- or the
+// word operator "to" / "optionally to".
+func (d *ErDiagram) parseRelationship(line string) bool {
+	colon := strings.Index(line, ":")
+	if colon < 0 {
+		return false
+	}
+	main := strings.TrimSpace(line[:colon])
+	label := strings.Trim(strings.TrimSpace(line[colon+1:]), `"`)
+
+	var left, right string
+	var identifying bool
+	if loc := lineOpRegex.FindStringIndex(main); loc != nil {
+		left = strings.TrimSpace(main[:loc[0]])
+		right = strings.TrimSpace(main[loc[1]:])
+		identifying = main[loc[0]:loc[1]] == "--"
+	} else if i, w := findWordOp(main); i >= 0 {
+		left = strings.TrimSpace(main[:i])
+		right = strings.TrimSpace(main[i+len(w):])
+		identifying = w == " to "
+	} else {
+		return false
+	}
+
+	e1, lcard := splitEntityCard(left, true)
+	e2, rcard := splitEntityCard(right, false)
+	lc, lok := cardAny[strings.ToLower(lcard)]
+	rc, rok := cardAny[strings.ToLower(rcard)]
+	if e1 == "" || e2 == "" || !lok || !rok {
+		return false
+	}
+	d.entity(e1)
+	d.entity(e2)
+	d.Relationships = append(d.Relationships, &Relationship{
+		Left: e1, Right: e2, LeftCard: lc, RightCard: rc,
+		Identifying: identifying, Label: label,
+	})
+	return true
+}
+
+// findWordOp locates the " to " / " optionally to " word connector.
+func findWordOp(s string) (int, string) {
+	for _, w := range []string{" optionally to ", " to "} {
+		if i := strings.Index(s, w); i >= 0 {
+			return i, w
+		}
+	}
+	return -1, ""
+}
+
+// splitEntityCard splits "ENTITY <card>" (entityFirst) or "<card> ENTITY" into
+// the entity id and the cardinality text.
+func splitEntityCard(part string, entityFirst bool) (entity, card string) {
+	toks := strings.Fields(part)
+	if len(toks) == 0 {
+		return "", ""
+	}
+	if entityFirst {
+		return strings.Trim(toks[0], `"`), strings.Join(toks[1:], " ")
+	}
+	return strings.Trim(toks[len(toks)-1], `"`), strings.Join(toks[:len(toks)-1], " ")
 }
 
 // splitAttrTokens splits on whitespace but keeps parenthesised groups intact, so
