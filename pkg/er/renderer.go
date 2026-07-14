@@ -57,7 +57,7 @@ func renderEntity(e *Entity, g glyphs) []string {
 	}
 	// The header (entity name) may be wider than the columns; grow the last
 	// column so the grid and header line up.
-	if nameW := runewidth.StringWidth(e.Name) + 2; nameW > inner && len(cols) > 0 {
+	if nameW := runewidth.StringWidth(e.Display) + 2; nameW > inner && len(cols) > 0 {
 		width[cols[len(cols)-1]] += nameW - inner
 		inner = nameW
 	}
@@ -81,8 +81,8 @@ func renderEntity(e *Entity, g glyphs) []string {
 	var out []string
 	// Top border + centred name header + separator with column tees.
 	out = append(out, string(g.tl)+strings.Repeat(string(g.h), inner)+string(g.tr))
-	namePad := inner - runewidth.StringWidth(e.Name)
-	out = append(out, string(g.v)+strings.Repeat(" ", namePad/2)+e.Name+
+	namePad := inner - runewidth.StringWidth(e.Display)
+	out = append(out, string(g.v)+strings.Repeat(" ", namePad/2)+e.Display+
 		strings.Repeat(" ", namePad-namePad/2)+string(g.v))
 	out = append(out, rule(g.teeR, g.teeD, g.teeL))
 	// Attribute rows.

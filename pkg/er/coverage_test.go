@@ -99,3 +99,47 @@ func TestRecursiveAndDuplicate(t *testing.T) {
 		t.Errorf("want 2 relationships, got %d", len(d.Relationships))
 	}
 }
+
+// TestEitherSideCardinality: a token like o{ / }| may appear on the LEFT too.
+func TestEitherSideCardinality(t *testing.T) {
+	d, err := Parse("erDiagram\n grants o{--|| tx : has")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := d.Relationships[0]
+	if r.LeftCard != ZeroOrMore || r.RightCard != OnlyOne {
+		t.Errorf("got L=%v R=%v, want ZeroOrMore, OnlyOne", r.LeftCard, r.RightCard)
+	}
+}
+
+// TestEntityAliases: block, bracket, and standalone alias forms.
+func TestEntityAliases(t *testing.T) {
+	cases := []struct{ in, id, display string }{
+		{"erDiagram\n Signature draft {\n  int id\n }", "Signature", "draft"},
+		{"erDiagram\n" + ` fua["Fresha User Account"] {` + "\n  int id\n }", "fua", "Fresha User Account"},
+		{"erDiagram\n" + ` acct["Account Ledger"]`, "acct", "Account Ledger"},
+	}
+	for _, c := range cases {
+		d, err := Parse(c.in)
+		if err != nil {
+			t.Fatalf("%q: %v", c.in, err)
+		}
+		e := d.Entities[0]
+		if e.Name != c.id || e.Display != c.display {
+			t.Errorf("%q => id=%q display=%q, want id=%q display=%q", c.in, e.Name, e.Display, c.id, c.display)
+		}
+	}
+}
+
+// TestDirectionAndLenientComments: direction directive, // notes, and an
+// unclosed-quote comment are all tolerated.
+func TestDirectionAndLenientComments(t *testing.T) {
+	in := "erDiagram\n direction LR\n T {\n  // a note line\n  string s \"unclosed comment\n  int n\n }"
+	d, err := Parse(in)
+	if err != nil {
+		t.Fatalf("expected tolerant parse, got: %v", err)
+	}
+	if len(d.Entities) != 1 || len(d.Entities[0].Attributes) != 2 {
+		t.Errorf("want 1 entity with 2 attrs, got %d entities", len(d.Entities))
+	}
+}

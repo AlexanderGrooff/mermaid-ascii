@@ -31,9 +31,12 @@ type Attribute struct {
 	Comment string
 }
 
-// Entity is a named box with an optional list of attributes.
+// Entity is a named box with an optional list of attributes. Name is the id
+// used in relationships; Display is the label shown in the box (an alias if one
+// was given, otherwise the name).
 type Entity struct {
 	Name       string
+	Display    string
 	Attributes []Attribute
 }
 
@@ -55,14 +58,23 @@ type ErDiagram struct {
 }
 
 var (
-	// leftCard/rightCard map the crow's-foot tokens to a Cardinality.
-	leftCard  = map[string]Cardinality{"||": OnlyOne, "|o": ZeroOrOne, "}o": ZeroOrMore, "}|": OneOrMore}
-	rightCard = map[string]Cardinality{"||": OnlyOne, "o|": ZeroOrOne, "o{": ZeroOrMore, "|{": OneOrMore}
+	// cardToken maps every crow's-foot token to a Cardinality. mermaid accepts
+	// any of these on either side of a relationship.
+	cardToken = map[string]Cardinality{
+		"||": OnlyOne,
+		"|o": ZeroOrOne, "o|": ZeroOrOne,
+		"}o": ZeroOrMore, "o{": ZeroOrMore,
+		"}|": OneOrMore, "|{": OneOrMore,
+	}
 
-	// relationshipRegex matches "ENTITY1 <lcard><line><rcard> ENTITY2 : label"
-	// where line is -- (identifying), .. / -. / .- (non-identifying).
+	// relationshipRegex matches "ENTITY1 <lcard><line><rcard> ENTITY2 : label".
+	// A cardinality token may appear on either side; line is -- (identifying) or
+	// .. / -. / .- (non-identifying).
 	relationshipRegex = regexp.MustCompile(
-		`^\s*(?:"([^"]+)"|(\S+))\s+([|}o]{2})(--|\.\.|-\.|\.-)([|o{]{2})\s+(?:"([^"]+)"|(\S+))\s*:\s*(.*)$`)
+		`^\s*(?:"([^"]+)"|(\S+))\s+([|o{}]{2})(--|\.\.|-\.|\.-)([|o{}]{2})\s+(?:"([^"]+)"|(\S+))\s*:\s*(.*)$`)
+
+	// directionRegex matches the optional "direction TB|LR|..." layout directive.
+	directionRegex = regexp.MustCompile(`(?i)^\s*direction\s+\S+\s*$`)
 
 	// textRelRegex matches the word-alias form: "E1 <cardphrase> to|optionally to
 	// <cardphrase> E2 : label" (e.g. "PERSON many optionally to one CAR : owns").
@@ -82,11 +94,13 @@ var (
 	// ASCII meaning; they're skipped so a stray one doesn't fail a diagram.
 	styleLineRegex = regexp.MustCompile(`(?i)^\s*(classDef|class|style|accTitle|accDescr)\b`)
 
-	// entityHeaderRegex matches the opening of an attribute block: `NAME {`.
-	entityHeaderRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|(\S+))\s*\{\s*$`)
+	// entityHeaderRegex matches the opening of an attribute block, with an
+	// optional alias: `NAME {`, `NAME alias {`, or `NAME["Alias Label"] {`.
+	entityHeaderRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|(\S+?))(?:\s*\["([^"]+)"\]|\s+(\S+))?\s*\{\s*$`)
 
-	// loneEntityRegex matches an entity declared on its own with no block/relation.
-	loneEntityRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([A-Za-z0-9_-]+))\s*$`)
+	// loneEntityRegex matches an entity declared on its own (no block/relation),
+	// with an optional alias: `NAME`, `NAME alias`, or `NAME["Alias Label"]`.
+	loneEntityRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([A-Za-z0-9_-]+))(?:\s*\["([^"]+)"\]|\s+(\S+))?\s*$`)
 
 	// attrKeyRegex matches a PK/FK/UK key token (possibly comma-separated).
 	attrKeyRegex = regexp.MustCompile(`^(?:PK|FK|UK)(?:\s*,\s*(?:PK|FK|UK))*$`)
@@ -111,7 +125,7 @@ func (d *ErDiagram) entity(name string) *Entity {
 	if e, ok := d.byName[name]; ok {
 		return e
 	}
-	e := &Entity{Name: name}
+	e := &Entity{Name: name, Display: name}
 	d.byName[name] = e
 	d.Entities = append(d.Entities, e)
 	return e
@@ -135,15 +149,19 @@ func Parse(input string) (*ErDiagram, error) {
 			continue
 		}
 
-		// Visual styling / accessibility lines carry no ASCII meaning — skip.
-		if styleLineRegex.MatchString(line) {
+		// Visual styling / accessibility / layout-direction lines carry no ASCII
+		// meaning here — skip them rather than failing the diagram.
+		if styleLineRegex.MatchString(line) || directionRegex.MatchString(line) {
 			continue
 		}
 
-		// Entity attribute block: NAME { ... }
+		// Entity attribute block: NAME { ... } (with optional alias)
 		if m := entityHeaderRegex.FindStringSubmatch(line); m != nil {
 			name := firstNonEmpty(m[1], m[2])
 			e := d.entity(name)
+			if alias := firstNonEmpty(m[3], m[4]); alias != "" {
+				e.Display = alias
+			}
 			attrs, next, err := parseAttributeBlock(lines, i+1)
 			if err != nil {
 				return nil, fmt.Errorf("entity %q: %w", name, err)
@@ -155,19 +173,23 @@ func Parse(input string) (*ErDiagram, error) {
 
 		// Relationship: ENTITY1 ||--o{ ENTITY2 : label
 		if m := relationshipRegex.FindStringSubmatch(line); m != nil {
-			left := firstNonEmpty(m[1], m[2])
-			right := firstNonEmpty(m[6], m[7])
-			d.entity(left)
-			d.entity(right)
-			d.Relationships = append(d.Relationships, &Relationship{
-				Left:        left,
-				Right:       right,
-				LeftCard:    leftCard[m[3]],
-				RightCard:   rightCard[m[5]],
-				Identifying: m[4] == "--",
-				Label:       strings.TrimSpace(m[8]),
-			})
-			continue
+			lc, lok := cardToken[m[3]]
+			rc, rok := cardToken[m[5]]
+			if lok && rok {
+				left := firstNonEmpty(m[1], m[2])
+				right := firstNonEmpty(m[6], m[7])
+				d.entity(left)
+				d.entity(right)
+				d.Relationships = append(d.Relationships, &Relationship{
+					Left:        left,
+					Right:       right,
+					LeftCard:    lc,
+					RightCard:   rc,
+					Identifying: m[4] == "--",
+					Label:       strings.TrimSpace(m[8]),
+				})
+				continue
+			}
 		}
 
 		// Relationship, word-alias form: E1 <cardphrase> to <cardphrase> E2 : lbl
@@ -189,9 +211,12 @@ func Parse(input string) (*ErDiagram, error) {
 			}
 		}
 
-		// A bare entity name declares an entity with no attributes.
+		// A bare entity name (with optional alias) declares an entity.
 		if m := loneEntityRegex.FindStringSubmatch(line); m != nil {
-			d.entity(firstNonEmpty(m[1], m[2]))
+			e := d.entity(firstNonEmpty(m[1], m[2]))
+			if alias := firstNonEmpty(m[3], m[4]); alias != "" {
+				e.Display = alias
+			}
 			continue
 		}
 
@@ -210,8 +235,8 @@ func parseAttributeBlock(lines []string, start int) ([]Attribute, int, error) {
 	var attrs []Attribute
 	for i := start; i < len(lines); i++ {
 		line := strings.TrimSpace(lines[i])
-		if line == "" {
-			continue
+		if line == "" || strings.HasPrefix(line, "//") {
+			continue // blank or a // note line (some diagrams use these)
 		}
 		if line == "}" {
 			return attrs, i, nil
@@ -227,13 +252,16 @@ func parseAttributeBlock(lines []string, start int) ([]Attribute, int, error) {
 
 // parseAttribute parses "type name [keys] [\"comment\"]".
 func parseAttribute(line string) (Attribute, error) {
-	// Pull a trailing quoted comment off first.
+	// Pull a trailing quoted comment off first. Tolerate an unclosed quote
+	// (some hand-written diagrams forget the closing ") by taking the rest.
 	comment := ""
 	if idx := strings.Index(line, `"`); idx != -1 {
 		if end := strings.LastIndex(line, `"`); end > idx {
 			comment = line[idx+1 : end]
-			line = strings.TrimSpace(line[:idx])
+		} else {
+			comment = line[idx+1:]
 		}
+		line = strings.TrimSpace(line[:idx])
 	}
 	fields := splitAttrTokens(line)
 	if len(fields) < 2 {
