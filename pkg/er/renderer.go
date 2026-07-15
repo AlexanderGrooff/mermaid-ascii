@@ -9,10 +9,11 @@ import (
 // box-drawing glyphs (Unicode by default, ASCII when useAscii).
 type glyphs struct {
 	h, v, tl, tr, bl, br, teeD, teeU, teeL, teeR, cross rune
+	hd, vd                                              rune // dashed line, for non-identifying relationships
 }
 
-var unicodeGlyphs = glyphs{'─', '│', '┌', '┐', '└', '┘', '┬', '┴', '┤', '├', '┼'}
-var asciiGlyphs = glyphs{'-', '|', '+', '+', '+', '+', '+', '+', '+', '+', '+'}
+var unicodeGlyphs = glyphs{'─', '│', '┌', '┐', '└', '┘', '┬', '┴', '┤', '├', '┼', '┈', '┊'}
+var asciiGlyphs = glyphs{'-', '|', '+', '+', '+', '+', '+', '+', '+', '+', '+', '.', ':'}
 
 // renderEntity draws an entity as an attribute table: a name header above a grid
 // of the attribute rows. Columns (type, name, key, comment) are included only

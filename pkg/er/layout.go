@@ -84,6 +84,7 @@ type layout struct {
 	byName map[string]*placedEntity
 	placed []*placedEntity
 	lanes  int   // one lane per relationship (global, so lanes never clash)
+	gutW   int   // width of each vertical gutter
 	vGutX  []int // left edge x of each vertical gutter (len cols+1)
 	hGutY  []int // top edge y of each horizontal gutter (len rows+1)
 	cols   int
@@ -136,27 +137,36 @@ func placeEntities(d *ErDiagram, g glyphs) *layout {
 		}
 	}
 
-	// X layout: [gutter][col0][gutter][col1]…[gutter]. Each gutter is `lanes`
-	// wide so every relationship gets a clear vertical lane.
+	// X layout: [col0][gutter][col1]…[gutter]. No gutter left of column 0 —
+	// trunks only ever run between columns or off the right edge.
 	vGutX := make([]int, cols+1)
 	colX := make([]int, cols)
 	x := 0
 	for c := 0; c < cols; c++ {
 		vGutX[c] = x
-		x += gutW
-		colX[c] = x
+		if c > 0 {
+			x += gutW
+			colX[c] = x
+		} else {
+			colX[0] = 0
+		}
 		x += colW[c]
 	}
 	vGutX[cols] = x
 
-	// Y layout mirrors X: [gutter][row0][gutter]…[gutter].
+	// Y layout: [row0][gutter][row1]…[gutter]. No gutter above row 0 — nothing
+	// ever exits upward from the top row, so it would only be blank space.
 	hGutY := make([]int, rows+1)
 	rowY := make([]int, rows)
 	y := 0
 	for r := 0; r < rows; r++ {
 		hGutY[r] = y
-		y += lanes
-		rowY[r] = y
+		if r > 0 {
+			y += lanes
+			rowY[r] = y
+		} else {
+			rowY[0] = 0
+		}
 		y += rowH[r]
 	}
 	hGutY[rows] = y
@@ -166,7 +176,7 @@ func placeEntities(d *ErDiagram, g glyphs) *layout {
 		p.x, p.y = colX[p.col], rowY[p.row]
 		byName[p.entity.Name] = p
 	}
-	return &layout{byName: byName, placed: placed, lanes: lanes, vGutX: vGutX, hGutY: hGutY, cols: cols}
+	return &layout{byName: byName, placed: placed, lanes: lanes, gutW: gutW, vGutX: vGutX, hGutY: hGutY, cols: cols}
 }
 
 func blockWidth(lines []string) int {
@@ -220,7 +230,9 @@ func (o *overlay) polyline(pts [][2]int, solid bool) {
 		a, b := pts[i], pts[i+1]
 		dx, dy := sign(b[0]-a[0]), sign(b[1]-a[1])
 		x, y := a[0], a[1]
-		for {
+		for x != b[0] || y != b[1] {
+			// outgoing link on the cell we leave — never on the segment's end,
+			// or corners would grow phantom arms and render as tees.
 			if dx > 0 {
 				m[[2]int{x, y}] |= dE
 			} else if dx < 0 {
@@ -231,12 +243,9 @@ func (o *overlay) polyline(pts [][2]int, solid bool) {
 			} else if dy < 0 {
 				m[[2]int{x, y}] |= dN
 			}
-			if x == b[0] && y == b[1] {
-				break
-			}
 			x += dx
 			y += dy
-			// mark the reverse link on the cell we just entered
+			// incoming link on the cell we enter
 			if dx > 0 {
 				m[[2]int{x, y}] |= dW
 			} else if dx < 0 {
@@ -276,10 +285,10 @@ func attach(p *placedEntity, s side, idx, total int) (int, int) {
 
 // endpoint is a resolved connection: box side + on-canvas attach coordinate.
 type endpoint struct {
-	p       *placedEntity
-	s       side
-	x, y    int
-	card    Cardinality
+	p    *placedEntity
+	s    side
+	x, y int
+	card Cardinality
 }
 
 // drawConnectors routes every relationship and writes the result onto c.
@@ -318,6 +327,11 @@ func drawConnectors(c *canvas, lay *layout, d *ErDiagram, g glyphs) {
 			ep.x, ep.y = attach(ep.p, ep.s, slotUsed[key], slotCount[key])
 			slotUsed[key]++
 		}
+		// A self-loop's two stubs share one face; evenly-spaced slots sit too
+		// close together for the crow's-foot tokens, so spread them to the ends.
+		if p := all[i].a.p; p == all[i].b.p {
+			all[i].a.x, all[i].b.x = p.x+1, p.x+p.w-2
+		}
 	}
 
 	for i, r := range d.Relationships {
@@ -329,79 +343,107 @@ func drawConnectors(c *canvas, lay *layout, d *ErDiagram, g glyphs) {
 	}
 
 	composite(c, o, g)
+
+	// Mark each attach point on the box border with a tee so the stub visibly
+	// joins the box (composite itself never draws over box cells).
+	for i := range all {
+		if all[i].a.p == nil {
+			continue
+		}
+		for _, ep := range []endpoint{all[i].a, all[i].b} {
+			tee := g.teeD // ┬: stub leaves downward through a bottom border
+			if ep.s == sideT {
+				tee = g.teeU // ┴: stub leaves upward through a top border
+			}
+			c.set(ep.x, ep.y, tee)
+		}
+	}
 }
 
-// sidesFor picks each box's exit face. Connectors leave through the left/right
-// faces so the crow's-foot markers face the boxes naturally; same-column pairs
-// both exit right into the shared gutter between that column and the next.
+// sidesFor picks each box's exit face. Connectors leave through the top/bottom
+// faces so every relationship rides a horizontal gutter row — the only rows
+// where labels are guaranteed collision-free (each relationship owns a global
+// lane). Boxes exit toward each other, with one exception: vertically-adjacent
+// boxes in the same column would meet in their shared gutter as a straight
+// vertical line with no horizontal run to carry tokens or a label, so the lower
+// box exits bottom too and the path wraps round through the side gutter.
 func sidesFor(a, b *placedEntity) (side, side) {
+	sameColAdjacent := a.col == b.col && abs(a.row-b.row) == 1
 	switch {
-	case b.col > a.col:
-		return sideR, sideL
-	case b.col < a.col:
-		return sideL, sideR
-	default: // same column (incl. self): both exit right
-		return sideR, sideR
+	case a.row < b.row:
+		if sameColAdjacent {
+			return sideB, sideB
+		}
+		return sideB, sideT
+	case a.row > b.row:
+		if sameColAdjacent {
+			return sideB, sideB
+		}
+		return sideT, sideB
+	default: // same row (incl. self-relationships): both dip into the gutter below
+		return sideB, sideB
 	}
+}
+
+// gutterY is the horizontal gutter row an endpoint's stub reaches: the gutter
+// below the box for bottom exits, above for top exits, offset by the
+// relationship's own lane so distinct relationships never share a row.
+func (l *layout) gutterY(e endpoint, lane int) int {
+	if e.s == sideB {
+		return l.hGutY[e.p.row+1] + lane
+	}
+	return l.hGutY[e.p.row] + lane
+}
+
+// trunkX is the vertical lane column a relationship travels along when its two
+// gutter rows differ: a box-free vertical gutter between (or beside) the two
+// columns, offset by the relationship's lane.
+func (l *layout) trunkX(a, b *placedEntity, lane int) int {
+	if a.col == b.col {
+		// Far side of the gutter, so the horizontal runs span its full width
+		// and have room to carry the relationship label.
+		return l.vGutX[a.col+1] + l.gutW - 1 - lane
+	}
+	return l.vGutX[(a.col+b.col+1)/2] + lane
 }
 
 // route draws one relationship as an orthogonal line in this edge's own lane, so
-// distinct edges never overlap — only genuine crossings share a cell (┼).
-// Neighbouring boxes get a straight (or single-jog) line across the gutter
-// between them; boxes that aren't neighbours dip through a clear horizontal
-// gutter so the run never cuts across an intervening box.
+// distinct edges never overlap — only genuine crossings share a cell (┼). Each
+// endpoint drops (or rises) vertically from its box into a horizontal gutter
+// row; if both stubs reach the same row the run merges into one straight span,
+// otherwise a vertical trunk in a side gutter joins the two rows:
+//
+//	{a.x,a.y} {a.x,ya} {tx,ya} {tx,yb} {b.x,yb} {b.x,b.y}
 func route(o *overlay, lay *layout, a, b endpoint, r *Relationship, k int) {
 	lane := k % lay.lanes
+	ya, yb := lay.gutterY(a, lane), lay.gutterY(b, lane)
 
-	if a.p == b.p { // self-relationship: a small loop off the right side
-		selfLoop(o, lay, a, lane, r)
-		return
-	}
-
-	putToken(o, a.x, a.y, a.s, r.LeftCard)
-	putToken(o, b.x, b.y, b.s, r.RightCard)
-
-	// Same column: join the two right sides through the gutter to their right.
-	if a.p.col == b.p.col {
-		xg := lay.vGutX[a.p.col+1] + lane
-		o.polyline([][2]int{{a.x, a.y}, {xg, a.y}, {xg, b.y}, {b.x, b.y}}, r.Identifying)
-		putLabel(o, r.Label, xg+1, xg+1+runewidth.StringWidth(r.Label), (a.y+b.y)/2)
-		return
-	}
-
-	// Neighbouring columns: one shared gutter, straight line when rows align.
-	if abs(a.p.col-b.p.col) == 1 {
-		xg := lay.vGutX[maxI(a.p.col, b.p.col)] + lane
-		o.polyline([][2]int{{a.x, a.y}, {xg, a.y}, {xg, b.y}, {b.x, b.y}}, r.Identifying)
-		if a.y == b.y { // straight line: label spans the whole gap
-			putLabel(o, r.Label, minI(a.x, b.x), maxI(a.x, b.x), a.y)
-		} else if abs(xg-a.x) >= abs(b.x-xg) {
-			putLabel(o, r.Label, minI(a.x, xg), maxI(a.x, xg), a.y)
+	if ya == yb { // both stubs meet one gutter row: a single horizontal run
+		o.polyline([][2]int{{a.x, a.y}, {a.x, ya}, {b.x, ya}, {b.x, b.y}}, r.Identifying)
+		putToken(o, a, b.x, ya)
+		putToken(o, b, a.x, ya)
+		if a.p == b.p { // self-loop: the run is at most the box's width, so the
+			// label sits beside the loop instead of inside it
+			for i, c := range []rune(r.Label) {
+				o.label[[2]int{maxI(a.x, b.x) + 2 + i, ya}] = c
+			}
 		} else {
-			putLabel(o, r.Label, minI(xg, b.x), maxI(xg, b.x), b.y)
+			putLabel(o, r.Label, minI(a.x, b.x), maxI(a.x, b.x), ya)
 		}
 		return
 	}
 
-	// Distant columns: drop into a horizontal gutter and run across it, so the
-	// line never crosses an intervening box.
-	xa := lay.vGutX[a.p.col+1] + lane
-	if a.s == sideL {
-		xa = lay.vGutX[a.p.col] + lane
-	}
-	xb := lay.vGutX[b.p.col+1] + lane
-	if b.s == sideL {
-		xb = lay.vGutX[b.p.col] + lane
-	}
-	hg := maxI(a.p.row, b.p.row)
-	if a.p.row == b.p.row {
-		hg = a.p.row + 1
-	}
-	hy := lay.hGutY[hg] + lane
+	tx := lay.trunkX(a.p, b.p, lane)
 	o.polyline([][2]int{
-		{a.x, a.y}, {xa, a.y}, {xa, hy}, {xb, hy}, {xb, b.y}, {b.x, b.y},
+		{a.x, a.y}, {a.x, ya}, {tx, ya}, {tx, yb}, {b.x, yb}, {b.x, b.y},
 	}, r.Identifying)
-	putLabel(o, r.Label, minI(xa, xb), maxI(xa, xb), hy)
+	putToken(o, a, tx, ya)
+	putToken(o, b, tx, yb)
+	if abs(a.x-tx) >= abs(b.x-tx) { // label rides the longer horizontal run
+		putLabel(o, r.Label, minI(a.x, tx), maxI(a.x, tx), ya)
+	} else {
+		putLabel(o, r.Label, minI(b.x, tx), maxI(b.x, tx), yb)
+	}
 }
 
 func abs(n int) int {
@@ -411,41 +453,31 @@ func abs(n int) int {
 	return n
 }
 
-// selfLoop draws a compact loop from a box's right side back to itself.
-func selfLoop(o *overlay, lay *layout, a endpoint, lane int, r *Relationship) {
-	x := lay.vGutX[a.p.col+1] + lane
-	y1, y2 := a.p.y+1, a.p.y+a.p.h-2
-	ax := a.p.x + a.p.w - 1
-	o.polyline([][2]int{{ax, y1}, {x, y1}, {x, y2}, {ax, y2}}, r.Identifying)
-	putLabel(o, r.Label, ax, x, y1)
-}
-
-// putToken stamps a two-cell crow's-foot marker just outside a box on the stub,
-// oriented so the marker reads toward the box. (atX,atY) is the box-edge attach
-// cell and s the face the connector leaves from.
-func putToken(o *overlay, atX, atY int, s side, card Cardinality) {
-	var tok []rune
-	var start int
-	if s == sideR {
-		tok = []rune(leftToken(card)) // }o, }|, |o … reading into the gutter
-		start = atX + 1
-	} else {
-		tok = []rune(rightToken(card)) // o{, |{, o| … ending at the box
-		start = atX - len(tok)
+// putToken stamps a two-cell crow's-foot marker on the gutter row, next to the
+// corner where the endpoint's stub turns toward targetX. Orientation is pure
+// geometry: whichever way the run leaves the stub, the marker's foot character
+// stays adjacent to the box and the pair reads left-to-right.
+func putToken(o *overlay, ep endpoint, targetX, y int) {
+	if ep.x < targetX { // run leaves rightward
+		for i, r := range []rune(leftToken(ep.card)) {
+			o.token[[2]int{ep.x + 1 + i, y}] = r
+		}
+		return
 	}
+	tok := []rune(rightToken(ep.card))
 	for i, r := range tok {
-		o.token[[2]int{start + i, atY}] = r
+		o.token[[2]int{ep.x - len(tok) + i, y}] = r
 	}
 }
 
 // putLabel centres a label on the run [x0,x1] at row y, clipped clear of the
-// crow's-foot tokens (3 cells) at each end.
+// corner cell plus two-cell crow's-foot token (3 cells) at each end.
 func putLabel(o *overlay, s string, x0, x1, y int) {
 	if s == "" {
 		return
 	}
-	x0 += 2
-	x1 -= 2
+	x0 += 3
+	x1 -= 3
 	rs := []rune(s)
 	start := (x0 + x1 - len(rs) + 1) / 2
 	if start < x0 {
@@ -499,9 +531,12 @@ func glyphFor(bits uint8, solid bool, g glyphs) rune {
 		if solid {
 			return g.v
 		}
-		return ':'
+		return g.vd
 	case dE | dW:
-		return g.h
+		if solid {
+			return g.h
+		}
+		return g.hd
 	case dN | dE:
 		return g.bl // └
 	case dN | dW:
@@ -524,9 +559,12 @@ func glyphFor(bits uint8, solid bool, g glyphs) rune {
 		if solid {
 			return g.v
 		}
-		return ':'
+		return g.vd
 	default: // dE, dW, 0
-		return g.h
+		if solid {
+			return g.h
+		}
+		return g.hd
 	}
 }
 
