@@ -18,8 +18,8 @@ func TestLayoutPlacement(t *testing.T) {
 		}
 	}
 	// Boxes must not overlap: verify placement rectangles are disjoint.
-	byName, placed := placeEntities(d, unicodeGlyphs)
-	_ = byName
+	lay := placeEntities(d, unicodeGlyphs)
+	placed := lay.placed
 	for i := 0; i < len(placed); i++ {
 		for j := i + 1; j < len(placed); j++ {
 			a, b := placed[i], placed[j]

@@ -18,6 +18,19 @@ var asciiGlyphs = glyphs{'-', '|', '+', '+', '+', '+', '+', '+', '+', '+', '+'}
 // of the attribute rows. Columns (type, name, key, comment) are included only
 // when at least one attribute uses them, and are padded to a common width.
 func renderEntity(e *Entity, g glyphs) []string {
+	// No attributes → a plain named box (no column grid, no divider rule). This
+	// is the most common ER form (e.g. `CUSTOMER ||--o{ ORDER`).
+	if len(e.Attributes) == 0 {
+		inner := runewidth.StringWidth(e.Display) + 2
+		pad := inner - runewidth.StringWidth(e.Display)
+		return []string{
+			string(g.tl) + strings.Repeat(string(g.h), inner) + string(g.tr),
+			string(g.v) + strings.Repeat(" ", pad/2) + e.Display +
+				strings.Repeat(" ", pad-pad/2) + string(g.v),
+			string(g.bl) + strings.Repeat(string(g.h), inner) + string(g.br),
+		}
+	}
+
 	// Column cells per attribute row: type, name, keys, comment.
 	rows := make([][4]string, len(e.Attributes))
 	has := [4]bool{true, true, false, false} // type/name always shown
@@ -109,12 +122,12 @@ func Render(d *ErDiagram, useAscii bool) string {
 	if useAscii {
 		g = asciiGlyphs
 	}
-	byName, placed := placeEntities(d, g)
+	lay := placeEntities(d, g)
 
 	c := &canvas{}
-	for _, p := range placed {
+	for _, p := range lay.placed {
 		c.stamp(p.x, p.y, p.lines)
 	}
-	drawConnectors(c, byName, d, g)
+	drawConnectors(c, lay, d, g)
 	return c.String()
 }
