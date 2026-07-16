@@ -18,11 +18,13 @@ var asciiGlyphs = glyphs{'-', '|', '+', '+', '+', '+', '+', '+', '+', '+', '+', 
 // renderEntity draws an entity as an attribute table: a name header above a grid
 // of the attribute rows. Columns (type, name, key, comment) are included only
 // when at least one attribute uses them, and are padded to a common width.
-func renderEntity(e *Entity, g glyphs) []string {
+// minInner is a lower bound on the box's inner width, used to guarantee every
+// relationship touching the box gets its own attach column.
+func renderEntity(e *Entity, g glyphs, minInner int) []string {
 	// No attributes → a plain named box (no column grid, no divider rule). This
 	// is the most common ER form (e.g. `CUSTOMER ||--o{ ORDER`).
 	if len(e.Attributes) == 0 {
-		inner := runewidth.StringWidth(e.Display) + 2
+		inner := max(runewidth.StringWidth(e.Display)+2, minInner)
 		pad := inner - runewidth.StringWidth(e.Display)
 		return []string{
 			string(g.tl) + strings.Repeat(string(g.h), inner) + string(g.tr),
@@ -69,11 +71,11 @@ func renderEntity(e *Entity, g glyphs) []string {
 			inner++ // column separator
 		}
 	}
-	// The header (entity name) may be wider than the columns; grow the last
-	// column so the grid and header line up.
-	if nameW := runewidth.StringWidth(e.Display) + 2; nameW > inner && len(cols) > 0 {
-		width[cols[len(cols)-1]] += nameW - inner
-		inner = nameW
+	// The header (entity name) may be wider than the columns — as may the
+	// required minimum width; grow the last column so everything lines up.
+	if need := max(runewidth.StringWidth(e.Display)+2, minInner); need > inner && len(cols) > 0 {
+		width[cols[len(cols)-1]] += need - inner
+		inner = need
 	}
 
 	pad := func(s string, w int) string {

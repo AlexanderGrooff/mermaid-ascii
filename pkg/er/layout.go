@@ -38,12 +38,19 @@ func (c *canvas) at(x, y int) rune {
 }
 
 // stamp places a block of pre-rendered lines with its top-left at (x0,y0).
+// Runes advance by display width: a double-width rune (CJK, emoji) occupies
+// its cell plus a sentinel cell, keeping canvas columns aligned with what the
+// terminal shows.
 func (c *canvas) stamp(x0, y0 int, block []string) {
 	for dy, line := range block {
 		x := x0
 		for _, r := range line {
 			c.set(x, y0+dy, r)
-			x++
+			w := runewidth.RuneWidth(r)
+			if w == 2 {
+				c.set(x+1, y0+dy, 0)
+			}
+			x += w
 		}
 	}
 }
@@ -51,19 +58,24 @@ func (c *canvas) stamp(x0, y0 int, block []string) {
 func (c *canvas) String() string {
 	var b strings.Builder
 	for _, row := range c.rows {
-		b.WriteString(strings.TrimRight(string(row), " "))
+		line := make([]rune, 0, len(row))
+		for _, r := range row {
+			if r != 0 { // sentinel: second column of a double-width rune
+				line = append(line, r)
+			}
+		}
+		b.WriteString(strings.TrimRight(string(line), " "))
 		b.WriteByte('\n')
 	}
 	return b.String()
 }
 
-// side identifies which face of a box a connector attaches to.
+// side identifies which face of a box a connector attaches to. Connectors only
+// ever leave through the top or bottom face (see sidesFor).
 type side int
 
 const (
-	sideL side = iota
-	sideR
-	sideT
+	sideT side = iota
 	sideB
 )
 
@@ -87,7 +99,6 @@ type layout struct {
 	gutW   int   // width of each vertical gutter
 	vGutX  []int // left edge x of each vertical gutter (len cols+1)
 	hGutY  []int // top edge y of each horizontal gutter (len rows+1)
-	cols   int
 }
 
 // placeEntities renders every entity and arranges the boxes in a near-square
@@ -105,19 +116,38 @@ func placeEntities(d *ErDiagram, g glyphs) *layout {
 		lanes = 1
 	}
 
-	// Vertical gutters must be wide enough both for one lane per relationship and
-	// to give the widest label clear room to sit on its horizontal run.
+	// Vertical gutters hold one trunk lane per relationship AND must leave the
+	// widest label room on a horizontal run. A relationship's longer run always
+	// spans at least gutW-lane cells, so budgeting lanes+label keeps every
+	// label whole whichever lane it lands in.
 	maxLabel := 0
 	for _, r := range d.Relationships {
 		if w := runewidth.StringWidth(r.Label); w > maxLabel {
 			maxLabel = w
 		}
 	}
-	gutW := maxI(lanes, maxLabel) + 5
+	gutW := lanes + maxLabel + 5
+
+	// Boxes must be wide enough that every relationship touching them gets its
+	// own attach column (self-loops additionally need room for two crow's-foot
+	// tokens plus a gap between their stubs).
+	deg := map[string]int{}
+	selfLoop := map[string]bool{}
+	for _, r := range d.Relationships {
+		deg[r.Left]++
+		deg[r.Right]++
+		if r.Left == r.Right {
+			selfLoop[r.Left] = true
+		}
+	}
 
 	placed := make([]*placedEntity, n)
 	for i, e := range d.Entities {
-		lines := renderEntity(e, g)
+		minW := 2*deg[e.Name] + 3
+		if selfLoop[e.Name] {
+			minW = max(minW, 9)
+		}
+		lines := renderEntity(e, g, minW-2)
 		placed[i] = &placedEntity{
 			entity: e, lines: lines,
 			w: blockWidth(lines), h: len(lines),
@@ -176,7 +206,7 @@ func placeEntities(d *ErDiagram, g glyphs) *layout {
 		p.x, p.y = colX[p.col], rowY[p.row]
 		byName[p.entity.Name] = p
 	}
-	return &layout{byName: byName, placed: placed, lanes: lanes, gutW: gutW, vGutX: vGutX, hGutY: hGutY, cols: cols}
+	return &layout{byName: byName, placed: placed, lanes: lanes, gutW: gutW, vGutX: vGutX, hGutY: hGutY}
 }
 
 func blockWidth(lines []string) int {
@@ -260,27 +290,22 @@ func (o *overlay) polyline(pts [][2]int, solid bool) {
 	}
 }
 
-// attach chooses evenly-spaced connection points along each box side so several
-// relationships touching the same side don't stack on one cell. It returns the
-// (x,y) for the idx-th of total connectors on that side.
+// attach chooses evenly-spaced connection points along a box's top or bottom
+// face so several relationships touching the same face don't stack on one
+// cell. It returns the (x,y) for the idx-th of total connectors on that face.
+// placeEntities sizes boxes so span ≥ 2·total, keeping every slot distinct.
 func attach(p *placedEntity, s side, idx, total int) (int, int) {
-	slot := func(lo, hi int) int {
-		span := hi - lo
-		if total <= 1 || span <= 0 {
-			return lo + span/2
-		}
-		return lo + span*(idx+1)/(total+1)
+	lo, hi := p.x+1, p.x+p.w-2
+	span := hi - lo
+	x := lo + span/2
+	if total > 1 && span > 0 {
+		x = lo + span*(idx+1)/(total+1)
 	}
-	switch s {
-	case sideL:
-		return p.x, slot(p.y+1, p.y+p.h-2)
-	case sideR:
-		return p.x + p.w - 1, slot(p.y+1, p.y+p.h-2)
-	case sideT:
-		return slot(p.x+1, p.x+p.w-2), p.y
-	default: // sideB
-		return slot(p.x+1, p.x+p.w-2), p.y + p.h - 1
+	y := p.y + p.h - 1 // sideB
+	if s == sideT {
+		y = p.y
 	}
+	return x, y
 }
 
 // endpoint is a resolved connection: box side + on-canvas attach coordinate.
@@ -334,30 +359,44 @@ func drawConnectors(c *canvas, lay *layout, d *ErDiagram, g glyphs) {
 		}
 	}
 
+	plans := make([]routePlan, 0, len(d.Relationships))
 	for i, r := range d.Relationships {
-		e := all[i]
-		if e.a.p == nil {
+		if all[i].a.p == nil {
 			continue
 		}
-		route(o, lay, e.a, e.b, r, i)
+		plans = append(plans, newPlan(lay, all[i].a, all[i].b, r, i))
+	}
+
+	// Lines first, decorations second: label placement inspects the finished
+	// line overlay so labels can dodge cells other relationships pass through.
+	for _, p := range plans {
+		p.drawLine(o)
+	}
+	for _, p := range plans {
+		p.decorate(o)
 	}
 
 	composite(c, o, g)
 
 	// Mark each attach point on the box border with a tee so the stub visibly
 	// joins the box (composite itself never draws over box cells).
-	for i := range all {
-		if all[i].a.p == nil {
-			continue
-		}
-		for _, ep := range []endpoint{all[i].a, all[i].b} {
-			tee := g.teeD // ┬: stub leaves downward through a bottom border
-			if ep.s == sideT {
-				tee = g.teeU // ┴: stub leaves upward through a top border
-			}
-			c.set(ep.x, ep.y, tee)
-		}
+	for _, p := range plans {
+		setAttachTee(c, p.a, g)
+		setAttachTee(c, p.b, g)
 	}
+}
+
+// setAttachTee stamps ┬/┴ where a stub leaves a box; if the border cell already
+// tees the other way (an attribute-table column rule), the two merge into ┼.
+func setAttachTee(c *canvas, ep endpoint, g glyphs) {
+	tee, opposite := g.teeD, g.teeU
+	if ep.s == sideT {
+		tee, opposite = g.teeU, g.teeD
+	}
+	if c.at(ep.x, ep.y) == opposite {
+		tee = g.cross
+	}
+	c.set(ep.x, ep.y, tee)
 }
 
 // sidesFor picks each box's exit face. Connectors leave through the top/bottom
@@ -407,50 +446,67 @@ func (l *layout) trunkX(a, b *placedEntity, lane int) int {
 	return l.vGutX[(a.col+b.col+1)/2] + lane
 }
 
-// route draws one relationship as an orthogonal line in this edge's own lane, so
-// distinct edges never overlap — only genuine crossings share a cell (┼). Each
-// endpoint drops (or rises) vertically from its box into a horizontal gutter
-// row; if both stubs reach the same row the run merges into one straight span,
-// otherwise a vertical trunk in a side gutter joins the two rows:
+// routePlan is one relationship's resolved geometry. Each endpoint drops (or
+// rises) vertically from its box into a horizontal gutter row; if both stubs
+// reach the same row the run merges into one straight span, otherwise a
+// vertical trunk in a side gutter joins the two rows:
 //
 //	{a.x,a.y} {a.x,ya} {tx,ya} {tx,yb} {b.x,yb} {b.x,b.y}
-func route(o *overlay, lay *layout, a, b endpoint, r *Relationship, k int) {
-	lane := k % lay.lanes
-	ya, yb := lay.gutterY(a, lane), lay.gutterY(b, lane)
+type routePlan struct {
+	rel    *Relationship
+	a, b   endpoint
+	ya, yb int
+	tx     int  // trunk column, valid only when !merged
+	merged bool // both stubs meet one gutter row: single run, no trunk
+}
 
-	if ya == yb { // both stubs meet one gutter row: a single horizontal run
-		o.polyline([][2]int{{a.x, a.y}, {a.x, ya}, {b.x, ya}, {b.x, b.y}}, r.Identifying)
-		putToken(o, a, b.x, ya)
-		putToken(o, b, a.x, ya)
-		if a.p == b.p { // self-loop: the run is at most the box's width, so the
-			// label sits beside the loop instead of inside it
-			for i, c := range []rune(r.Label) {
-				o.label[[2]int{maxI(a.x, b.x) + 2 + i, ya}] = c
-			}
+func newPlan(lay *layout, a, b endpoint, r *Relationship, lane int) routePlan {
+	ya, yb := lay.gutterY(a, lane), lay.gutterY(b, lane)
+	p := routePlan{rel: r, a: a, b: b, ya: ya, yb: yb, merged: ya == yb}
+	if !p.merged {
+		p.tx = lay.trunkX(a.p, b.p, lane)
+	}
+	return p
+}
+
+// drawLine draws the relationship's orthogonal line in its own lane, so
+// distinct edges never overlap — only genuine crossings share a cell (┼).
+func (p routePlan) drawLine(o *overlay) {
+	if p.merged {
+		o.polyline([][2]int{
+			{p.a.x, p.a.y}, {p.a.x, p.ya}, {p.b.x, p.ya}, {p.b.x, p.b.y},
+		}, p.rel.Identifying)
+		return
+	}
+	o.polyline([][2]int{
+		{p.a.x, p.a.y}, {p.a.x, p.ya}, {p.tx, p.ya}, {p.tx, p.yb}, {p.b.x, p.yb}, {p.b.x, p.b.y},
+	}, p.rel.Identifying)
+}
+
+// decorate stamps the crow's-foot tokens and the label. Runs after every line
+// is drawn so the label can dodge cells other relationships pass through.
+func (p routePlan) decorate(o *overlay) {
+	if p.merged {
+		putToken(o, p.a, p.b.x, p.ya)
+		putToken(o, p.b, p.a.x, p.ya)
+		if p.a.p == p.b.p { // self-loop: the run is at most the box's width, so
+			// the label sits beside the loop instead of inside it
+			writeLabel(o, p.rel.Label, max(p.a.x, p.b.x)+2, p.ya, -1)
 		} else {
-			putLabel(o, r.Label, minI(a.x, b.x), maxI(a.x, b.x), ya)
+			putLabel(o, p.rel.Label, [][3]int{{min(p.a.x, p.b.x), max(p.a.x, p.b.x), p.ya}})
 		}
 		return
 	}
-
-	tx := lay.trunkX(a.p, b.p, lane)
-	o.polyline([][2]int{
-		{a.x, a.y}, {a.x, ya}, {tx, ya}, {tx, yb}, {b.x, yb}, {b.x, b.y},
-	}, r.Identifying)
-	putToken(o, a, tx, ya)
-	putToken(o, b, tx, yb)
-	if abs(a.x-tx) >= abs(b.x-tx) { // label rides the longer horizontal run
-		putLabel(o, r.Label, minI(a.x, tx), maxI(a.x, tx), ya)
-	} else {
-		putLabel(o, r.Label, minI(b.x, tx), maxI(b.x, tx), yb)
+	putToken(o, p.a, p.tx, p.ya)
+	putToken(o, p.b, p.tx, p.yb)
+	runs := [][3]int{
+		{min(p.a.x, p.tx), max(p.a.x, p.tx), p.ya},
+		{min(p.b.x, p.tx), max(p.b.x, p.tx), p.yb},
 	}
-}
-
-func abs(n int) int {
-	if n < 0 {
-		return -n
+	if runs[1][1]-runs[1][0] > runs[0][1]-runs[0][0] {
+		runs[0], runs[1] = runs[1], runs[0] // longest run first
 	}
-	return n
+	putLabel(o, p.rel.Label, runs)
 }
 
 // putToken stamps a two-cell crow's-foot marker on the gutter row, next to the
@@ -470,24 +526,67 @@ func putToken(o *overlay, ep endpoint, targetX, y int) {
 	}
 }
 
-// putLabel centres a label on the run [x0,x1] at row y, clipped clear of the
-// corner cell plus two-cell crow's-foot token (3 cells) at each end.
-func putLabel(o *overlay, s string, x0, x1, y int) {
+// putLabel places a label on one of the candidate runs (each {x0,x1,y}),
+// clipped 3 cells at each end to clear the corner and crow's-foot token.
+// Candidates arrive longest-first; the first one the label fits on wins.
+func putLabel(o *overlay, s string, runs [][3]int) {
 	if s == "" {
 		return
 	}
-	x0 += 3
-	x1 -= 3
-	rs := []rune(s)
-	start := (x0 + x1 - len(rs) + 1) / 2
-	if start < x0 {
-		start = x0
-	}
-	for i, r := range rs {
-		if start+i > x1 {
+	lw := runewidth.StringWidth(s)
+	best := runs[0]
+	for _, r := range runs {
+		if r[1]-r[0]-6+1 >= lw {
+			best = r
 			break
 		}
-		o.label[[2]int{start + i, y}] = r
+	}
+	lo, hi, y := best[0]+3, best[1]-3, best[2]
+	if lo > hi {
+		return
+	}
+	writeLabel(o, s, labelStart(o, lo, hi, lw, y), y, hi)
+}
+
+// labelStart picks where the label begins: centred on the run, sliding
+// outwards if needed to a spot where it severs no crossing vertical line.
+func labelStart(o *overlay, lo, hi, lw, y int) int {
+	centre := max(lo, lo+(hi-lo+1-lw)/2)
+	for d := 0; d <= hi-lo; d++ {
+		for _, c := range []int{centre - d, centre + d} {
+			if c >= lo && c+lw-1 <= hi && !vBlocked(o, c, c+lw-1, y) {
+				return c
+			}
+		}
+	}
+	return centre
+}
+
+// vBlocked reports whether any cell in [x0,x1] at row y carries a vertical
+// line (a crossing another relationship's trunk or stub makes through here).
+func vBlocked(o *overlay, x0, x1, y int) bool {
+	for x := x0; x <= x1; x++ {
+		if o.bits(x, y)&(dN|dS) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// writeLabel writes label runes from x, advancing by display width (reserving
+// a sentinel cell after each double-width rune so columns stay aligned). A
+// limit ≥ 0 clips the label; -1 writes it whole.
+func writeLabel(o *overlay, s string, x, y, limit int) {
+	for _, c := range s {
+		w := runewidth.RuneWidth(c)
+		if limit >= 0 && x+w-1 > limit {
+			return
+		}
+		o.label[[2]int{x, y}] = c
+		if w == 2 {
+			o.label[[2]int{x + 1, y}] = 0
+		}
+		x += w
 	}
 }
 
@@ -595,6 +694,13 @@ func rightToken(c Cardinality) string {
 	}
 }
 
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
 func sign(n int) int {
 	if n > 0 {
 		return 1
@@ -603,17 +709,4 @@ func sign(n int) int {
 		return -1
 	}
 	return 0
-}
-
-func minI(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-func maxI(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

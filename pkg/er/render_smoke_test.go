@@ -12,7 +12,7 @@ func TestRenderEntity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	out := strings.Join(renderEntity(d.Entities[0], unicodeGlyphs), "\n")
+	out := strings.Join(renderEntity(d.Entities[0], unicodeGlyphs, 0), "\n")
 
 	for _, want := range []string{"USER", "id", "int", "PK", "email", "unique", "bio"} {
 		if !strings.Contains(out, want) {
@@ -26,7 +26,7 @@ func TestRenderEntity(t *testing.T) {
 
 	// No-comment, no-key entity drops those columns (only type+name).
 	d2, _ := Parse("erDiagram\n T {\n  int a\n  int b\n }")
-	out2 := strings.Join(renderEntity(d2.Entities[0], unicodeGlyphs), "\n")
+	out2 := strings.Join(renderEntity(d2.Entities[0], unicodeGlyphs, 0), "\n")
 	if strings.Count(out2, "┬") != 1 { // one column separator ⇒ two columns
 		t.Errorf("expected exactly two columns (type,name):\n%s", out2)
 	}

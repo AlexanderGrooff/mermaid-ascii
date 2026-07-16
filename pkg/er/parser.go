@@ -81,17 +81,24 @@ var (
 	// directionRegex matches the optional "direction TB|LR|..." layout directive.
 	directionRegex = regexp.MustCompile(`(?i)^\s*direction\s+\S+\s*$`)
 
-	// styleLineRegex matches visual-styling / accessibility lines that carry no
-	// ASCII meaning; they're skipped so a stray one doesn't fail a diagram.
-	styleLineRegex = regexp.MustCompile(`(?i)^\s*(classDef|class|style|accTitle|accDescr)\b`)
+	// styleLineRegex matches visual-styling lines that carry no ASCII meaning;
+	// they're skipped so a stray one doesn't fail a diagram. Checked after the
+	// entity-header form so an entity that happens to be named `class` still works.
+	styleLineRegex = regexp.MustCompile(`(?i)^\s*(classDef|class|style)\b`)
+
+	// accLineRegex matches accessibility metadata: `accTitle: …`, `accDescr: …`,
+	// or the multi-line `accDescr {` block form (whose body is skipped too).
+	accLineRegex = regexp.MustCompile(`(?i)^\s*(accTitle|accDescr)\s*[:{]`)
 
 	// entityHeaderRegex matches the opening of an attribute block, with an
-	// optional alias: `NAME {`, `NAME alias {`, or `NAME["Alias Label"] {`.
-	entityHeaderRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|(\S+?))(?:\s*\["([^"]+)"\]|\s+(\S+))?\s*\{\s*$`)
+	// optional alias: `NAME {`, `NAME alias {`, `NAME[Alias] {`, or
+	// `NAME["Alias Label"] {`.
+	entityHeaderRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([^\s{}["]+))(?:\s*\[\s*"?([^"\]]+?)"?\s*\]|\s+(\S+))?\s*\{\s*$`)
 
 	// loneEntityRegex matches an entity declared on its own (no block/relation),
-	// with an optional alias: `NAME`, `NAME alias`, or `NAME["Alias Label"]`.
-	loneEntityRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([A-Za-z0-9_.-]+))(?:\s*\["([^"]+)"\]|\s+(\S+))?\s*$`)
+	// with an optional alias: `NAME`, `NAME alias`, `NAME[Alias]`, or
+	// `NAME["Alias Label"]`.
+	loneEntityRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([^\s{}:|"\[]+))(?:\s*\[\s*"?([^"\]]+?)"?\s*\]|\s+(\S+))?\s*$`)
 
 	// attrKeyRegex matches a PK/FK/UK key token (possibly comma-separated).
 	attrKeyRegex = regexp.MustCompile(`^(?:PK|FK|UK)(?:\s*,\s*(?:PK|FK|UK))*$`)
@@ -124,29 +131,44 @@ func (d *ErDiagram) entity(name string) *Entity {
 
 // Parse parses an erDiagram into entities and relationships.
 func Parse(input string) (*ErDiagram, error) {
-	lines := diagram.RemoveComments(diagram.SplitLines(strings.TrimSpace(input)))
-	if len(lines) == 0 {
-		return nil, fmt.Errorf("empty input")
-	}
-	if !IsErDiagram(strings.TrimSpace(lines[0])) {
+	if !IsErDiagram(input) {
 		return nil, fmt.Errorf("expected %q keyword", erKeyword)
+	}
+	// Comments are stripped in place (not filtered out as whole lines) so error
+	// messages report the caller's real line numbers.
+	lines := diagram.SplitLines(strings.TrimSpace(input))
+	for i, l := range lines {
+		lines[i] = stripComment(l)
 	}
 
 	d := &ErDiagram{byName: map[string]*Entity{}}
 
-	for i := 1; i < len(lines); i++ {
+	seenKeyword := false
+	for i := 0; i < len(lines); i++ {
 		line := strings.TrimSpace(lines[i])
 		if line == "" {
 			continue
 		}
-
-		// Visual styling / accessibility / layout-direction lines carry no ASCII
-		// meaning here — skip them rather than failing the diagram.
-		if styleLineRegex.MatchString(line) || directionRegex.MatchString(line) {
+		if !seenKeyword { // the erDiagram keyword line itself (verified above)
+			seenKeyword = true
 			continue
 		}
 
-		// Entity attribute block: NAME { ... } (with optional alias)
+		// Accessibility / layout-direction lines carry no ASCII meaning here —
+		// skip them (including an `accDescr { … }` block) rather than failing.
+		if accLineRegex.MatchString(line) {
+			if strings.HasSuffix(line, "{") {
+				for i++; i < len(lines) && !strings.Contains(lines[i], "}"); i++ {
+				}
+			}
+			continue
+		}
+		if directionRegex.MatchString(line) {
+			continue
+		}
+
+		// Entity attribute block: NAME { ... } (with optional alias). Checked
+		// before the style-line skip so entities named e.g. `class` still work.
 		if m := entityHeaderRegex.FindStringSubmatch(line); m != nil {
 			name := firstNonEmpty(m[1], m[2])
 			e := d.entity(name)
@@ -163,7 +185,15 @@ func Parse(input string) (*ErDiagram, error) {
 		}
 
 		// Relationship (any cardinality form: crow's-foot, numeric, or words).
+		// Checked before the style-line skip — a relationship always carries a
+		// connector and a colon, which no styling directive does, so an entity
+		// named `class` keeps its relationships.
 		if d.parseRelationship(line) {
+			continue
+		}
+
+		// Visual styling directives (classDef/class/style) have no ASCII meaning.
+		if styleLineRegex.MatchString(line) {
 			continue
 		}
 
@@ -235,6 +265,14 @@ func parseAttribute(line string) (Attribute, error) {
 	return attr, nil
 }
 
+// stripComment drops a %% comment (whole-line or trailing) from a line.
+func stripComment(line string) string {
+	if idx := strings.Index(line, "%%"); idx != -1 {
+		return strings.TrimRight(line[:idx], " \t")
+	}
+	return line
+}
+
 func firstNonEmpty(a, b string) string {
 	if a != "" {
 		return a
@@ -296,14 +334,29 @@ func findWordOp(s string) (int, string) {
 }
 
 // splitEntityCard splits "ENTITY <card>" (entityFirst) or "<card> ENTITY" into
-// the entity id and the cardinality text.
+// the entity id and the cardinality text. Quoted names may contain spaces.
 func splitEntityCard(part string, entityFirst bool) (entity, card string) {
+	part = strings.TrimSpace(part)
+	if entityFirst {
+		if strings.HasPrefix(part, `"`) {
+			if end := strings.Index(part[1:], `"`); end >= 0 {
+				return part[1 : end+1], strings.TrimSpace(part[end+2:])
+			}
+		}
+		toks := strings.Fields(part)
+		if len(toks) == 0 {
+			return "", ""
+		}
+		return strings.Trim(toks[0], `"`), strings.Join(toks[1:], " ")
+	}
+	if strings.HasSuffix(part, `"`) {
+		if start := strings.LastIndex(part[:len(part)-1], `"`); start >= 0 {
+			return part[start+1 : len(part)-1], strings.TrimSpace(part[:start])
+		}
+	}
 	toks := strings.Fields(part)
 	if len(toks) == 0 {
 		return "", ""
-	}
-	if entityFirst {
-		return strings.Trim(toks[0], `"`), strings.Join(toks[1:], " ")
 	}
 	return strings.Trim(toks[len(toks)-1], `"`), strings.Join(toks[:len(toks)-1], " ")
 }
