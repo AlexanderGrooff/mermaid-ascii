@@ -129,8 +129,9 @@ func placeEntities(d *ErDiagram, g glyphs) *layout {
 	gutW := lanes + maxLabel + 5
 
 	// Boxes must be wide enough that every relationship touching them gets its
-	// own attach column (self-loops additionally need room for two crow's-foot
-	// tokens plus a gap between their stubs).
+	// own attach column with clearance for a 2-cell crow's-foot token beside it
+	// (attach spaces slots 4 apart). Self-loops additionally need both their
+	// tokens on one row, and clearance from any other connector on the face.
 	deg := map[string]int{}
 	selfLoop := map[string]bool{}
 	for _, r := range d.Relationships {
@@ -143,9 +144,12 @@ func placeEntities(d *ErDiagram, g glyphs) *layout {
 
 	placed := make([]*placedEntity, n)
 	for i, e := range d.Entities {
-		minW := 2*deg[e.Name] + 3
+		minW := 4*deg[e.Name] + 1
 		if selfLoop[e.Name] {
-			minW = max(minW, 9)
+			minW = 11
+			if deg[e.Name] > 2 {
+				minW = 4*deg[e.Name] + 9
+			}
 		}
 		lines := renderEntity(e, g, minW-2)
 		placed[i] = &placedEntity{
@@ -290,17 +294,19 @@ func (o *overlay) polyline(pts [][2]int, solid bool) {
 	}
 }
 
-// attach chooses evenly-spaced connection points along a box's top or bottom
-// face so several relationships touching the same face don't stack on one
-// cell. It returns the (x,y) for the idx-th of total connectors on that face.
-// placeEntities sizes boxes so span ≥ 2·total, keeping every slot distinct.
+// attach chooses connection points along a box's top or bottom face: slots 4
+// cells apart (a stub, its 2-cell crow's-foot token, and clearance), the group
+// centred on the face — placeEntities sizes boxes so it always fits. Every
+// slot is snapped to a per-face parity, bottom faces even columns and top
+// faces odd, so stubs from boxes stacked in the same grid column can never
+// share a canvas column and visually fuse into one line.
 func attach(p *placedEntity, s side, idx, total int) (int, int) {
 	lo, hi := p.x+1, p.x+p.w-2
-	span := hi - lo
-	x := lo + span/2
-	if total > 1 && span > 0 {
-		x = lo + span*(idx+1)/(total+1)
+	x := lo + (hi-lo-4*(total-1))/2 + 4*idx
+	if (s == sideB) == (x%2 != 0) {
+		x++
 	}
+	x = max(lo, min(x, hi))
 	y := p.y + p.h - 1 // sideB
 	if s == sideT {
 		y = p.y
@@ -353,9 +359,17 @@ func drawConnectors(c *canvas, lay *layout, d *ErDiagram, g glyphs) {
 			slotUsed[key]++
 		}
 		// A self-loop's two stubs share one face; evenly-spaced slots sit too
-		// close together for the crow's-foot tokens, so spread them to the ends.
+		// close together for the crow's-foot tokens, so spread them to the
+		// ends (snapped to the bottom face's even-column parity).
 		if p := all[i].a.p; p == all[i].b.p {
-			all[i].a.x, all[i].b.x = p.x+1, p.x+p.w-2
+			x1, x2 := p.x+1, p.x+p.w-2
+			if x1%2 != 0 {
+				x1++
+			}
+			if x2%2 != 0 {
+				x2--
+			}
+			all[i].a.x, all[i].b.x = x1, x2
 		}
 	}
 
@@ -435,15 +449,12 @@ func (l *layout) gutterY(e endpoint, lane int) int {
 }
 
 // trunkX is the vertical lane column a relationship travels along when its two
-// gutter rows differ: a box-free vertical gutter between (or beside) the two
-// columns, offset by the relationship's lane.
+// gutter rows differ. All trunks form one family: the box-free gutter just
+// right of the leftmost box's column, in the gutter's rightmost `lanes` band.
+// That leaves the leftmost box's horizontal run at least a full label wide,
+// and — lanes being globally unique — no two trunks ever share a column.
 func (l *layout) trunkX(a, b *placedEntity, lane int) int {
-	if a.col == b.col {
-		// Far side of the gutter, so the horizontal runs span its full width
-		// and have room to carry the relationship label.
-		return l.vGutX[a.col+1] + l.gutW - 1 - lane
-	}
-	return l.vGutX[(a.col+b.col+1)/2] + lane
+	return l.vGutX[min(a.col, b.col)+1] + l.gutW - l.lanes + lane
 }
 
 // routePlan is one relationship's resolved geometry. Each endpoint drops (or
@@ -528,63 +539,85 @@ func putToken(o *overlay, ep endpoint, targetX, y int) {
 
 // putLabel places a label on one of the candidate runs (each {x0,x1,y}),
 // clipped 3 cells at each end to clear the corner and crow's-foot token.
-// Candidates arrive longest-first; the first one the label fits on wins.
+// Candidates arrive longest-first; the first run offering the label a spot
+// clear of crossing lines wins, then the first it merely fits on.
 func putLabel(o *overlay, s string, runs [][3]int) {
 	if s == "" {
 		return
 	}
 	lw := runewidth.StringWidth(s)
-	best := runs[0]
+	type spot struct{ start, cost, y, hi int }
+	best := spot{cost: -1}
 	for _, r := range runs {
-		if r[1]-r[0]-6+1 >= lw {
-			best = r
+		lo, hi, y := r[0]+3, r[1]-3, r[2]
+		if hi-lo+1 < lw {
+			continue
+		}
+		start, cost := labelStart(o, lo, hi, lw, y)
+		if best.cost < 0 || cost < best.cost {
+			best = spot{start, cost, y, hi}
+		}
+		if cost == 0 {
 			break
 		}
 	}
-	lo, hi, y := best[0]+3, best[1]-3, best[2]
-	if lo > hi {
-		return
+	if best.cost < 0 { // fits nowhere whole: clip on the longest run
+		lo, hi, y := runs[0][0]+3, runs[0][1]-3, runs[0][2]
+		if lo > hi {
+			return
+		}
+		start, _ := labelStart(o, lo, hi, lw, y)
+		best = spot{start, 0, y, hi}
 	}
-	writeLabel(o, s, labelStart(o, lo, hi, lw, y), y, hi)
+	writeLabel(o, s, best.start, best.y, best.hi)
 }
 
-// labelStart picks where the label begins: centred on the run, sliding
-// outwards if needed to a spot where it severs no crossing vertical line.
-func labelStart(o *overlay, lo, hi, lw, y int) int {
+// labelStart picks where the label begins on [lo,hi]: centred, sliding
+// outwards to the nearest spot crossing the fewest vertical lines. It returns
+// the start and how many crossings the label will sit on (0 is a clean spot).
+func labelStart(o *overlay, lo, hi, lw, y int) (int, int) {
 	centre := max(lo, lo+(hi-lo+1-lw)/2)
-	for d := 0; d <= hi-lo; d++ {
+	start, cost := centre, vCrossings(o, centre, min(centre+lw-1, hi), y)
+	for d := 1; d <= hi-lo && cost > 0; d++ {
 		for _, c := range []int{centre - d, centre + d} {
-			if c >= lo && c+lw-1 <= hi && !vBlocked(o, c, c+lw-1, y) {
-				return c
+			if c < lo || c+lw-1 > hi {
+				continue
+			}
+			if n := vCrossings(o, c, c+lw-1, y); n < cost {
+				start, cost = c, n
 			}
 		}
 	}
-	return centre
+	return start, cost
 }
 
-// vBlocked reports whether any cell in [x0,x1] at row y carries a vertical
-// line (a crossing another relationship's trunk or stub makes through here).
-func vBlocked(o *overlay, x0, x1, y int) bool {
+// vCrossings counts cells in [x0,x1] at row y carrying a vertical line (a
+// crossing another relationship's trunk or stub makes through here).
+func vCrossings(o *overlay, x0, x1, y int) int {
+	n := 0
 	for x := x0; x <= x1; x++ {
 		if o.bits(x, y)&(dN|dS) != 0 {
-			return true
+			n++
 		}
 	}
-	return false
+	return n
 }
 
 // writeLabel writes label runes from x, advancing by display width (reserving
 // a sentinel cell after each double-width rune so columns stay aligned). A
-// limit ≥ 0 clips the label; -1 writes it whole.
+// limit ≥ 0 clips the label; -1 writes it whole. A space rune over a crossing
+// vertical line is not stamped, so word gaps never punch holes in other lines.
 func writeLabel(o *overlay, s string, x, y, limit int) {
 	for _, c := range s {
 		w := runewidth.RuneWidth(c)
 		if limit >= 0 && x+w-1 > limit {
 			return
 		}
-		o.label[[2]int{x, y}] = c
-		if w == 2 {
-			o.label[[2]int{x + 1, y}] = 0
+		if c != ' ' || o.bits(x, y)&(dN|dS) == 0 {
+			o.label[[2]int{x, y}] = c
+			if w == 2 {
+				o.label[[2]int{x + 1, y}] = 0
+			}
 		}
 		x += w
 	}

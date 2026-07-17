@@ -102,6 +102,9 @@ var (
 
 	// attrKeyRegex matches a PK/FK/UK key token (possibly comma-separated).
 	attrKeyRegex = regexp.MustCompile(`^(?:PK|FK|UK)(?:\s*,\s*(?:PK|FK|UK))*$`)
+
+	// emptyBlockRegex matches a one-line empty attribute block suffix: `NAME {}`.
+	emptyBlockRegex = regexp.MustCompile(`\s*\{\s*\}\s*$`)
 )
 
 // IsErDiagram reports whether the input's first meaningful line declares an
@@ -167,6 +170,12 @@ func Parse(input string) (*ErDiagram, error) {
 			continue
 		}
 
+		// A one-line empty attribute block (`NAME {}`) is just an entity
+		// declaration; strip the block and let the lone-entity form match.
+		if emptyBlockRegex.MatchString(line) {
+			line = strings.TrimSpace(emptyBlockRegex.ReplaceAllString(line, ""))
+		}
+
 		// Entity attribute block: NAME { ... } (with optional alias). Checked
 		// before the style-line skip so entities named e.g. `class` still work.
 		if m := entityHeaderRegex.FindStringSubmatch(line); m != nil {
@@ -209,9 +218,7 @@ func Parse(input string) (*ErDiagram, error) {
 		return nil, fmt.Errorf("line %d: invalid syntax: %q", i+1, line)
 	}
 
-	if len(d.Entities) == 0 {
-		return nil, fmt.Errorf("no entities found")
-	}
+	// A statement-less erDiagram is valid mermaid; it renders as empty output.
 	return d, nil
 }
 
@@ -229,7 +236,7 @@ func parseAttributeBlock(lines []string, start int) ([]Attribute, int, error) {
 		}
 		attr, err := parseAttribute(line)
 		if err != nil {
-			return nil, i, err
+			return nil, i, fmt.Errorf("line %d: %w", i+1, err)
 		}
 		attrs = append(attrs, attr)
 	}
@@ -266,9 +273,17 @@ func parseAttribute(line string) (Attribute, error) {
 }
 
 // stripComment drops a %% comment (whole-line or trailing) from a line.
+// %% inside a quoted string (a label or attribute comment) is kept, matching
+// mermaid's lexer, which tokenizes strings before comments.
 func stripComment(line string) string {
-	if idx := strings.Index(line, "%%"); idx != -1 {
-		return strings.TrimRight(line[:idx], " \t")
+	inQuote := false
+	for i := 0; i < len(line); i++ {
+		switch {
+		case line[i] == '"':
+			inQuote = !inQuote
+		case !inQuote && line[i] == '%' && i+1 < len(line) && line[i+1] == '%':
+			return strings.TrimRight(line[:i], " \t")
+		}
 	}
 	return line
 }

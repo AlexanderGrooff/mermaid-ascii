@@ -1,6 +1,9 @@
 package er
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestIsErDiagram(t *testing.T) {
 	for _, c := range []struct {
@@ -85,12 +88,23 @@ func TestParseErErrors(t *testing.T) {
 		{"missing keyword", "A ||--|| B : x", "expected"},
 		{"unclosed block", "erDiagram\n A {\n  int id", "unclosed"},
 		{"bad attribute", "erDiagram\n A {\n  oneword\n }", "type and name"},
-		{"no entities", "erDiagram\n", "no entities"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			if _, err := Parse(c.in); err == nil {
 				t.Errorf("expected error containing %q", c.wantErr)
 			}
 		})
+	}
+}
+
+// TestEmptyErDiagram: a statement-less erDiagram is valid mermaid and renders
+// as empty output rather than erroring.
+func TestEmptyErDiagram(t *testing.T) {
+	d, err := Parse("erDiagram\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out := Render(d, false); strings.TrimSpace(out) != "" {
+		t.Errorf("empty diagram should render empty, got %q", out)
 	}
 }
