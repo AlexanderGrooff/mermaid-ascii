@@ -349,6 +349,7 @@ func drawConnectors(c *canvas, lay *layout, d *ErDiagram, g glyphs) {
 		slotCount[[2]int{entIdx[b], int(sb)}]++
 	}
 	slotUsed := map[[2]int]int{}
+	selfSeen := map[*placedEntity]int{}
 	for i := range all {
 		if all[i].a.p == nil {
 			continue
@@ -360,9 +361,13 @@ func drawConnectors(c *canvas, lay *layout, d *ErDiagram, g glyphs) {
 		}
 		// A self-loop's two stubs share one face; evenly-spaced slots sit too
 		// close together for the crow's-foot tokens, so spread them to the
-		// ends (snapped to the bottom face's even-column parity).
+		// ends (snapped to the bottom face's even-column parity). Each further
+		// self-loop on the same entity nests one slot-pitch inside the last,
+		// so no two loops ever share an attach column.
 		if p := all[i].a.p; p == all[i].b.p {
-			x1, x2 := p.x+1, p.x+p.w-2
+			in := 4 * selfSeen[p]
+			selfSeen[p]++
+			x1, x2 := p.x+1+in, p.x+p.w-2-in
 			if x1%2 != 0 {
 				x1++
 			}

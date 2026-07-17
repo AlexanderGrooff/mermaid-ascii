@@ -160,6 +160,46 @@ func TestLongLabelSurvivesManyLanes(t *testing.T) {
 
 func entityName(i int) string { return "E" + string(rune('0'+i)) }
 
+// TestTwoSelfLoopsDistinct checks two self-relationships on one entity keep
+// separate attach columns (distinct tee positions) and both labels render.
+func TestTwoSelfLoopsDistinct(t *testing.T) {
+	d, err := Parse("erDiagram\n E ||--o{ E : first\n E }o..o| E : second")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(Render(d, false), "\n")
+	// Bottom border must carry 4 distinct attach tees (2 stubs per loop).
+	if n := strings.Count(lines[2], "┬"); n != 4 {
+		t.Errorf("want 4 distinct attach tees, got %d:\n%s", n, lines[2])
+	}
+	out := strings.Join(lines, "\n")
+	for _, want := range []string{"first", "second"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing label %q:\n%s", want, out)
+		}
+	}
+}
+
+// TestWhitespaceLabelsCollapse checks whitespace-only and padded labels don't
+// punch blank holes in their connector line.
+func TestWhitespaceLabelsCollapse(t *testing.T) {
+	d, err := Parse("erDiagram\n A ||--o{ B : \"   \"\n A ||--o{ C : \"     x\"")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Relationships[0].Label != "" || d.Relationships[1].Label != "x" {
+		t.Fatalf("labels not collapsed: %q, %q",
+			d.Relationships[0].Label, d.Relationships[1].Label)
+	}
+	for _, line := range strings.Split(Render(d, false), "\n") {
+		// A run must never contain interior blank gaps: once a horizontal line
+		// starts (└ or token), spaces may not appear before its closing corner.
+		if strings.Contains(line, "─ ") && strings.Contains(line[strings.Index(line, "─ "):], "─") {
+			t.Errorf("hole punched in connector: %q", line)
+		}
+	}
+}
+
 func runeColumns(s string, targets ...rune) []int {
 	var cols []int
 	col := 0

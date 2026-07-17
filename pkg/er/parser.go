@@ -306,7 +306,9 @@ func (d *ErDiagram) parseRelationship(line string) bool {
 		return false
 	}
 	main := strings.TrimSpace(line[:colon])
-	label := strings.Trim(strings.TrimSpace(line[colon+1:]), `"`)
+	// Collapse label whitespace like mermaid's SVG text rendering does; a
+	// whitespace-only label would otherwise punch blank holes in its line.
+	label := strings.Join(strings.Fields(strings.Trim(strings.TrimSpace(line[colon+1:]), `"`)), " ")
 
 	var left, right string
 	var identifying bool
