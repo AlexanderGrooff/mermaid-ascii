@@ -1,12 +1,32 @@
 package cmd
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
 	"github.com/mattn/go-runewidth"
 )
+
+func TestRenderGraphHandlesLongChainWithoutPanic(t *testing.T) {
+	config := diagram.NewTestConfig(true, "cli")
+
+	var b strings.Builder
+	b.WriteString("graph TD\n")
+	for i := 1; i < 30; i++ {
+		fmt.Fprintf(&b, "N%d --> N%d\n", i, i+1)
+	}
+
+	output, err := RenderDiagram(b.String(), config)
+	if err != nil {
+		t.Fatalf("RenderDiagram() error = %v", err)
+	}
+
+	if !strings.Contains(output, "N30") {
+		t.Fatalf("expected output to contain the last node\noutput:\n%s", output)
+	}
+}
 
 func TestRenderGraphKeepsDisplayWidthForWideNodeLabels(t *testing.T) {
 	config := diagram.NewTestConfig(true, "cli")

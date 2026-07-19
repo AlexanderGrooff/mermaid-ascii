@@ -181,13 +181,10 @@ func (g *graph) setSubgraphs(textSubgraphs []*textSubgraph) {
 }
 
 func (g *graph) createMapping() {
-	// Set mapping coord for every node in the graph
-	highestPositionPerLevel := []int{}
-	// Init array with 0 values
-	// TODO: I'm sure there's a better way of doing this
-	for i := 0; i < 100; i++ {
-		highestPositionPerLevel = append(highestPositionPerLevel, 0)
-	}
+	// Set mapping coord for every node in the graph.
+	// Keyed by level so it grows with the graph instead of assuming a fixed
+	// number of levels; a missing key reads as the zero value.
+	highestPositionPerLevel := map[int]int{}
 
 	// TODO: should the mapping be bottom-to-top instead of top-to-bottom?
 	// Set root nodes to level 0
