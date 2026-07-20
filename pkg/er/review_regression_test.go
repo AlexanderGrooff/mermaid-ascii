@@ -160,6 +160,65 @@ func TestLongLabelSurvivesManyLanes(t *testing.T) {
 
 func entityName(i int) string { return "E" + string(rune('0'+i)) }
 
+// TestClassShorthandStripped checks `:::class` styling decorations are
+// stripped in every position mermaid allows them: lone declaration, block
+// header, after an alias, and on relationship endpoints.
+func TestClassShorthandStripped(t *testing.T) {
+	d, err := Parse("erDiagram\n A:::x\n B:::y,z {\n  int id\n }\n C[\"Custom C\"]:::w\n A:::x ||--o{ B:::y : links")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Entities) != 3 {
+		t.Fatalf("want 3 entities, got %d: %+v", len(d.Entities), d.Entities)
+	}
+	for i, want := range []string{"A", "B", "C"} {
+		if d.Entities[i].Name != want {
+			t.Errorf("entity %d = %q, want %q (::: not stripped)", i, d.Entities[i].Name, want)
+		}
+	}
+	if d.Entities[2].Display != "Custom C" {
+		t.Errorf("alias lost when stripping :::, got %q", d.Entities[2].Display)
+	}
+	if r := d.Relationships[0]; r.Left != "A" || r.Right != "B" {
+		t.Errorf("relationship endpoints = %q/%q, want A/B", r.Left, r.Right)
+	}
+	if out := Render(d, false); strings.Contains(out, ":::") {
+		t.Errorf("::: leaked into render:\n%s", out)
+	}
+}
+
+// TestSubgraphRejected checks er subgraph blocks fail loudly instead of
+// misparsing into bogus entity boxes.
+func TestSubgraphRejected(t *testing.T) {
+	_, err := Parse("erDiagram\n subgraph CUSTOMERS\n  A ||--|| B : has\n end")
+	if err == nil || !strings.Contains(err.Error(), "subgraph") {
+		t.Errorf("want a subgraph-not-supported error, got %v", err)
+	}
+}
+
+// TestBacktickAttributesStripped checks backtick-escaped attribute types and
+// names (mermaid's escape for special characters) render without the ticks,
+// including names containing spaces.
+func TestBacktickAttributesStripped(t *testing.T) {
+	d, err := Parse("erDiagram\n X {\n  type `geo.accuracy`\n  `geo point` `two words` PK\n }")
+	if err != nil {
+		t.Fatal(err)
+	}
+	attrs := d.Entities[0].Attributes
+	want := [][2]string{{"type", "geo.accuracy"}, {"geo point", "two words"}}
+	for i, w := range want {
+		if attrs[i].Type != w[0] || attrs[i].Name != w[1] {
+			t.Errorf("attr %d = %q %q, want %q %q", i, attrs[i].Type, attrs[i].Name, w[0], w[1])
+		}
+	}
+	if len(attrs[1].Keys) != 1 || attrs[1].Keys[0] != "PK" {
+		t.Errorf("PK key lost after backtick tokens: %+v", attrs[1])
+	}
+	if out := Render(d, false); strings.Contains(out, "`") {
+		t.Errorf("backticks leaked into render:\n%s", out)
+	}
+}
+
 // TestTwoSelfLoopsDistinct checks two self-relationships on one entity keep
 // separate attach columns (distinct tee positions) and both labels render.
 func TestTwoSelfLoopsDistinct(t *testing.T) {

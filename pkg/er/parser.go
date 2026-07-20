@@ -105,6 +105,14 @@ var (
 
 	// emptyBlockRegex matches a one-line empty attribute block suffix: `NAME {}`.
 	emptyBlockRegex = regexp.MustCompile(`\s*\{\s*\}\s*$`)
+
+	// classShorthandRegex matches a `:::class[,class…]` styling decoration on an
+	// entity; like classDef/class lines it carries no ASCII meaning.
+	classShorthandRegex = regexp.MustCompile(`:::[\w,-]+`)
+
+	// subgraphRegex matches the opening of an er subgraph block (an unreleased
+	// upstream feature this renderer rejects rather than mis-draws).
+	subgraphRegex = regexp.MustCompile(`^subgraph\b`)
 )
 
 // IsErDiagram reports whether the input's first meaningful line declares an
@@ -168,6 +176,18 @@ func Parse(input string) (*ErDiagram, error) {
 		}
 		if directionRegex.MatchString(line) {
 			continue
+		}
+
+		// er subgraphs (unreleased upstream) would otherwise misparse into
+		// bogus entity boxes — reject them loudly instead.
+		if subgraphRegex.MatchString(line) || line == "end" {
+			return nil, fmt.Errorf("line %d: er subgraphs are not supported", i+1)
+		}
+
+		// `:::class` styling decorations carry no ASCII meaning; strip them
+		// (outside quoted strings) so the decorated statement parses normally.
+		if strings.Contains(line, ":::") {
+			line = stripClassShorthand(line)
 		}
 
 		// A one-line empty attribute block (`NAME {}`) is just an entity
@@ -260,7 +280,13 @@ func parseAttribute(line string) (Attribute, error) {
 	if len(fields) < 2 {
 		return Attribute{}, fmt.Errorf("attribute needs a type and name: %q", line)
 	}
-	attr := Attribute{Type: fields[0], Name: fields[1], Comment: comment}
+	// Backtick escaping (`geo.accuracy`) exists only to smuggle special
+	// characters past mermaid's lexer; the backticks themselves never render.
+	attr := Attribute{
+		Type:    strings.Trim(fields[0], "`"),
+		Name:    strings.Trim(fields[1], "`"),
+		Comment: comment,
+	}
 	if rest := strings.TrimSpace(strings.Join(fields[2:], " ")); rest != "" {
 		if !attrKeyRegex.MatchString(rest) {
 			return Attribute{}, fmt.Errorf("unexpected attribute tokens %q", rest)
@@ -270,6 +296,16 @@ func parseAttribute(line string) (Attribute, error) {
 		}
 	}
 	return attr, nil
+}
+
+// stripClassShorthand removes `:::class[,class…]` decorations from the parts
+// of a line outside double-quoted strings.
+func stripClassShorthand(line string) string {
+	parts := strings.Split(line, `"`)
+	for i := 0; i < len(parts); i += 2 { // even indices are outside quotes
+		parts[i] = classShorthandRegex.ReplaceAllString(parts[i], "")
+	}
+	return strings.Join(parts, `"`)
 }
 
 // stripComment drops a %% comment (whole-line or trailing) from a line.
@@ -378,12 +414,14 @@ func splitEntityCard(part string, entityFirst bool) (entity, card string) {
 	return strings.Trim(toks[len(toks)-1], `"`), strings.Join(toks[:len(toks)-1], " ")
 }
 
-// splitAttrTokens splits on whitespace but keeps parenthesised groups intact, so
-// a type like "decimal(10, 2)" or "varchar(255)" stays a single token.
+// splitAttrTokens splits on whitespace but keeps parenthesised and
+// backtick-escaped groups intact, so a type like "decimal(10, 2)" or a name
+// like `two words` stays a single token.
 func splitAttrTokens(s string) []string {
 	var toks []string
 	var cur strings.Builder
 	depth := 0
+	inTick := false
 	flush := func() {
 		if cur.Len() > 0 {
 			toks = append(toks, cur.String())
@@ -392,15 +430,18 @@ func splitAttrTokens(s string) []string {
 	}
 	for _, r := range s {
 		switch {
-		case r == '(':
+		case r == '`':
+			inTick = !inTick
+			cur.WriteRune(r)
+		case r == '(' && !inTick:
 			depth++
 			cur.WriteRune(r)
-		case r == ')':
+		case r == ')' && !inTick:
 			if depth > 0 {
 				depth--
 			}
 			cur.WriteRune(r)
-		case (r == ' ' || r == '\t') && depth == 0:
+		case (r == ' ' || r == '\t') && depth == 0 && !inTick:
 			flush()
 		default:
 			cur.WriteRune(r)
