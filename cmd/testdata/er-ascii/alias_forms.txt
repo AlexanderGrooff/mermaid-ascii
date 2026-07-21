@@ -1,0 +1,9 @@
+erDiagram
+    p[Person]
+    a["Customer Account"]
+    p ||--o| a : owns
+---
++--------+          +------------------+
+| Person |          | Customer Account |
++---+----+          +---------+--------+
+    +||--------owns---------o|+

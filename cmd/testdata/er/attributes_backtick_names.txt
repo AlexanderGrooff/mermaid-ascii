@@ -1,0 +1,12 @@
+erDiagram
+    CAR {
+        string `type`
+        int `order`
+    }
+---
+┌────────────────┐
+│      CAR       │
+├────────┬───────┤
+│ string │ type  │
+│ int    │ order │
+└────────┴───────┘

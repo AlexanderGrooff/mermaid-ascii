@@ -1,0 +1,7 @@
+erDiagram
+    PERSON ||..o{ NICKNAME : known_as
+---
++--------+              +----------+
+| PERSON |              | NICKNAME |
++---+----+              +-----+----+
+    +||......known_as.......o{+

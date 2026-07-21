@@ -1,0 +1,7 @@
+erDiagram
+    "Customer Account" ||--o{ "Purchase Order" : places
+---
++------------------+            +----------------+
+| Customer Account |            | Purchase Order |
++---------+--------+            +-------+--------+
+          +||---------places----------o{+

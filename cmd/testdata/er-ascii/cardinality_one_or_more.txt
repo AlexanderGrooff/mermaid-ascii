@@ -1,0 +1,7 @@
+erDiagram
+    ORDER }|--|{ LINE_ITEM : contains
+---
++-------+              +-----------+
+| ORDER |              | LINE_ITEM |
++---+---+              +------+----+
+    +}|------contains-------|{+

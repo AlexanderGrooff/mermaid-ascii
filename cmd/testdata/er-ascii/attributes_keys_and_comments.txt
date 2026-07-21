@@ -1,0 +1,16 @@
+erDiagram
+    ORDER {
+        int id PK "unique identifier"
+        int customerId FK
+        string trackingCode UK
+        decimal total "includes tax"
+    }
+---
++-------------------------------------------------+
+|                      ORDER                      |
++---------+--------------+----+-------------------+
+| int     | id           | PK | unique identifier |
+| int     | customerId   | FK |                   |
+| string  | trackingCode | UK |                   |
+| decimal | total        |    | includes tax      |
++---------+--------------+----+-------------------+

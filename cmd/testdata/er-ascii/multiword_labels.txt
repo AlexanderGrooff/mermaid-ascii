@@ -1,0 +1,7 @@
+erDiagram
+    CUSTOMER ||--o{ ORDER : "places an order for"
+---
++----------+                         +-------+
+| CUSTOMER |                         | ORDER |
++-----+----+                         +----+--+
+      +||------places an order for------o{+

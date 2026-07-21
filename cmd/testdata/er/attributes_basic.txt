@@ -1,0 +1,14 @@
+erDiagram
+    CUSTOMER {
+        string name
+        string email
+        int loyaltyPoints
+    }
+---
+┌────────────────────────┐
+│        CUSTOMER        │
+├────────┬───────────────┤
+│ string │ name          │
+│ string │ email         │
+│ int    │ loyaltyPoints │
+└────────┴───────────────┘
