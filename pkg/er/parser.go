@@ -251,14 +251,24 @@ func parseAttributeBlock(lines []string, start int) ([]Attribute, int, error) {
 		if line == "" || strings.HasPrefix(line, "//") {
 			continue // blank or a // note line (some diagrams use these)
 		}
-		if line == "}" {
+		// Mermaid allows the closing brace on the last attribute's line
+		// ("string title}"), so a trailing "}" closes the block after the
+		// attribute (if any) on that line is parsed. Quoted comments never
+		// end in a bare "}" — the quote is the last character.
+		closes := strings.HasSuffix(line, "}")
+		if closes {
+			line = strings.TrimSpace(strings.TrimSuffix(line, "}"))
+		}
+		if line != "" {
+			attr, err := parseAttribute(line)
+			if err != nil {
+				return nil, i, fmt.Errorf("line %d: %w", i+1, err)
+			}
+			attrs = append(attrs, attr)
+		}
+		if closes {
 			return attrs, i, nil
 		}
-		attr, err := parseAttribute(line)
-		if err != nil {
-			return nil, i, fmt.Errorf("line %d: %w", i+1, err)
-		}
-		attrs = append(attrs, attr)
 	}
 	return nil, len(lines), fmt.Errorf("unclosed attribute block (missing '}')")
 }
