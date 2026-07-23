@@ -1,0 +1,12 @@
+erDiagram
+    CAR {
+        string registrationNumber PK, FK
+        string make
+    }
+---
+┌─────────────────────────────────────┐
+│                 CAR                 │
+├────────┬────────────────────┬───────┤
+│ string │ registrationNumber │ PK,FK │
+│ string │ make               │       │
+└────────┴────────────────────┴───────┘

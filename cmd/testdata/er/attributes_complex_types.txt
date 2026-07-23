@@ -1,0 +1,14 @@
+erDiagram
+    PRODUCT {
+        decimal(10,2) price
+        string[] tags
+        map(string,int) stock
+    }
+---
+┌─────────────────────────┐
+│         PRODUCT         │
+├─────────────────┬───────┤
+│ decimal(10,2)   │ price │
+│ string[]        │ tags  │
+│ map(string,int) │ stock │
+└─────────────────┴───────┘

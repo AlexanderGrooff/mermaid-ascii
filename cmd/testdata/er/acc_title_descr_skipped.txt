@@ -1,0 +1,12 @@
+erDiagram
+    accTitle: My access title
+    accDescr {
+        A long multi-line
+        description block
+    }
+    A ||--|| B : linked
+---
+┌───┐            ┌───┐
+│ A │            │ B │
+└─┬─┘            └──┬┘
+  └||───linked────||┘

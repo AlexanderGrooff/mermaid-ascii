@@ -1,0 +1,18 @@
+erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    CUSTOMER {
+        string name PK
+        string email
+    }
+    ORDER {
+        int id PK
+        decimal total
+    }
+---
++---------------------+            +----------------------+
+|      CUSTOMER       |            |        ORDER         |
++--------+-------+----+            +---------+-------+----+
+| string | name  | PK |            | int     | id    | PK |
+| string | email |    |            | decimal | total |    |
++--------+--+----+----+            +---------++------+----+
+            +||-----------places------------o{+

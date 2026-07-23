@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
+	"github.com/AlexanderGrooff/mermaid-ascii/pkg/er"
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/sequence"
 )
 
@@ -13,6 +14,10 @@ func DiagramFactory(input string) (diagram.Diagram, error) {
 
 	if sequence.IsSequenceDiagram(input) {
 		return &SequenceDiagram{}, nil
+	}
+
+	if er.IsErDiagram(input) {
+		return &ErDiagram{}, nil
 	}
 
 	lines := strings.Split(input, "\n")
@@ -94,3 +99,26 @@ func (gd *GraphDiagram) Render(config *diagram.Config) (string, error) {
 func (gd *GraphDiagram) Type() string {
 	return "graph"
 }
+
+// ErDiagram adapts the er package to the Diagram interface.
+type ErDiagram struct {
+	parsed *er.ErDiagram
+}
+
+func (d *ErDiagram) Parse(input string) error {
+	parsed, err := er.Parse(input)
+	if err != nil {
+		return err
+	}
+	d.parsed = parsed
+	return nil
+}
+
+func (d *ErDiagram) Render(config *diagram.Config) (string, error) {
+	if d.parsed == nil {
+		return "", fmt.Errorf("er diagram not parsed: call Parse() before Render()")
+	}
+	return er.Render(d.parsed, config.UseAscii), nil
+}
+
+func (d *ErDiagram) Type() string { return "er" }

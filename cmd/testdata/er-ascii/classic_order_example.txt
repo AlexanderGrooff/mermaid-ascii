@@ -1,0 +1,14 @@
+erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    ORDER ||--|{ LINE_ITEM : contains
+    CUSTOMER }|..|{ DELIVERY_ADDRESS : uses
+---
++----------+                 +-------+
+| CUSTOMER |                 | ORDER |
++---+---+--+                 +--+---++
+    +||-+------places---------o{+   |
+       +}|--------contains--------||+
+       |+}|...........uses...........|{+
++------+----+                +---------+--------+
+| LINE_ITEM |                | DELIVERY_ADDRESS |
++-----------+                +------------------+

@@ -367,6 +367,55 @@ $ cat sequence.mermaid | mermaid-ascii --ascii
 
 ```
 
+### Entity Relationship Diagrams
+
+Entity relationship diagrams render entities as tables and relationships as crow's-foot connectors, with each relationship label on its own line so they never collide.
+
+```bash
+# Relationships with cardinality and labels
+$ cat er.mermaid
+erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    ORDER ||--|{ LINE_ITEM : contains
+    CUSTOMER }|..|{ DELIVERY_ADDRESS : uses
+$ mermaid-ascii -f er.mermaid
+┌──────────┐                 ┌───────┐
+│ CUSTOMER │                 │ ORDER │
+└───┬───┬──┘                 └──┬───┬┘
+    └||─┼──────places─────────o{┘   │
+       ┌}|────────contains────────||┘
+       │└}|┈┈┈┈┈┈┈┈┈┈┈uses┈┈┈┈┈┈┈┈┈┈┈|{┐
+┌──────┴────┐                ┌─────────┴────────┐
+│ LINE_ITEM │                │ DELIVERY_ADDRESS │
+└───────────┘                └──────────────────┘
+
+# Entities with typed attributes, keys and comments
+$ cat er.mermaid
+erDiagram
+    CUSTOMER {
+        string name PK
+        string email
+        int loyaltyPoints
+    }
+    ORDER {
+        int id PK
+        decimal(10,2) total
+    }
+    CUSTOMER ||--o{ ORDER : places
+$ mermaid-ascii -f er.mermaid
+┌─────────────────────────────┐            ┌────────────────────────────┐
+│          CUSTOMER           │            │           ORDER            │
+├────────┬───────────────┬────┤            ├───────────────┬───────┬────┤
+│ string │ name          │ PK │            │ int           │ id    │ PK │
+│ string │ email         │    │            │ decimal(10,2) │ total │    │
+│ int    │ loyaltyPoints │    │            └──────────────┬┴───────┴────┘
+└────────┴──────┬────────┴────┘                           │
+                └||───────────────places────────────────o{┘
+
+```
+
+Identifying relationships (`--`) are drawn solid, non-identifying ones (`..`) dashed. All crow's-foot cardinalities are supported (`||`, `|o`, `}o`, `}|` on either side), as well as the numeric (`1`, `0+`, `1+`) and word (`only one`, `zero or more`, …) forms.
+
 ```bash
 $ mermaid-ascii --help
 Generate ASCII diagrams from mermaid code.
@@ -557,6 +606,18 @@ Note that with `--coords` enabled, the grid-coords shown show the starting locat
 - [ ] Activation boxes
 - [x] `alt`/`else` blocks (incl. multiple else, nesting)
 - [x] `par`/`and`, `critical`/`option`, `break`, `rect` blocks
+
+### Entity Relationship Diagrams ✅
+- [x] Relationships with all crow's-foot cardinalities (`||--o{`, `}|..|{`, …)
+- [x] Numeric (`1`, `0+`, `1+`) and word (`one or more`, `zero or one`, …) cardinalities
+- [x] Identifying (solid) and non-identifying (dashed) relationships
+- [x] Relationship labels, collision-free (one routing lane per relationship)
+- [x] Entity attribute tables: type, name, keys (PK/FK/UK) and comments
+- [x] Entity aliases (`CUSTOMER c {`, `CUSTOMER["Customer"]`)
+- [x] Self-relationships (`EMPLOYEE ||--o{ EMPLOYEE : manages`)
+- [x] Both ASCII and Unicode rendering modes
+- [ ] `MD_PARENT` (`u--`) cardinality
+- [ ] `style` / `classDef` styling directives (parsed and ignored)
 
 ## TODOs
 

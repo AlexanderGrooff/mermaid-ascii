@@ -1,0 +1,7 @@
+erDiagram
+    EMPLOYEE ||--o{ EMPLOYEE : manages
+---
++----------+
+| EMPLOYEE |
++-+-------++
+  +||---o{+ manages
