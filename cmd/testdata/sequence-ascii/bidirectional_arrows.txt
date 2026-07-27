@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant A
+    participant B
+    A<<->>B: solid bidirectional
+    A<<-->>B: dotted bidirectional
+---
++---+     +---+
+| A |     | B |
++-+-+     +-+-+
+  |         |
+  | solid bidirectional
+  +<------->|
+  |         |
+  | dotted bidirectional
+  +<.......>|
+  |         |

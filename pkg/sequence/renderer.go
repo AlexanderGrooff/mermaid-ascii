@@ -647,19 +647,25 @@ func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string
 		}
 		// Open arrows (-> / -->) have no head: draw the line right up to the
 		// target lifeline instead of an arrowhead.
-		line[to-1] = style
-		if msg.ArrowType.hasHead() {
-			line[to-1] = chars.ArrowRight
+		if head, ok := msg.ArrowType.head(chars, true); ok {
+			line[to-1] = head
+		}
+		// Bidirectional arrows carry a head at the source end too.
+		if msg.ArrowType.isBidirectional() {
+			line[from+1] = chars.ArrowLeft
 		}
 		line[to] = chars.Vertical
 	} else {
 		line[to] = chars.Vertical
 		line[to+1] = style
-		if msg.ArrowType.hasHead() {
-			line[to+1] = chars.ArrowLeft
+		if head, ok := msg.ArrowType.head(chars, false); ok {
+			line[to+1] = head
 		}
 		for i := to + 2; i < from; i++ {
 			line[i] = style
+		}
+		if msg.ArrowType.isBidirectional() {
+			line[from-1] = chars.ArrowRight
 		}
 		line[from] = chars.TeeLeft
 	}
@@ -734,10 +740,12 @@ func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []st
 
 	l3 := ensureWidth(buildLifeline(layout, chars))
 	l3[center] = chars.Vertical
-	// Open arrows have no head.
+	// Open arrows have no head. A bidirectional self-message collapses to a
+	// single head: both of its ends sit on the same lifeline, and the return
+	// head is where they coincide.
 	l3[center+1] = style
-	if msg.ArrowType.hasHead() {
-		l3[center+1] = chars.ArrowLeft
+	if head, ok := msg.ArrowType.head(chars, false); ok {
+		l3[center+1] = head
 	}
 	for i := 2; i < width-1; i++ {
 		l3[center+i] = style

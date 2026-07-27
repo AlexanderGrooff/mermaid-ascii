@@ -14,6 +14,9 @@ type BoxChars struct {
 	Cross        rune
 	ArrowRight   rune
 	ArrowLeft    rune
+	CrossHead    rune // head of -x / --x (lost/failed message)
+	PointRight   rune // head of -) / --) (async message)
+	PointLeft    rune
 	SolidLine    rune
 	DottedLine   rune
 	SelfTopRight rune
@@ -33,6 +36,9 @@ var ASCII = BoxChars{
 	Cross:        '+',
 	ArrowRight:   '>',
 	ArrowLeft:    '<',
+	CrossHead:    'x',
+	PointRight:   ')',
+	PointLeft:    '(',
 	SolidLine:    '-',
 	DottedLine:   '.',
 	SelfTopRight: '+',
@@ -52,6 +58,9 @@ var Unicode = BoxChars{
 	Cross:        '┼',
 	ArrowRight:   '►',
 	ArrowLeft:    '◄',
+	CrossHead:    '×',
+	PointRight:   ')',
+	PointLeft:    '(',
 	SolidLine:    '─',
 	DottedLine:   '┈',
 	SelfTopRight: '┐',

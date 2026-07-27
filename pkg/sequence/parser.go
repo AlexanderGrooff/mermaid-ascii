@@ -18,12 +18,15 @@ var (
 	// participantRegex matches participant declarations: participant [ID] [as Label]
 	participantRegex = regexp.MustCompile(`(?i)^\s*participant\s+(?:"([^"]+)"|(\S+))(?:\s+as\s+(.+))?$`)
 
-	// messageRegex matches messages: [From][arrow][To]: [Label]. The arrow is one
-	// of ->>, -->>, -> or -->. Unquoted participant names exclude the arrow
-	// characters (- > <) so an unsupported arrow such as the bidirectional
-	// "<<->>" cannot be silently absorbed into a name — it fails to match and is
-	// reported as invalid syntax rather than rendered wrongly.
-	messageRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([^\s<>-]+))\s*(-->>|-->|->>|->)\s*(?:"([^"]+)"|([^\s<>-]+))\s*:\s*(.*)$`)
+	// messageRegex matches messages: [From][arrow][To]: [Label]. The arrow is
+	// one of mermaid's ten message types: ->> / -->> (arrowhead), -> / -->
+	// (open), -x / --x (cross), -) / --) (async point), <<->> / <<-->>
+	// (bidirectional). Longer alternatives come first so e.g. "-->>" is never
+	// consumed as "-->". Unquoted participant names exclude the arrow
+	// characters (- > <) so a malformed arrow cannot be silently absorbed into
+	// a name — it fails to match and is reported as invalid syntax rather than
+	// rendered wrongly.
+	messageRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([^\s<>-]+))\s*(<<-->>|<<->>|-->>|--[x)]|-->|->>|-[x)]|->)\s*(?:"([^"]+)"|([^\s<>-]+))\s*:\s*(.*)$`)
 
 	// autonumberRegex matches the autonumber directive
 	autonumberRegex = regexp.MustCompile(`(?i)^\s*autonumber\s*$`)
@@ -192,22 +195,53 @@ type Message struct {
 type ArrowType int
 
 const (
-	SolidArrow  ArrowType = iota // ->>  solid line with an arrowhead
-	DottedArrow                  // -->> dotted line with an arrowhead
-	SolidOpen                    // ->   solid line, no arrowhead
-	DottedOpen                   // -->  dotted line, no arrowhead
+	SolidArrow          ArrowType = iota // ->>    solid line with an arrowhead
+	DottedArrow                          // -->>   dotted line with an arrowhead
+	SolidOpen                            // ->     solid line, no arrowhead
+	DottedOpen                           // -->    dotted line, no arrowhead
+	SolidCross                           // -x     solid line, cross head (lost/failed message)
+	DottedCross                          // --x    dotted line, cross head
+	SolidPoint                           // -)     solid line, open point head (async message)
+	DottedPoint                          // --)    dotted line, open point head
+	BidirectionalSolid                   // <<->>  solid line, arrowheads both ends
+	BidirectionalDotted                  // <<-->> dotted line, arrowheads both ends
 )
 
 // isDotted reports whether the arrow is drawn with a dotted (rather than solid)
 // line.
 func (a ArrowType) isDotted() bool {
-	return a == DottedArrow || a == DottedOpen
+	switch a {
+	case DottedArrow, DottedOpen, DottedCross, DottedPoint, BidirectionalDotted:
+		return true
+	}
+	return false
 }
 
-// hasHead reports whether the arrow terminates in an arrowhead. The open forms
-// (-> and -->) are drawn as a plain line touching the target lifeline.
-func (a ArrowType) hasHead() bool {
-	return a == SolidArrow || a == DottedArrow
+// isBidirectional reports whether the arrow carries a head at the source end
+// too (mermaid's <<->> and <<-->>).
+func (a ArrowType) isBidirectional() bool {
+	return a == BidirectionalSolid || a == BidirectionalDotted
+}
+
+// head returns the glyph drawn where the arrow meets the target lifeline, and
+// false for the open forms (-> and -->), which are drawn as a plain line
+// touching the lifeline. rightward selects the direction the head points.
+func (a ArrowType) head(chars BoxChars, rightward bool) (rune, bool) {
+	switch a {
+	case SolidArrow, DottedArrow, BidirectionalSolid, BidirectionalDotted:
+		if rightward {
+			return chars.ArrowRight, true
+		}
+		return chars.ArrowLeft, true
+	case SolidCross, DottedCross:
+		return chars.CrossHead, true
+	case SolidPoint, DottedPoint:
+		if rightward {
+			return chars.PointRight, true
+		}
+		return chars.PointLeft, true
+	}
+	return 0, false
 }
 
 func (a ArrowType) String() string {
@@ -220,6 +254,18 @@ func (a ArrowType) String() string {
 		return "solid-open"
 	case DottedOpen:
 		return "dotted-open"
+	case SolidCross:
+		return "solid-cross"
+	case DottedCross:
+		return "dotted-cross"
+	case SolidPoint:
+		return "solid-point"
+	case DottedPoint:
+		return "dotted-point"
+	case BidirectionalSolid:
+		return "bidirectional-solid"
+	case BidirectionalDotted:
+		return "bidirectional-dotted"
 	default:
 		return fmt.Sprintf("ArrowType(%d)", int(a))
 	}
@@ -461,6 +507,18 @@ func (sd *SequenceDiagram) parseMessage(line string, participants map[string]*Pa
 		aType = SolidOpen
 	case "-->":
 		aType = DottedOpen
+	case "-x":
+		aType = SolidCross
+	case "--x":
+		aType = DottedCross
+	case "-)":
+		aType = SolidPoint
+	case "--)":
+		aType = DottedPoint
+	case "<<->>":
+		aType = BidirectionalSolid
+	case "<<-->>":
+		aType = BidirectionalDotted
 	}
 
 	msgNumber := 0

@@ -33,26 +33,36 @@ func TestArrowTypes(t *testing.T) {
 			if got.isDotted() != tt.wantDotted {
 				t.Errorf("isDotted() = %v, want %v", got.isDotted(), tt.wantDotted)
 			}
-			if got.hasHead() != tt.wantHead {
-				t.Errorf("hasHead() = %v, want %v", got.hasHead(), tt.wantHead)
+			if _, hasHead := got.head(Unicode, true); hasHead != tt.wantHead {
+				t.Errorf("head() present = %v, want %v", hasHead, tt.wantHead)
 			}
 		})
 	}
 }
 
-// TestUnsupportedArrowsRejected documents that arrow types we don't yet support
-// (async -x/-), cross, and bidirectional <<->>) are rejected rather than
-// silently mis-parsed. mermaid supports these; adding them is future work.
-func TestUnsupportedArrowsRejected(t *testing.T) {
-	for _, in := range []string{
-		"sequenceDiagram\n A-xB: cross",
-		"sequenceDiagram\n A-)B: async",
-		"sequenceDiagram\n A--xB: dotted cross",
-		"sequenceDiagram\n A--)B: dotted async",
-		"sequenceDiagram\n A<<->>B: bidirectional",
-	} {
-		if _, err := Parse(in); err == nil {
-			t.Errorf("expected error for unsupported arrow in %q, got none", in)
+// TestCrossPointBidirectionalArrows checks that mermaid's remaining message
+// arrows — cross (-x/--x), async point (-)/--)) and bidirectional
+// (<<->>/<<-->>) — parse to the right ArrowType.
+func TestCrossPointBidirectionalArrows(t *testing.T) {
+	tests := []struct {
+		in   string
+		want ArrowType
+	}{
+		{"sequenceDiagram\n A-xB: cross", SolidCross},
+		{"sequenceDiagram\n A--xB: dotted cross", DottedCross},
+		{"sequenceDiagram\n A-)B: async", SolidPoint},
+		{"sequenceDiagram\n A--)B: dotted async", DottedPoint},
+		{"sequenceDiagram\n A<<->>B: bidirectional", BidirectionalSolid},
+		{"sequenceDiagram\n A<<-->>B: dotted bidirectional", BidirectionalDotted},
+	}
+	for _, tt := range tests {
+		sd, err := Parse(tt.in)
+		if err != nil {
+			t.Errorf("Parse(%q): %v", tt.in, err)
+			continue
+		}
+		if len(sd.Messages) != 1 || sd.Messages[0].ArrowType != tt.want {
+			t.Errorf("Parse(%q): expected 1 message with ArrowType %v, got %+v", tt.in, tt.want, sd.Messages)
 		}
 	}
 }

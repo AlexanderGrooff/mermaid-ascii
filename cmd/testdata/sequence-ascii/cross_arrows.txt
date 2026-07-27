@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant A
+    participant B
+    A-xB: solid cross
+    B--xA: dotted cross
+---
++---+     +---+
+| A |     | B |
++-+-+     +-+-+
+  |         |
+  | solid cross
+  +--------x|
+  |         |
+  | dotted cross
+  |x........+
+  |         |

@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant A
+    participant B
+    A-)B: solid point
+    B--)A: dotted point
+---
++---+     +---+
+| A |     | B |
++-+-+     +-+-+
+  |         |
+  | solid point
+  +--------)|
+  |         |
+  | dotted point
+  |(........+
+  |         |
