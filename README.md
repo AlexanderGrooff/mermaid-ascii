@@ -595,6 +595,7 @@ Note that with `--coords` enabled, the grid-coords shown show the starting locat
 ### Sequence Diagrams ✅
 - [x] Basic message syntax (`A->>B: message`)
 - [x] Solid and dotted arrows, with or without an arrowhead (`->>`, `-->>`, `->`, `-->`)
+- [x] Cross (`-x`, `--x`), async point (`-)`, `--)`) and bidirectional (`<<->>`, `<<-->>`) arrows
 - [x] Self-messages (`A->>A: think`)
 - [x] Participant declarations (`participant Alice`)
 - [x] Participant aliases (`participant A as Alice`)
