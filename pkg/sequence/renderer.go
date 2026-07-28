@@ -650,7 +650,9 @@ func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string
 		if head, ok := msg.ArrowType.head(chars, true); ok {
 			line[to-1] = head
 		}
-		// Bidirectional arrows carry a head at the source end too.
+		// Bidirectional arrows carry a head at the source end too. This can
+		// never clobber the target head: participant centers are always ≥6
+		// columns apart (box width ≥5 plus spacing ≥1), so from+1 < to-1.
 		if msg.ArrowType.isBidirectional() {
 			line[from+1] = chars.ArrowLeft
 		}
