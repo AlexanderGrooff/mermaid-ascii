@@ -671,6 +671,13 @@ func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string
 		}
 		line[from] = chars.TeeLeft
 	}
+	// Central connections replace the lifeline attachment with a circle.
+	if msg.CentralFrom {
+		line[from] = chars.Circle
+	}
+	if msg.CentralTo {
+		line[to] = chars.Circle
+	}
 	lines = append(lines, strings.TrimRight(string(line), " "))
 	return lines
 }
@@ -730,6 +737,9 @@ func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []st
 
 	l1 := ensureWidth(buildLifeline(layout, chars))
 	l1[center] = chars.TeeRight
+	if msg.CentralFrom {
+		l1[center] = chars.Circle
+	}
 	for i := 1; i < width; i++ {
 		l1[center+i] = style
 	}
@@ -742,6 +752,9 @@ func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []st
 
 	l3 := ensureWidth(buildLifeline(layout, chars))
 	l3[center] = chars.Vertical
+	if msg.CentralTo {
+		l3[center] = chars.Circle
+	}
 	// Open arrows have no head. A bidirectional self-message collapses to a
 	// single head: both of its ends sit on the same lifeline, and the return
 	// head is where they coincide.

@@ -71,20 +71,50 @@ func TestArrowSpecParityForms(t *testing.T) {
 	}
 }
 
-// TestCentralConnectionsRejected documents that mermaid's central-connection
-// syntax (circle markers at the lifeline: "A ()->>() B", released in mermaid
-// 11.16) is rejected loudly rather than silently mis-parsed. It composes with
-// every arrow type, so supporting it is its own follow-up.
-func TestCentralConnectionsRejected(t *testing.T) {
+// TestCentralConnections checks mermaid's central-connection syntax (circle
+// markers at the lifeline, mermaid 11.16): "()" on either side of any arrow.
+// The "()" is its own token in mermaid's lexer, so spaces around it are legal.
+func TestCentralConnections(t *testing.T) {
+	tests := []struct {
+		in       string
+		arrow    ArrowType
+		from, to bool
+	}{
+		{"sequenceDiagram\n Alice ()->>() Bob: dual", SolidArrow, true, true},
+		{"sequenceDiagram\n Alice ()-x() Bob: cross dual", SolidCross, true, true},
+		{"sequenceDiagram\n Alice ()<<->>() Bob: bidirectional dual", BidirectionalSolid, true, true},
+		{"sequenceDiagram\n Alice ->>() Bob: forward", SolidArrow, false, true},
+		{"sequenceDiagram\n Alice ()->> Bob: reverse", SolidArrow, true, false},
+		{"sequenceDiagram\n Alice () -->> () Bob: spaced dual", DottedArrow, true, true},
+		{"sequenceDiagram\n Alice ()--)() Bob: point dual", DottedPoint, true, true},
+	}
+	for _, tt := range tests {
+		sd, err := Parse(tt.in)
+		if err != nil {
+			t.Errorf("Parse(%q): %v", tt.in, err)
+			continue
+		}
+		if len(sd.Messages) != 1 {
+			t.Errorf("Parse(%q): expected 1 message, got %d", tt.in, len(sd.Messages))
+			continue
+		}
+		m := sd.Messages[0]
+		if m.ArrowType != tt.arrow || m.CentralFrom != tt.from || m.CentralTo != tt.to {
+			t.Errorf("Parse(%q): got arrow=%v centralFrom=%v centralTo=%v, want %v/%v/%v",
+				tt.in, m.ArrowType, m.CentralFrom, m.CentralTo, tt.arrow, tt.from, tt.to)
+		}
+	}
+}
+
+// TestMalformedCentralConnectionsRejected keeps near-miss circle forms loud.
+func TestMalformedCentralConnectionsRejected(t *testing.T) {
 	for _, in := range []string{
-		"sequenceDiagram\n Alice ()->>() Bob: dual",
-		"sequenceDiagram\n Alice ()-x() Bob: cross dual",
-		"sequenceDiagram\n Alice ()<<->>() Bob: bidirectional dual",
-		"sequenceDiagram\n Alice ->>() Bob: forward",
-		"sequenceDiagram\n Alice ()->> Bob: reverse",
+		"sequenceDiagram\n Alice (->>) Bob: parens around arrow",
+		"sequenceDiagram\n Alice ( )->> Bob: space inside circle",
+		"sequenceDiagram\n Alice (()->> Bob: unbalanced",
 	} {
 		if _, err := Parse(in); err == nil {
-			t.Errorf("expected error for central-connection syntax %q, got none", in)
+			t.Errorf("expected error for malformed central connection %q, got none", in)
 		}
 	}
 }
