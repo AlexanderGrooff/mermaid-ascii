@@ -145,12 +145,12 @@ func TestMessageRegex(t *testing.T) {
 		if match[1] != "" {
 			gotFrom = match[1]
 		}
-		gotArrow := match[3]
-		gotTo := match[5]
-		if match[4] != "" {
-			gotTo = match[4]
+		gotArrow := match[4]
+		gotTo := match[7]
+		if match[6] != "" {
+			gotTo = match[6]
 		}
-		gotLabel := match[6]
+		gotLabel := match[8]
 
 		if gotFrom != tt.wantFrom || gotArrow != tt.wantArrow || gotTo != tt.wantTo || gotLabel != tt.wantLabel {
 			t.Errorf("messageRegex(%q) = (%q, %q, %q, %q), want (%q, %q, %q, %q)",

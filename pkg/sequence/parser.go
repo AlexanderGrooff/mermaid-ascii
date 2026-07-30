@@ -18,15 +18,19 @@ var (
 	// participantRegex matches participant declarations: participant [ID] [as Label]
 	participantRegex = regexp.MustCompile(`(?i)^\s*participant\s+(?:"([^"]+)"|(\S+))(?:\s+as\s+(.+))?$`)
 
-	// messageRegex matches messages: [From][arrow][To]: [Label]. The arrow is
-	// one of mermaid's ten message types: ->> / -->> (arrowhead), -> / -->
-	// (open), -x / --x (cross), -) / --) (async point), <<->> / <<-->>
-	// (bidirectional). Longer alternatives come first so e.g. "-->>" is never
-	// consumed as "-->". Unquoted participant names exclude the arrow
-	// characters (- > <) so a malformed arrow cannot be silently absorbed into
-	// a name — it fails to match and is reported as invalid syntax rather than
-	// rendered wrongly.
-	messageRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([^\s<>-]+))\s*(<<-->>|<<->>|-->>|--[x)]|-->|->>|-[x)]|->)\s*(?:"([^"]+)"|([^\s<>-]+))\s*:\s*(.*)$`)
+	// messageRegex matches messages: [From][()][arrow][()][To]: [Label]. The
+	// arrow is one of mermaid's ten message types: ->> / -->> (arrowhead),
+	// -> / --> (open), -x / --x (cross), -) / --) (async point), <<->> /
+	// <<-->> (bidirectional). Longer alternatives come first so e.g. "-->>"
+	// is never consumed as "-->". An optional "()" on either side of the
+	// arrow marks a central connection (mermaid 11.16): a circle where the
+	// message meets that lifeline. Unquoted participant names exclude the
+	// arrow characters (- > <) so a malformed arrow cannot be silently
+	// absorbed into a name — it fails to match and is reported as invalid
+	// syntax rather than rendered wrongly — and "(" so a central-connection
+	// marker binds to the arrow, not the name (mermaid's ACTOR token excludes
+	// parentheses too).
+	messageRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([^\s<>(-]+))\s*(\(\))?\s*(<<-->>|<<->>|-->>|--[x)]|-->|->>|-[x)]|->)\s*(\(\))?\s*(?:"([^"]+)"|([^\s<>(-]+))\s*:\s*(.*)$`)
 
 	// autonumberRegex matches the autonumber directive
 	autonumberRegex = regexp.MustCompile(`(?i)^\s*autonumber\s*$`)
@@ -189,7 +193,12 @@ type Message struct {
 	To        *Participant
 	Label     string
 	ArrowType ArrowType
-	Number    int // Message number when autonumber is enabled (0 means no number)
+	// CentralFrom / CentralTo mark central connections (mermaid's "()" on
+	// either side of the arrow): a circle drawn where the message meets that
+	// participant's lifeline.
+	CentralFrom bool
+	CentralTo   bool
+	Number      int // Message number when autonumber is enabled (0 means no number)
 }
 
 type ArrowType int
@@ -485,14 +494,16 @@ func (sd *SequenceDiagram) parseMessage(line string, participants map[string]*Pa
 		fromID = match[1]
 	}
 
-	arrow := match[3]
+	centralFrom := match[3] != ""
+	arrow := match[4]
+	centralTo := match[5] != ""
 
-	toID := match[5]
-	if match[4] != "" {
-		toID = match[4]
+	toID := match[7]
+	if match[6] != "" {
+		toID = match[6]
 	}
 
-	label := strings.TrimSpace(match[6])
+	label := strings.TrimSpace(match[8])
 
 	from := sd.getParticipant(fromID, participants)
 	to := sd.getParticipant(toID, participants)
@@ -527,11 +538,13 @@ func (sd *SequenceDiagram) parseMessage(line string, participants map[string]*Pa
 	}
 
 	msg := &Message{
-		From:      from,
-		To:        to,
-		Label:     label,
-		ArrowType: aType,
-		Number:    msgNumber,
+		From:        from,
+		To:          to,
+		Label:       label,
+		ArrowType:   aType,
+		CentralFrom: centralFrom,
+		CentralTo:   centralTo,
+		Number:      msgNumber,
 	}
 	sd.Messages = append(sd.Messages, msg)
 	sd.Events = append(sd.Events, Event{Kind: EventMessage, Message: msg})
