@@ -15,22 +15,28 @@ const (
 )
 
 var (
-	// participantRegex matches participant declarations: participant [ID] [as Label]
-	participantRegex = regexp.MustCompile(`(?i)^\s*participant\s+(?:"([^"]+)"|(\S+))(?:\s+as\s+(.+))?$`)
+	// participantRegex matches participant declarations: participant [rest].
+	// The rest ([ID] [as Label]) is split by parseParticipant, because IDs may
+	// contain spaces (mermaid's ID lexer state allows them: "participant cron
+	// job as Cron").
+	participantRegex = regexp.MustCompile(`(?i)^\s*participant\s+(.+)$`)
 
-	// messageRegex matches messages: [From][()][arrow][()][To]: [Label]. The
-	// arrow is one of mermaid's ten message types: ->> / -->> (arrowhead),
-	// -> / --> (open), -x / --x (cross), -) / --) (async point), <<->> /
-	// <<-->> (bidirectional). Longer alternatives come first so e.g. "-->>"
-	// is never consumed as "-->". An optional "()" on either side of the
-	// arrow marks a central connection (mermaid 11.16): a circle where the
-	// message meets that lifeline. Unquoted participant names exclude the
-	// arrow characters (- > <) so a malformed arrow cannot be silently
-	// absorbed into a name — it fails to match and is reported as invalid
-	// syntax rather than rendered wrongly — and "(" so a central-connection
-	// marker binds to the arrow, not the name (mermaid's ACTOR token excludes
-	// parentheses too).
-	messageRegex = regexp.MustCompile(`^\s*(?:"([^"]+)"|([^\s<>(-]+))\s*(\(\))?\s*(<<-->>|<<->>|-->>|--[x)]|-->|->>|-[x)]|->)\s*(\(\))?\s*(?:"([^"]+)"|([^\s<>(-]+))\s*:\s*(.*)$`)
+	// participantAsRegex splits "ID as Label" at the FIRST " as ", matching
+	// mermaid's lexer for whitespace-free IDs. For IDs containing spaces this
+	// is a deliberate extension: mermaid's alias rule only fires for
+	// whitespace-free IDs, so it would read the whole line as one long name.
+	participantAsRegex = regexp.MustCompile(`(?i)^(.*?\S)\s+as\s+(.+)$`)
+
+	// fragmentKeywordRegex guards message parsing: mermaid lexes fragment
+	// keywords before actor names, so a line whose first word is one of them
+	// is never a message — even when its label contains an arrow and a colon
+	// ("else fall back -> retry: yes").
+	fragmentKeywordRegex = regexp.MustCompile(`(?i)^(loop|opt|alt|par|critical|break|rect|else|and|option|end)\b`)
+
+	// arrowTokens are mermaid's ten message arrows, longest first so that at
+	// any position the longest token wins (e.g. "-->>" is never read as
+	// "-->", "--)" never as "--" + ")").
+	arrowTokens = []string{"<<-->>", "<<->>", "-->>", "--x", "--)", "-->", "->>", "-x", "-)", "->"}
 
 	// autonumberRegex matches the autonumber directive
 	autonumberRegex = regexp.MustCompile(`(?i)^\s*autonumber\s*$`)
@@ -459,11 +465,16 @@ func (sd *SequenceDiagram) parseParticipant(line string, participants map[string
 		return false, nil
 	}
 
-	id := match[2]
-	if match[1] != "" {
-		id = match[1]
+	rest := strings.TrimSpace(match[1])
+	id := rest
+	label := ""
+	if asMatch := participantAsRegex.FindStringSubmatch(rest); asMatch != nil {
+		id, label = asMatch[1], asMatch[2]
 	}
-	label := match[3]
+	id, idOK := parseName(id)
+	if !idOK {
+		return true, fmt.Errorf("invalid participant name %q", id)
+	}
 	if label == "" {
 		label = id
 	}
@@ -483,27 +494,96 @@ func (sd *SequenceDiagram) parseParticipant(line string, participants map[string
 	return true, nil
 }
 
+// findArrow returns the index and token of the first arrow in line, skipping
+// quoted spans. This mirrors mermaid's lexer, where a name may contain '-'
+// (Alice-in-Wonderland) or spaces (cron job) because only a '-' or '<' that
+// starts a real arrow token can end it.
+func findArrow(line string) (int, string) {
+	inQuotes := false
+	for i := 0; i < len(line); i++ {
+		switch {
+		case line[i] == '"':
+			inQuotes = !inQuotes
+		case !inQuotes && (line[i] == '-' || line[i] == '<'):
+			for _, tok := range arrowTokens {
+				if strings.HasPrefix(line[i:], tok) {
+					return i, tok
+				}
+			}
+		}
+	}
+	return -1, ""
+}
+
+// validName reports whether an unquoted participant name is acceptable.
+// Mermaid's ACTOR token excludes these characters; anything else (spaces,
+// dashes not forming an arrow, '=', '.', ...) is a legal name.
+func validName(name string) bool {
+	return name != "" && !strings.ContainsAny(name, `"<>:,;(`)
+}
+
+// parseName extracts a participant name: either a quoted string or a bare
+// name validated by validName.
+func parseName(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+	if len(raw) >= 2 && strings.HasPrefix(raw, `"`) && strings.HasSuffix(raw, `"`) {
+		inner := raw[1 : len(raw)-1]
+		return inner, inner != "" && !strings.Contains(inner, `"`)
+	}
+	return raw, validName(raw)
+}
+
+// splitMessage breaks a line into [From][()][arrow][()][To]: [Label], where
+// "()" marks a central connection on that side. ok is false when the line is
+// not a message, so parsing can fall through to the other statement forms.
+func splitMessage(line string) (fromID, arrow, toID, label string, centralFrom, centralTo, ok bool) {
+	idx, arrow := findArrow(line)
+	if idx < 0 {
+		return
+	}
+
+	left := strings.TrimSpace(line[:idx])
+	// A line opening with a fragment keyword is a fragment statement whose
+	// label happens to contain an arrow, never a message. Quoted names are
+	// exempt: `"loop svc" ->> B` is an explicit participant reference.
+	if !strings.HasPrefix(left, `"`) && fragmentKeywordRegex.MatchString(left) {
+		return
+	}
+	if strings.HasSuffix(left, "()") {
+		centralFrom = true
+		left = strings.TrimSpace(strings.TrimSuffix(left, "()"))
+	}
+	fromID, fromOK := parseName(left)
+
+	rest := strings.TrimSpace(line[idx+len(arrow):])
+	if strings.HasPrefix(rest, "()") {
+		centralTo = true
+		rest = strings.TrimSpace(strings.TrimPrefix(rest, "()"))
+	}
+	// The label starts at the first ':' after the (possibly quoted) to-name.
+	start := 0
+	if strings.HasPrefix(rest, `"`) {
+		if end := strings.Index(rest[1:], `"`); end >= 0 {
+			start = end + 2
+		}
+	}
+	colon := strings.Index(rest[start:], ":")
+	if colon < 0 {
+		return
+	}
+	colon += start
+	toID, toOK := parseName(rest[:colon])
+	label = strings.TrimSpace(rest[colon+1:])
+
+	ok = fromOK && toOK
+	return
+}
+
 func (sd *SequenceDiagram) parseMessage(line string, participants map[string]*Participant) (bool, error) {
-	match := messageRegex.FindStringSubmatch(line)
-	if match == nil {
+	fromID, arrow, toID, label, centralFrom, centralTo, ok := splitMessage(line)
+	if !ok {
 		return false, nil
 	}
-
-	fromID := match[2]
-	if match[1] != "" {
-		fromID = match[1]
-	}
-
-	centralFrom := match[3] != ""
-	arrow := match[4]
-	centralTo := match[5] != ""
-
-	toID := match[7]
-	if match[6] != "" {
-		toID = match[6]
-	}
-
-	label := strings.TrimSpace(match[8])
 
 	from := sd.getParticipant(fromID, participants)
 	to := sd.getParticipant(toID, participants)

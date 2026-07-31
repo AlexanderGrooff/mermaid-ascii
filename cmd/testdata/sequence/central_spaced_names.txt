@@ -1,0 +1,10 @@
+sequenceDiagram
+    cron job ()->>() data svc: run
+---
+┌──────────┐     ┌──────────┐
+│ cron job │     │ data svc │
+└─────┬────┘     └─────┬────┘
+      │                │
+      │ run            │
+      o───────────────►o
+      │                │

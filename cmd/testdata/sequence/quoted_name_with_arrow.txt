@@ -1,0 +1,10 @@
+sequenceDiagram
+    "A->B" ->> C: quoted arrow name
+---
+┌──────┐     ┌───┐
+│ A->B │     │ C │
+└───┬──┘     └─┬─┘
+    │          │
+    │ quoted arrow name
+    ├─────────►│
+    │          │

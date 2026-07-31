@@ -128,32 +128,42 @@ func TestMessageRegex(t *testing.T) {
 		{"A->B: Test", "A", "->", "B", "Test", true},
 		{"A-->B: Test", "A", "-->", "B", "Test", true},
 		{"A->>B", "", "", "", "", false},
+		// Names with spaces, dashes and equals (mermaid ACTOR allows them).
+		{"cron job->>customer-notifier: run", "cron job", "->>", "customer-notifier", "run", true},
+		{"Alice-in-Wonderland->Bob: hi", "Alice-in-Wonderland", "->", "Bob", "hi", true},
+		{"a=b->>c: x", "a=b", "->>", "c", "x", true},
+		// A label may contain arrows and colons; only the first arrow splits.
+		{"A ->> B: label with -x and <<->> and a : colon", "A", "->>", "B", "label with -x and <<->> and a : colon", true},
+		// Quoted names may contain arrow characters.
+		{`"A->B" ->> C: quoted`, "A->B", "->>", "C", "quoted", true},
+		{`A ->> "B: with colon": label`, "A", "->>", "B: with colon", "label", true},
+		// Central connections still bind to the arrow, not the name.
+		{"cron job ()->>() customer-notifier: run", "cron job", "->>", "customer-notifier", "run", true},
+		// Note text mentioning an arrow is not a message (name would hold ':').
+		{"Note right of A: use -> to go", "", "", "", "", false},
+		// Fragment openers/dividers whose label contains an arrow and a colon
+		// are fragment statements, never messages (mermaid lexes the keyword
+		// first). A quoted name is an explicit participant reference.
+		{"else fall back -> retry: yes", "", "", "", "", false},
+		{"alt cache -> hit: yes", "", "", "", "", false},
+		{"loop poll -> until done: 5x", "", "", "", "", false},
+		{`"loop svc" ->> B: quoted keyword name`, "loop svc", "->>", "B", "quoted keyword name", true},
 	}
 
 	for _, tt := range tests {
-		match := messageRegex.FindStringSubmatch(tt.input)
+		gotFrom, gotArrow, gotTo, gotLabel, _, _, ok := splitMessage(tt.input)
 		if !tt.wantMatch {
-			if match != nil {
-				t.Errorf("messageRegex should not match %q", tt.input)
+			if ok {
+				t.Errorf("splitMessage should not match %q", tt.input)
 			}
 			continue
 		}
-		if match == nil {
-			t.Fatalf("messageRegex failed to match: %q", tt.input)
+		if !ok {
+			t.Fatalf("splitMessage failed to match: %q", tt.input)
 		}
-		gotFrom := match[2]
-		if match[1] != "" {
-			gotFrom = match[1]
-		}
-		gotArrow := match[4]
-		gotTo := match[7]
-		if match[6] != "" {
-			gotTo = match[6]
-		}
-		gotLabel := match[8]
 
 		if gotFrom != tt.wantFrom || gotArrow != tt.wantArrow || gotTo != tt.wantTo || gotLabel != tt.wantLabel {
-			t.Errorf("messageRegex(%q) = (%q, %q, %q, %q), want (%q, %q, %q, %q)",
+			t.Errorf("splitMessage(%q) = (%q, %q, %q, %q), want (%q, %q, %q, %q)",
 				tt.input, gotFrom, gotArrow, gotTo, gotLabel, tt.wantFrom, tt.wantArrow, tt.wantTo, tt.wantLabel)
 		}
 	}
@@ -163,28 +173,34 @@ func TestParticipantRegex(t *testing.T) {
 	tests := []struct {
 		input     string
 		wantID    string
-		wantAlias string
+		wantLabel string
 	}{
-		{"participant Alice", "Alice", ""},
+		{"participant Alice", "Alice", "Alice"},
 		{"participant Alice as A", "Alice", "A"},
-		{`participant "My Service"`, "My Service", ""},
+		{`participant "My Service"`, "My Service", "My Service"},
 		{`participant "My Service" as Service`, "My Service", "Service"},
+		// IDs may contain spaces, dashes and equals (mermaid's ID lexer
+		// state allows them); "as" binds to its first occurrence, matching
+		// mermaid for whitespace-free IDs (spaced-ID aliasing is our
+		// extension — mermaid would read the whole line as one name).
+		{"participant cron job", "cron job", "cron job"},
+		{"participant cron job as Cron", "cron job", "Cron"},
+		{"participant data=svc as DS", "data=svc", "DS"},
+		{"participant a as b as c", "a", "b as c"},
 	}
 
 	for _, tt := range tests {
-		match := participantRegex.FindStringSubmatch(tt.input)
-		if match == nil {
-			t.Fatalf("participantRegex failed to match: %q", tt.input)
+		sd, err := Parse("sequenceDiagram\n " + tt.input)
+		if err != nil {
+			t.Fatalf("Parse(%q): %v", tt.input, err)
 		}
-		gotID := match[2]
-		if match[1] != "" {
-			gotID = match[1]
+		if len(sd.Participants) != 1 {
+			t.Fatalf("Parse(%q): expected 1 participant, got %d", tt.input, len(sd.Participants))
 		}
-		gotAlias := match[3]
-
-		if gotID != tt.wantID || gotAlias != tt.wantAlias {
-			t.Errorf("participantRegex(%q) = (%q, %q), want (%q, %q)",
-				tt.input, gotID, gotAlias, tt.wantID, tt.wantAlias)
+		p := sd.Participants[0]
+		if p.ID != tt.wantID || p.Label != tt.wantLabel {
+			t.Errorf("Parse(%q) participant = (%q, %q), want (%q, %q)",
+				tt.input, p.ID, p.Label, tt.wantID, tt.wantLabel)
 		}
 	}
 }

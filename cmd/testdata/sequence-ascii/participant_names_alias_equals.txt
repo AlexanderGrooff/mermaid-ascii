@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant cron job as Cron
+    participant data=svc as DS
+    cron job->>data=svc: sync
+    data=svc--)cron job: ok
+---
++------+     +----+
+| Cron |     | DS |
++---+--+     +--+-+
+    |           |
+    | sync      |
+    +---------->|
+    |           |
+    | ok        |
+    |(..........+
+    |           |
