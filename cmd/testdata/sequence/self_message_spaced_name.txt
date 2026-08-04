@@ -1,0 +1,12 @@
+sequenceDiagram
+    cron job->>cron job: tick
+---
+┌──────────┐
+│ cron job │
+└─────┬────┘
+      │
+      │ tick
+      ├──┐
+      │  │
+      │◄─┘
+      │

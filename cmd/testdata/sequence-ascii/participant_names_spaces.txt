@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant cron job
+    cron job->>customer-notifier: run
+    customer-notifier-->>cron job: done
+---
++----------+     +-------------------+
+| cron job |     | customer-notifier |
++-----+----+     +---------+---------+
+      |                    |
+      | run                |
+      +------------------->|
+      |                    |
+      | done               |
+      |<...................+
+      |                    |

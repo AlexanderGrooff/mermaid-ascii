@@ -65,8 +65,8 @@ func TestParseFragments(t *testing.T) {
 		{
 			// A participant literally named "loop" must stay a message, not a
 			// fragment opener, because the line is a valid message.
-			name:          "participant named loop is a message",
-			input:         "sequenceDiagram\n loop->>B: hi",
+			name:          "quoted participant named loop is a message",
+			input:         "sequenceDiagram\n \"loop\"->>B: hi",
 			wantMessages:  1,
 			wantFragments: nil,
 			wantLabels:    nil,
@@ -188,5 +188,22 @@ func TestRenderFragmentSmoke(t *testing.T) {
 				t.Errorf("ascii=%v: output missing %q\n%s", ascii, want, out)
 			}
 		}
+	}
+}
+
+// TestKeywordLineIsNeverAMessage pins mermaid's lexing order: a line whose
+// first word is a fragment keyword is a fragment statement even when its
+// label contains an arrow and a colon — never a message between phantom
+// participants (mermaid errors on "loop->>B: hi" too).
+func TestKeywordLineIsNeverAMessage(t *testing.T) {
+	sd, err := Parse("sequenceDiagram\n alt ok\n A->>B: m\n else fall back -> retry: yes\n A->>B: n\n end")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(sd.Participants) != 2 {
+		t.Fatalf("expected 2 participants, got %d", len(sd.Participants))
+	}
+	if _, err := Parse("sequenceDiagram\n loop->>B: hi"); err == nil {
+		t.Fatal("expected unclosed-fragment error for keyword line, got none")
 	}
 }

@@ -1,0 +1,21 @@
+sequenceDiagram
+    alt cache hit
+    cron job->>data svc: read
+    else fall back -> origin: yes
+    cron job->>data svc: fetch
+    end
+---
++----------+     +----------+
+| cron job |     | data svc |
++-----+----+     +-----+----+
+    +-[alt cache hit]------------+
+    | |                |         |
+    | | read           |         |
+    | +--------------->|         |
+    +.[fall back -> origin: yes].+
+    | |                |         |
+    | | fetch          |         |
+    | +--------------->|         |
+    | |                |         |
+    +----------------------------+
+      |                |

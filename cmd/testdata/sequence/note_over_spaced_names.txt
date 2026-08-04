@@ -1,0 +1,22 @@
+sequenceDiagram
+    participant cron job
+    participant data svc
+    cron job->>data svc: sync
+    Note over cron job,data svc: nightly -> at 02:00
+    Note right of data svc: ack
+---
+┌──────────┐     ┌──────────┐
+│ cron job │     │ data svc │
+└─────┬────┘     └─────┬────┘
+      │                │
+      │ sync           │
+      ├───────────────►│
+      │                │
+    ┌─────────────────────┐
+    │ nightly -> at 02:00 │
+    └─────────────────────┘
+      │                │
+      │                │ ┌─────┐
+      │                │ │ ack │
+      │                │ └─────┘
+      │                │

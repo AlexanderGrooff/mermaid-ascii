@@ -597,6 +597,7 @@ Note that with `--coords` enabled, the grid-coords shown show the starting locat
 - [x] Solid and dotted arrows, with or without an arrowhead (`->>`, `-->>`, `->`, `-->`)
 - [x] Cross (`-x`, `--x`), async point (`-)`, `--)`) and bidirectional (`<<->>`, `<<-->>`) arrows
 - [x] Central connections (`A ()->>() B`) on any arrow type
+- [x] Participant names with spaces, dashes and equals (`cron job->>customer-notifier`)
 - [x] Self-messages (`A->>A: think`)
 - [x] Participant declarations (`participant Alice`)
 - [x] Participant aliases (`participant A as Alice`)
