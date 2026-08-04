@@ -25,11 +25,14 @@ func TestStripFrontmatter(t *testing.T) {
 		{"indented title is not the title", "---\nconfig:\n  title: nested\n---\ndiagram", "diagram", ""},
 		{"crlf input", "---\r\ntitle: t\r\n---\r\ndiagram", "diagram", "t"},
 		{"multiline themeCSS config", "---\nconfig:\n  themeCSS: |\n    rect { fill: red; }\n---\nerDiagram", "erDiagram", ""},
+		{"inline comment stripped from title", "---\ntitle: hi # note\n---\ndiagram", "diagram", "hi"},
+		{"hash kept inside quoted title", "---\ntitle: \"a # b\"\n---\ndiagram", "diagram", "a # b"},
+		{"no space after colon is not a mapping", "---\ntitle:xyz\n---\ndiagram", "diagram", ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			rest, title := StripFrontmatter(c.in)
-			if rest != c.wantRest && normalize(rest) != c.wantRest {
+			if rest != c.wantRest {
 				t.Errorf("rest = %q, want %q", rest, c.wantRest)
 			}
 			if title != c.wantTitle {
@@ -37,15 +40,4 @@ func TestStripFrontmatter(t *testing.T) {
 			}
 		})
 	}
-}
-
-// normalize strips \r so CRLF inputs compare against \n expectations.
-func normalize(s string) string {
-	out := make([]rune, 0, len(s))
-	for _, r := range s {
-		if r != '\r' {
-			out = append(out, r)
-		}
-	}
-	return string(out)
 }

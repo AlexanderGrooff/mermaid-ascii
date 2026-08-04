@@ -33,10 +33,18 @@ func StripFrontmatter(input string) (rest string, title string) {
 			return strings.Join(lines[i+1:], "\n"), title
 		}
 		// Only a top-level `title:` key counts — indented occurrences are
-		// nested config values (e.g. inside themeCSS), not the title.
+		// nested config values (e.g. inside themeCSS), not the title. YAML
+		// requires whitespace after the colon for a mapping ("title:xyz" is a
+		// plain scalar, not a key), and an unquoted value ends at a comment.
 		trimmed := strings.TrimRight(lines[i], " \t\r")
-		if v, ok := strings.CutPrefix(trimmed, indent+"title:"); ok {
-			title = strings.Trim(strings.TrimSpace(v), `"'`)
+		if v, ok := strings.CutPrefix(trimmed, indent+"title:"); ok && (v == "" || v[0] == ' ' || v[0] == '\t') {
+			v = strings.TrimSpace(v)
+			if !strings.HasPrefix(v, `"`) && !strings.HasPrefix(v, `'`) {
+				if idx := strings.Index(v, " #"); idx != -1 {
+					v = strings.TrimSpace(v[:idx])
+				}
+			}
+			title = strings.Trim(v, `"'`)
 		}
 	}
 	return input, ""
