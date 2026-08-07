@@ -1,0 +1,16 @@
+sequenceDiagram
+    actor Alice as Alice2
+    participant John as John2
+    Alice->>John: Hi John
+    John->>Mandy: Hi Mandy
+---
++--------+     +-------+     +-------+
+| Alice2 |     | John2 |     | Mandy |
++----+---+     +---+---+     +---+---+
+     |             |             |
+     | Hi John     |             |
+     +------------>|             |
+     |             |             |
+     |             | Hi Mandy    |
+     |             +------------>|
+     |             |             |

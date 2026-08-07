@@ -15,11 +15,12 @@ const (
 )
 
 var (
-	// participantRegex matches participant declarations: participant [rest].
-	// The rest ([ID] [as Label]) is split by parseParticipant, because IDs may
-	// contain spaces (mermaid's ID lexer state allows them: "participant cron
-	// job as Cron").
-	participantRegex = regexp.MustCompile(`(?i)^\s*participant\s+(.+)$`)
+	// participantRegex matches participant declarations: participant [rest] or
+	// actor [rest]. mermaid renders an actor as a stick figure; in ASCII both
+	// forms draw the same labelled box. The rest ([ID] [as Label]) is split by
+	// parseParticipant, because IDs may contain spaces (mermaid's ID lexer
+	// state allows them: "participant cron job as Cron").
+	participantRegex = regexp.MustCompile(`(?i)^\s*(?:participant|actor)\s+(.+)$`)
 
 	// participantAsRegex splits "ID as Label" at the FIRST " as ", matching
 	// mermaid's lexer for whitespace-free IDs. For IDs containing spaces this

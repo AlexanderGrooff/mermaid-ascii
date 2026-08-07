@@ -1,0 +1,16 @@
+sequenceDiagram
+    actor A as Alice
+    actor B as Bob
+    A->>B: Hello Bob, how are you?
+    B-->>A: I am good thanks!
+---
++-------+     +-----+
+| Alice |     | Bob |
++---+---+     +--+--+
+    |            |
+    | Hello Bob, how are you?
+    +----------->|
+    |            |
+    | I am good thanks!
+    |<...........+
+    |            |
