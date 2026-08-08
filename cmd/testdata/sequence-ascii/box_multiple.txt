@@ -1,0 +1,23 @@
+sequenceDiagram
+    box rgb(23, 124, 207) Profiles
+    participant A
+    participant B
+    end
+    box Green New serwis
+    participant C
+    end
+    A->>B: x
+    B->>C: y
+---
++- Profiles ------+     +- New serwis -+
+| +---+     +---+ |     | +---+        |
+| | A |     | B | |     | | C |        |
+| +-+-+     +-+-+ |     | +-+-+        |
+|   |         |   |     |   |          |
+|   | x       |   |     |   |          |
+|   +-------->|   |     |   |          |
+|   |         |   |     |   |          |
+|   |         | y |     |   |          |
+|   |         +---+-----+-->|          |
+|   |         |   |     |   |          |
++-----------------+     +--------------+

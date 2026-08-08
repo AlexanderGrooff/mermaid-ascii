@@ -104,6 +104,11 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 		}
 	}
 
+	// Box spacing must know the fragment nesting depth: fragment frames indent
+	// per level, and a box border must sit outside the deepest frame that can
+	// open around its participants.
+	boxSidePad, boxRightExtra := applyBoxSpacing(sd, layout, events)
+
 	// Nested fragment frames stack their left borders in a gutter to the left of
 	// the first participant. A single (unnested) fragment already fits with its
 	// border at column 0, so only levels beyond the first need reserved columns;
@@ -118,6 +123,8 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 	if gutter := noteLeftGutter(events, layout); gutter > 0 {
 		shiftLayoutRight(layout, gutter)
 	}
+
+	spans := boxSpans(sd, layout, boxSidePad, boxRightExtra)
 
 	var lines []string
 
@@ -143,7 +150,174 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 	lines = append(lines, renderEvents(events, layout, chars)...)
 
 	lines = append(lines, buildLifeline(layout, chars))
+
+	// Participant-group boxes wrap their columns for the whole diagram height:
+	// a titled top border above the headers, side borders overlaid on every
+	// body line (crossing arrows and fragment rules become ┼), and a bottom
+	// border under the final lifeline row.
+	if len(spans) > 0 {
+		for i, line := range lines {
+			lines[i] = overlayBoxSides(line, spans, chars)
+		}
+		lines = append([]string{boxBorder(spans, chars, true)}, lines...)
+		lines = append(lines, boxBorder(spans, chars, false))
+	}
+
 	return strings.Join(lines, "\n") + "\n", nil
+}
+
+// boxSpan is a participant group's on-canvas extent: its border columns and
+// title. Computed after every layout shift so the columns are final.
+type boxSpan struct {
+	title       string
+	left, right int
+}
+
+// applyBoxSpacing widens the layout so each box clears everything drawn
+// around its participants: a border column plus padding on both sides (deep
+// enough that nested fragment frames stay inside), extra room on the right
+// when the title is wider than the participants, and clearance for
+// self-message loops and labels on boxed participants. It returns the side
+// padding and each box's extra right padding, which boxSpans mirrors.
+func applyBoxSpacing(sd *SequenceDiagram, layout *diagramLayout, events []Event) (int, []int) {
+	rightExtra := make([]int, len(sd.Boxes))
+	if len(sd.Boxes) == 0 {
+		return 0, rightExtra
+	}
+
+	// Fragment frames indent one step per nesting level; the box border must
+	// sit outside the deepest frame so neither erases the other.
+	sidePad := 2 + max(0, fragmentDepth(events)-1)*frameIndent
+
+	starts := map[int]int{}
+	ends := map[int]int{}
+	for bi, b := range sd.Boxes {
+		starts[b.First] += sidePad
+
+		// The top border must hold: corner, inset, " title ", and at least one
+		// horizontal cell before the right corner.
+		need := frameLabelInset + runewidth.StringWidth(b.Title) + 4
+		got := boxInnerWidth(b, layout) + 2*sidePad
+		rightExtra[bi] = max(0, need-got)
+
+		// A self-message on a boxed participant hooks out to the right of its
+		// lifeline and carries its label beside it; grow the box so neither
+		// pierces the border.
+		boxRight := boxRightEdge(b, layout) + sidePad
+		for _, ev := range events {
+			m := ev.Message
+			if ev.Kind != EventMessage || m == nil || m.From != m.To {
+				continue
+			}
+			if m.From.Index < b.First || m.From.Index > b.Last {
+				continue
+			}
+			labelW := runewidth.StringWidth(m.Label)
+			if sd.Autonumber {
+				labelW += 4 // room for the "NN. " prefix
+			}
+			extent := layout.participantCenters[m.From.Index] +
+				max(layout.selfMessageWidth+1, labelLeftMargin+labelW)
+			rightExtra[bi] = max(rightExtra[bi], extent-boxRight+1)
+		}
+
+		ends[b.Last] += sidePad + rightExtra[bi]
+	}
+
+	extra := 0
+	for i := range layout.participantCenters {
+		extra += starts[i]
+		layout.participantCenters[i] += extra
+		extra += ends[i]
+	}
+	layout.totalWidth += extra
+	return sidePad, rightExtra
+}
+
+// boxInnerWidth is the column span of a box's participants before any box
+// spacing is applied (calculateLayout coordinates).
+func boxInnerWidth(b *Box, layout *diagramLayout) int {
+	return boxRightEdge(b, layout) - boxLeftEdge(b, layout) + 1
+}
+
+func boxLeftEdge(b *Box, layout *diagramLayout) int {
+	return layout.participantCenters[b.First] - (layout.participantWidths[b.First]+boxBorderWidth)/2
+}
+
+func boxRightEdge(b *Box, layout *diagramLayout) int {
+	return layout.participantCenters[b.Last] - (layout.participantWidths[b.Last]+boxBorderWidth)/2 +
+		layout.participantWidths[b.Last] + boxBorderWidth - 1
+}
+
+// boxSpans resolves each box to its final border columns, mirroring the
+// spacing applyBoxSpacing reserved.
+func boxSpans(sd *SequenceDiagram, layout *diagramLayout, sidePad int, rightExtra []int) []boxSpan {
+	spans := make([]boxSpan, 0, len(sd.Boxes))
+	for bi, b := range sd.Boxes {
+		spans = append(spans, boxSpan{
+			title: b.Title,
+			left:  boxLeftEdge(b, layout) - sidePad,
+			right: boxRightEdge(b, layout) + sidePad + rightExtra[bi],
+		})
+	}
+	return spans
+}
+
+// boxBorder draws the top (with embedded title) or bottom border row for every
+// box on one line.
+func boxBorder(spans []boxSpan, chars BoxChars, top bool) string {
+	width := 0
+	for _, s := range spans {
+		width = max(width, s.right+1)
+	}
+	line := make([]rune, width)
+	for i := range line {
+		line[i] = ' '
+	}
+	for _, s := range spans {
+		leftCorner, rightCorner := chars.BottomLeft, chars.BottomRight
+		if top {
+			leftCorner, rightCorner = chars.TopLeft, chars.TopRight
+		}
+		line[s.left] = leftCorner
+		for c := s.left + 1; c < s.right; c++ {
+			line[c] = chars.Horizontal
+		}
+		line[s.right] = rightCorner
+		if top && s.title != "" {
+			col := s.left + frameLabelInset
+			for _, r := range " " + s.title + " " {
+				if col < s.right {
+					line[col] = r
+					col++
+				}
+			}
+		}
+	}
+	return strings.TrimRight(string(line), " ")
+}
+
+// overlayBoxSides draws every box's vertical borders onto a body line. A cell
+// already carrying a horizontal stroke (a message arrow or fragment rule
+// passing through the border) becomes a crossing; any other content (labels,
+// note boxes) wins over the border.
+func overlayBoxSides(line string, spans []boxSpan, chars BoxChars) string {
+	width := 0
+	for _, s := range spans {
+		width = max(width, s.right+1)
+	}
+	r := padRunes(line, width)
+	for _, s := range spans {
+		for _, c := range []int{s.left, s.right} {
+			switch r[c] {
+			case ' ':
+				r[c] = chars.Vertical
+			case chars.Horizontal, chars.DottedLine:
+				r[c] = chars.Cross
+			}
+		}
+	}
+	return strings.TrimRight(string(r), " ")
 }
 
 // renderEvents paints the ordered body of the diagram — messages and fragment
