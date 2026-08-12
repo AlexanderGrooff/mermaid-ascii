@@ -202,6 +202,11 @@ func setData(parent textNode, edge textEdge, data *orderedmap.OrderedMap[string,
 	}
 }
 
+// edgeArrowPattern matches the classic arrow (-->) plus the dotted, thick,
+// open, circle, and cross link operators Mermaid also supports (-.->, ==>,
+// ---, --o, --x).
+const edgeArrowPattern = `(?:-->|-\.->|==>|---|--o|--x)`
+
 func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 	log.Debugf("Parsing line: %v", line)
 	var lhs, rhs []textNode
@@ -243,7 +248,7 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 			},
 		},
 		{
-			regex: regexp.MustCompile(`(?s)^(.+)\s*-->\s*\|(.+)\|\s*(.+)$`),
+			regex: regexp.MustCompile(`(?s)^(.+)\s*` + edgeArrowPattern + `\s*\|(.+)\|\s*(.+)$`),
 			handler: func(match []string) ([]textNode, error) {
 				if lhs, err = gp.parseString(match[0]); err != nil {
 					lhs = []textNode{parseNode(match[0])}
@@ -255,7 +260,7 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 			},
 		},
 		{
-			regex: regexp.MustCompile(`(?s)^(.+)\s*-->\s*(.+)$`),
+			regex: regexp.MustCompile(`(?s)^(.+)\s*` + edgeArrowPattern + `\s*(.+)$`),
 			handler: func(match []string) ([]textNode, error) {
 				if lhs, err = gp.parseString(match[0]); err != nil {
 					lhs = []textNode{parseNode(match[0])}
