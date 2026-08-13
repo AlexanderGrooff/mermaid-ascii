@@ -59,6 +59,22 @@ var (
 	// fragmentEndRegex matches the "end" line that closes a fragment.
 	fragmentEndRegex = regexp.MustCompile(`(?i)^\s*end\s*$`)
 
+	// boxStartRegex matches a participant-group opener: `box [color] [title]`.
+	// Like participant/actor (and mermaid itself), the keyword wins at line
+	// start, so a participant named "box …" can only message via quoting.
+	boxStartRegex = regexp.MustCompile(`(?i)^\s*box(?:\s+(.*))?$`)
+
+	// boxColorFuncRegex matches a functional color prefix on a box line:
+	// rgb(…), rgba(…), hsl(…), hsla(…) — the argument list may contain spaces.
+	boxColorFuncRegex = regexp.MustCompile(`(?i)^(?:rgba?|hsla?)\s*\([^)]*\)`)
+
+	// boxHexColorRegex matches a leading #hex color token.
+	boxHexColorRegex = regexp.MustCompile(`^#[0-9a-fA-F]{3,8}\b`)
+
+	// brTagRegex matches <br> variants, which mermaid treats as line breaks;
+	// single-line ASCII titles render them as spaces.
+	brTagRegex = regexp.MustCompile(`(?i)<br\s*/?>`)
+
 	// noteRegex matches note annotations: "Note over A: text", "note left of A:
 	// text", "Note over A,B: text" (case-insensitive keyword). Group 1 is the
 	// placement, group 2 the participant list, group 3 the text.
@@ -77,6 +93,18 @@ type SequenceDiagram struct {
 	// original source order, including where loop/opt blocks open and close.
 	Events     []Event
 	Autonumber bool
+	// Boxes are participant groups declared with `box [color] [title] … end`;
+	// each wraps a contiguous run of participants (they are declared inside
+	// the block, so contiguity is inherent).
+	Boxes []*Box
+}
+
+// Box is a participant group drawn as a frame around its participants'
+// columns. mermaid fills it with a color; ASCII draws a plain frame, so the
+// color is parsed (to keep it out of the title) and discarded.
+type Box struct {
+	Title       string
+	First, Last int // participant Index range, inclusive
 }
 
 // FragmentType identifies a control-flow fragment (a "framed" block of
@@ -340,6 +368,10 @@ func Parse(input string) (*SequenceDiagram, error) {
 	// reject an "end"/"else" with no matching opener, validate that "else" only
 	// appears inside an "alt", and detect an opener with no matching "end".
 	var openFragments []FragmentType
+	// openBox is the box block currently being declared, if any. mermaid's
+	// grammar allows only participant declarations inside a box, and boxes
+	// cannot nest.
+	var openBox *Box
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -347,9 +379,42 @@ func Parse(input string) (*SequenceDiagram, error) {
 			continue
 		}
 
+		// Inside a box block only participant/actor declarations (and the
+		// closing "end") are valid, so handle that mode first.
+		if openBox != nil {
+			if fragmentEndRegex.MatchString(trimmed) {
+				openBox = nil
+				continue
+			}
+			if boxStartRegex.MatchString(trimmed) {
+				return nil, fmt.Errorf("line %d: boxes cannot nest", i+2)
+			}
+			matched, err := sd.parseParticipant(trimmed, participantMap)
+			if err != nil {
+				return nil, fmt.Errorf("line %d: %w", i+2, err)
+			}
+			if !matched {
+				return nil, fmt.Errorf("line %d: only participant declarations are allowed inside a box: %q", i+2, trimmed)
+			}
+			p := sd.Participants[len(sd.Participants)-1]
+			if openBox.First == -1 {
+				openBox.First = p.Index
+			}
+			openBox.Last = p.Index
+			continue
+		}
+
 		// Check for autonumber directive
 		if autonumberRegex.MatchString(trimmed) {
 			sd.Autonumber = true
+			continue
+		}
+
+		// A box opener starts a participant group; its optional color is
+		// parsed away (no ASCII meaning) so it never leaks into the title.
+		if m := boxStartRegex.FindStringSubmatch(trimmed); m != nil {
+			openBox = &Box{Title: parseBoxTitle(m[1]), First: -1}
+			sd.Boxes = append(sd.Boxes, openBox)
 			continue
 		}
 
@@ -449,6 +514,9 @@ func Parse(input string) (*SequenceDiagram, error) {
 		return nil, fmt.Errorf("line %d: invalid syntax: %q", i+2, trimmed)
 	}
 
+	if openBox != nil {
+		return nil, fmt.Errorf("unclosed box: missing \"end\"")
+	}
 	if len(openFragments) > 0 {
 		return nil, fmt.Errorf("unclosed fragment: missing %d \"end\"", len(openFragments))
 	}
@@ -456,6 +524,15 @@ func Parse(input string) (*SequenceDiagram, error) {
 	if len(sd.Participants) == 0 {
 		return nil, fmt.Errorf("no participants found")
 	}
+
+	// A box declared with no participants has nothing to frame; drop it.
+	kept := sd.Boxes[:0]
+	for _, b := range sd.Boxes {
+		if b.First >= 0 {
+			kept = append(kept, b)
+		}
+	}
+	sd.Boxes = kept
 
 	return sd, nil
 }
@@ -494,6 +571,56 @@ func (sd *SequenceDiagram) parseParticipant(line string, participants map[string
 	participants[id] = p
 	return true, nil
 }
+
+// parseBoxTitle extracts the display title from a box opener's argument:
+// an optional leading color (functional rgb()/hsl(), #hex, or a CSS color
+// name — mermaid fills the box with it, ASCII has no use for it) followed by
+// the title text. <br> tags become spaces, as elsewhere in single-line ASCII.
+func parseBoxTitle(rest string) string {
+	rest = strings.TrimSpace(brTagRegex.ReplaceAllString(rest, " "))
+	if loc := boxColorFuncRegex.FindStringIndex(rest); loc != nil {
+		return strings.TrimSpace(rest[loc[1]:])
+	}
+	if loc := boxHexColorRegex.FindStringIndex(rest); loc != nil {
+		return strings.TrimSpace(rest[loc[1]:])
+	}
+	tok := rest
+	if idx := strings.IndexAny(rest, " \t"); idx >= 0 {
+		tok = rest[:idx]
+	}
+	if cssColorNames[strings.ToLower(tok)] {
+		return strings.TrimSpace(rest[len(tok):])
+	}
+	return rest
+}
+
+// cssColorNames is the set of CSS color keywords (plus "transparent") that
+// mermaid accepts as a box fill. Needed to split "box Green New serwis"
+// (color Green, title "New serwis") from "box Facade" (no color, title
+// "Facade") the way mermaid does.
+var cssColorNames = func() map[string]bool {
+	const names = "aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue " +
+		"blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson " +
+		"cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta " +
+		"darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen darkslateblue darkslategray " +
+		"darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey dodgerblue firebrick " +
+		"floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod gray green greenyellow grey " +
+		"honeydew hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon " +
+		"lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey lightpink " +
+		"lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow " +
+		"lime limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple " +
+		"mediumseagreen mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue " +
+		"mintcream mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid " +
+		"palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum " +
+		"powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown seagreen " +
+		"seashell sienna silver skyblue slateblue slategray slategrey snow springgreen steelblue tan teal " +
+		"thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen transparent"
+	set := map[string]bool{}
+	for _, n := range strings.Fields(names) {
+		set[n] = true
+	}
+	return set
+}()
 
 // findArrow returns the index and token of the first arrow in line, skipping
 // quoted spans. This mirrors mermaid's lexer, where a name may contain '-'
