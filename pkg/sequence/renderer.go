@@ -147,9 +147,13 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 			string(chars.BottomRight)
 	}))
 
-	lines = append(lines, renderEvents(events, layout, chars)...)
+	// act carries the activation state past the body so an activation left open
+	// at the end of the diagram still marks the closing lifeline row, the way
+	// mermaid runs its activation box to the bottom.
+	act := newActivations()
+	lines = append(lines, renderEvents(events, layout, chars, act)...)
 
-	lines = append(lines, buildLifeline(layout, chars))
+	lines = append(lines, act.overlay(buildLifeline(layout, chars), layout, chars))
 
 	// Participant-group boxes wrap their columns for the whole diagram height:
 	// a titled top border above the headers, side borders overlaid on every
@@ -323,14 +327,28 @@ func overlayBoxSides(line string, spans []boxSpan, chars BoxChars) string {
 // renderEvents paints the ordered body of the diagram — messages and fragment
 // frames — into text lines. It recurses into each loop/opt block, so nested
 // fragments (a loop containing an opt, say) render correctly.
-func renderEvents(events []Event, layout *diagramLayout, chars BoxChars) []string {
+func renderEvents(events []Event, layout *diagramLayout, chars BoxChars, act *activations) []string {
 	var lines []string
+	// emit appends body lines, marking any active lifelines they cross.
+	emit := func(rows ...string) {
+		for _, l := range rows {
+			lines = append(lines, act.overlay(l, layout, chars))
+		}
+	}
 	for i := 0; i < len(events); {
 		ev := events[i]
 		if ev.Kind == EventFragmentStart {
 			end := matchingFragmentEnd(events, i)
-			lines = append(lines, wrapFragment(ev.Fragment, events[i+1:end], layout, chars)...)
+			lines = append(lines, wrapFragment(ev.Fragment, events[i+1:end], layout, chars, act)...)
 			i = end + 1
+			continue
+		}
+
+		// Activation boundaries draw nothing themselves: they change which
+		// lifelines are drawn active from here on.
+		if ev.Kind == EventActivate || ev.Kind == EventDeactivate {
+			act.apply(ev)
+			i++
 			continue
 		}
 
@@ -347,9 +365,12 @@ func renderEvents(events []Event, layout *diagramLayout, chars BoxChars) []strin
 
 		if ev.Kind == EventNote {
 			for s := 0; s < layout.messageSpacing; s++ {
-				lines = append(lines, buildLifeline(layout, chars))
+				emit(buildLifeline(layout, chars))
 			}
-			lines = append(lines, renderNote(ev.Note, layout, chars)...)
+			// The note box covers the lifelines it spans; overlay still marks
+			// any active lifeline outside it (it only rewrites lifeline glyphs,
+			// so the box itself is untouched).
+			emit(renderNote(ev.Note, layout, chars)...)
 			i++
 			continue
 		}
@@ -357,16 +378,78 @@ func renderEvents(events []Event, layout *diagramLayout, chars BoxChars) []strin
 		// EventMessage.
 		msg := ev.Message
 		for s := 0; s < layout.messageSpacing; s++ {
-			lines = append(lines, buildLifeline(layout, chars))
+			emit(buildLifeline(layout, chars))
 		}
 		if msg.From == msg.To {
-			lines = append(lines, renderSelfMessage(msg, layout, chars)...)
+			emit(renderSelfMessage(msg, layout, chars)...)
 		} else {
-			lines = append(lines, renderMessage(msg, layout, chars)...)
+			emit(renderMessage(msg, layout, chars)...)
 		}
 		i++
 	}
 	return lines
+}
+
+// activations tracks which lifelines are inside an activation period while the
+// body is rendered, so each emitted line can be drawn with a heavy stroke at
+// those columns. mermaid draws an activation box beside the lifeline; a heavy
+// lifeline conveys the same period without needing columns that ASCII output
+// would have to steal from the arrows.
+type activations struct {
+	depth map[*Participant]int
+}
+
+func newActivations() *activations {
+	return &activations{depth: map[*Participant]int{}}
+}
+
+// apply moves the active set across an activation boundary event.
+func (a *activations) apply(ev Event) {
+	switch ev.Kind {
+	case EventActivate:
+		a.depth[ev.Participant]++
+	case EventDeactivate:
+		if a.depth[ev.Participant] > 1 {
+			a.depth[ev.Participant]--
+		} else {
+			delete(a.depth, ev.Participant)
+		}
+	}
+}
+
+// overlay redraws a body line's active lifelines with the heavy stroke,
+// keeping the junction shape where a message attaches or crosses.
+func (a *activations) overlay(line string, layout *diagramLayout, chars BoxChars) string {
+	if len(a.depth) == 0 {
+		return line
+	}
+	var r []rune
+	for p, d := range a.depth {
+		if d == 0 || p.Index >= len(layout.participantCenters) {
+			continue
+		}
+		c := layout.participantCenters[p.Index]
+		if r == nil {
+			r = []rune(line)
+		}
+		if c >= len(r) {
+			continue
+		}
+		switch r[c] {
+		case chars.Vertical:
+			r[c] = chars.ActiveVertical
+		case chars.TeeRight:
+			r[c] = chars.ActiveTeeRight
+		case chars.TeeLeft:
+			r[c] = chars.ActiveTeeLeft
+		case chars.Cross:
+			r[c] = chars.ActiveCross
+		}
+	}
+	if r == nil {
+		return line
+	}
+	return string(r)
 }
 
 // fragmentDepth returns the maximum fragment nesting depth within events (0 if
@@ -533,7 +616,7 @@ func renderNote(note *Note, layout *diagramLayout, chars BoxChars) []string {
 
 // wrapFragment renders a loop/opt block: it paints the inner body, then draws a
 // labelled frame around the participants the block touches.
-func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars BoxChars) []string {
+func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars BoxChars, act *activations) []string {
 	// An alt block is split into sections by top-level "else" dividers (dividers
 	// nested inside child fragments belong to those fragments). Render each
 	// section, leaving a placeholder line where each divider will be drawn once
@@ -546,10 +629,11 @@ func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars Bo
 			dividerAt[len(body)] = dividerLabels[i-1]
 			body = append(body, "") // placeholder for the divider line
 		}
-		body = append(body, renderEvents(sec, layout, chars)...)
+		body = append(body, renderEvents(sec, layout, chars, act)...)
 	}
-	// A trailing lifeline gives breathing room above the bottom border.
-	body = append(body, buildLifeline(layout, chars))
+	// A trailing lifeline gives breathing room above the bottom border. It is
+	// part of the body, so it carries any activation still open here.
+	body = append(body, act.overlay(buildLifeline(layout, chars), layout, chars))
 
 	// The frame spans from just left of the leftmost involved lifeline to just
 	// right of the rightmost — the same participants the block's messages touch.
@@ -615,15 +699,15 @@ func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars Bo
 		}
 	}
 
-	out := []string{fragmentBorder(layout, chars, leftCol, rightCol, label, true)}
+	out := []string{act.overlay(fragmentBorder(layout, chars, leftCol, rightCol, label, true), layout, chars)}
 	for idx, l := range body {
 		if dl, ok := dividerAt[idx]; ok {
-			out = append(out, fragmentDivider(layout, chars, leftCol, rightCol, dl))
+			out = append(out, act.overlay(fragmentDivider(layout, chars, leftCol, rightCol, dl), layout, chars))
 		} else {
 			out = append(out, overlayFrameSides(l, chars, leftCol, rightCol))
 		}
 	}
-	out = append(out, fragmentBorder(layout, chars, leftCol, rightCol, "", false))
+	out = append(out, act.overlay(fragmentBorder(layout, chars, leftCol, rightCol, "", false), layout, chars))
 	return out
 }
 

@@ -1,0 +1,14 @@
+sequenceDiagram
+    Alice-->>+Bob: Hello Bob, how are you?
+    Bob-->>- Alice: I am fine and you?
+---
+┌───────┐     ┌─────┐
+│ Alice │     │ Bob │
+└───┬───┘     └──┬──┘
+    │            │
+    │ Hello Bob, how are you?
+    ├┈┈┈┈┈┈┈┈┈┈┈►│
+    │            ┃
+    │ I am fine and you?
+    │◄┈┈┈┈┈┈┈┈┈┈┈┨
+    │            │

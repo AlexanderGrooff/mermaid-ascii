@@ -22,6 +22,13 @@ type BoxChars struct {
 	DottedLine   rune
 	SelfTopRight rune
 	SelfBottom   rune
+	// Active* draw a lifeline during an activation period: a heavy stroke
+	// standing in for mermaid's activation box, with matching junctions where
+	// messages attach to or cross it.
+	ActiveVertical rune
+	ActiveTeeRight rune
+	ActiveTeeLeft  rune
+	ActiveCross    rune
 }
 
 var ASCII = BoxChars{
@@ -45,6 +52,11 @@ var ASCII = BoxChars{
 	DottedLine:   '.',
 	SelfTopRight: '+',
 	SelfBottom:   '+',
+	// ASCII has no heavy stroke; '#' is the conventional filled marker.
+	ActiveVertical: '#',
+	ActiveTeeRight: '#',
+	ActiveTeeLeft:  '#',
+	ActiveCross:    '#',
 }
 
 var Unicode = BoxChars{
@@ -70,4 +82,10 @@ var Unicode = BoxChars{
 	DottedLine:   '┈',
 	SelfTopRight: '┐',
 	SelfBottom:   '┘',
+	// Heavy vertical, with heavy-vertical/light-horizontal junctions so an
+	// arrow attaching to an active lifeline still reads as a light arrow.
+	ActiveVertical: '┃',
+	ActiveTeeRight: '┠',
+	ActiveTeeLeft:  '┨',
+	ActiveCross:    '╂',
 }
