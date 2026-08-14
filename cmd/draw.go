@@ -72,26 +72,42 @@ func (g *graph) drawLine(d *drawing, from drawingCoord, to drawingCoord, offsetF
 	drawnCoords := make([]drawingCoord, 0)
 	log.Debug("Drawing line from ", from, " to ", to, " direction: ", direction, " offsetFrom: ", offsetFrom, " offsetTo: ", offsetTo, " stroke: ", stroke)
 	if !g.useAscii {
+		// Vertical glyph: solid "│", dotted "┆", thick "┃" - Unicode's own
+		// dedicated dashed/heavy box-drawing glyphs, so (unlike ASCII) no
+		// skip-cell pattern is needed for dotted; the glyph is dashed on its
+		// own. Horizontal glyph: solid "─", dotted "┄", thick "━".
+		vertical := "│"
+		if stroke == strokeThick {
+			vertical = "┃"
+		} else if stroke == strokeDotted {
+			vertical = "┆"
+		}
+		horizontal := "─"
+		if stroke == strokeThick {
+			horizontal = "━"
+		} else if stroke == strokeDotted {
+			horizontal = "┄"
+		}
 		switch direction {
 		case Up:
 			for y := from.y - offsetFrom; y >= to.y-offsetTo; y-- {
 				drawnCoords = append(drawnCoords, drawingCoord{from.x, y})
-				(*d)[from.x][y] = "│"
+				(*d)[from.x][y] = vertical
 			}
 		case Down:
 			for y := from.y + offsetFrom; y <= to.y+offsetTo; y++ {
 				drawnCoords = append(drawnCoords, drawingCoord{from.x, y})
-				(*d)[from.x][y] = "│"
+				(*d)[from.x][y] = vertical
 			}
 		case Left:
 			for x := from.x - offsetFrom; x >= to.x-offsetTo; x-- {
 				drawnCoords = append(drawnCoords, drawingCoord{x, from.y})
-				(*d)[x][from.y] = "─"
+				(*d)[x][from.y] = horizontal
 			}
 		case Right:
 			for x := from.x + offsetFrom; x <= to.x+offsetTo; x++ {
 				drawnCoords = append(drawnCoords, drawingCoord{x, from.y})
-				(*d)[x][from.y] = "─"
+				(*d)[x][from.y] = horizontal
 			}
 		case UpperLeft:
 			for x, y := from.x, from.y-offsetFrom; x >= to.x-offsetTo && y >= to.y-offsetTo; x, y = x-1, y-1 {
@@ -115,9 +131,11 @@ func (g *graph) drawLine(d *drawing, from drawingCoord, to drawingCoord, offsetF
 			}
 		}
 	} else {
-		// (ASCII-only) Vertical glyphs: solid "|", dotted ":", thick "I".
-		// Horizontal glyph: solid/dotted share "-" (dotted skips every other
-		// cell below), thick "=".
+		// Vertical glyphs: solid "|", dotted ":" (every row - ASCII has no
+		// dashed-vertical glyph to space out), thick "I" (a plain, dot-less
+		// stroke; ASCII has no true double-width vertical). Horizontal
+		// glyph: solid/dotted share "-" (dotted skips every other cell
+		// below), thick "=".
 		vertical := "|"
 		if stroke == strokeThick {
 			vertical = "I"

@@ -112,9 +112,16 @@ func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) (*drawing, *dra
 	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, e.path)
 	dLabel := g.drawArrowLabel(e)
 	dPath, linesDrawn, lineDirs := g.drawPath(e.path, e.stroke)
-	dBoxStart := g.drawBoxStart(e.path, linesDrawn[0])
-	// Unicode output unchanged.
-	skipHead := g.useAscii && e.head == headNone
+	dBoxStart := g.drawBoxStart(e.path, linesDrawn[0], e.stroke)
+	skipHead := e.head == headNone
+	if skipHead && len(linesDrawn) > 0 {
+		// headNone (open links like ---) has no arrowhead glyph to mark the
+		// connection at the destination, unlike every other head; touch up
+		// the destination box's own border the same way drawBoxStart does
+		// for the source, so the join is visible there too.
+		dBoxEnd := g.drawBoxEnd(linesDrawn[len(linesDrawn)-1], lineDirs[len(lineDirs)-1], e.stroke)
+		dBoxStart = g.mergeDrawings(dBoxStart, drawingCoord{0, 0}, dBoxEnd)
+	}
 	var dArrowHead *drawing
 	if skipHead {
 		dArrowHead = copyCanvas(g.drawing)
@@ -125,7 +132,7 @@ func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) (*drawing, *dra
 		dStartArrowHead := g.drawArrowHead(reverseDrawingLine(linesDrawn[0]), lineDirs[0].getOpposite(), e.head)
 		dArrowHead = g.mergeDrawings(dArrowHead, drawingCoord{0, 0}, dStartArrowHead)
 	}
-	dCorners := g.drawCorners(e.path)
+	dCorners := g.drawCorners(e.path, e.stroke)
 	return dPath, dBoxStart, dArrowHead, dCorners, dLabel
 }
 
@@ -194,13 +201,20 @@ func (g *graph) drawPath(path []gridCoord, stroke edgeStroke) (*drawing, [][]dra
 	return d, linesDrawn, lineDirs
 }
 
-func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord) *drawing {
+func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord, stroke edgeStroke) *drawing {
 	d := *(copyCanvas(g.drawing))
 	from := firstLine[0]
 	dir := determineDirection(genericCoord(path[0]), genericCoord(path[1]))
 	log.Debugf("Drawing box start at %v with direction %v for line %v", from, dir, path)
 
 	if g.useAscii {
+		return &d
+	}
+
+	// A heavy line meeting a light box border looks mismatched through a
+	// light T-junction glyph (e.g. "├"); leave the box's own light border
+	// character in place instead.
+	if stroke == strokeThick {
 		return &d
 	}
 
@@ -217,6 +231,31 @@ func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord) *drawin
 	return &d
 }
 
+// drawBoxEnd is drawBoxStart's mirror for the destination end of a path.
+func (g *graph) drawBoxEnd(lastLine []drawingCoord, dir direction, stroke edgeStroke) *drawing {
+	d := *(copyCanvas(g.drawing))
+	if len(lastLine) == 0 {
+		return &d
+	}
+	to := lastLine[len(lastLine)-1]
+
+	if g.useAscii || stroke == strokeThick {
+		return &d
+	}
+
+	switch dir {
+	case Up:
+		d[to.x][to.y-1] = "┬"
+	case Down:
+		d[to.x][to.y+1] = "┴"
+	case Left:
+		d[to.x-1][to.y] = "├"
+	case Right:
+		d[to.x+1][to.y] = "┤"
+	}
+	return &d
+}
+
 func (g *graph) drawArrowHead(line []drawingCoord, fallback direction, head edgeHead) *drawing {
 	d := *(copyCanvas(g.drawing))
 	if len(line) == 0 {
@@ -229,11 +268,17 @@ func (g *graph) drawArrowHead(line []drawingCoord, fallback direction, head edge
 		dir = fallback
 	}
 
-	// ASCII-only.
-	if g.useAscii && (head == headCircle || head == headCross) {
+	// Circle and cross heads are a single glyph regardless of travel direction.
+	if head == headCircle || head == headCross {
 		char := "o"
 		if head == headCross {
 			char = "x"
+		}
+		if !g.useAscii {
+			char = "●"
+			if head == headCross {
+				char = "✕"
+			}
 		}
 		d[lastPos.x][lastPos.y] = char
 		return &d
@@ -310,8 +355,12 @@ func (g *graph) drawArrowHead(line []drawingCoord, fallback direction, head edge
 	return &d
 }
 
-func (g *graph) drawCorners(path []gridCoord) *drawing {
+func (g *graph) drawCorners(path []gridCoord, stroke edgeStroke) *drawing {
 	d := copyCanvas(g.drawing)
+	// Thick edges get the heavy box-drawing corner glyphs to match their
+	// heavy line/arrowhead; ASCII has no distinct "thick corner" (still
+	// "+"), and dotted corners are left as plain light corners.
+	thick := !g.useAscii && stroke == strokeThick
 	for idx, coord := range path {
 		// Skip the first and last step
 		if idx == 0 || idx == len(path)-1 {
@@ -327,12 +376,24 @@ func (g *graph) drawCorners(path []gridCoord) *drawing {
 			switch {
 			case (prevDir == Right && nextDir == Down) || (prevDir == Up && nextDir == Left):
 				corner = "┐"
+				if thick {
+					corner = "┓"
+				}
 			case (prevDir == Right && nextDir == Up) || (prevDir == Down && nextDir == Left):
 				corner = "┘"
+				if thick {
+					corner = "┛"
+				}
 			case (prevDir == Left && nextDir == Down) || (prevDir == Up && nextDir == Right):
 				corner = "┌"
+				if thick {
+					corner = "┏"
+				}
 			case (prevDir == Left && nextDir == Up) || (prevDir == Down && nextDir == Right):
 				corner = "└"
+				if thick {
+					corner = "┗"
+				}
 			default:
 				corner = "+"
 			}
