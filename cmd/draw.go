@@ -66,11 +66,11 @@ func (d *drawing) drawText(start drawingCoord, text string) {
 	}
 }
 
-func (g *graph) drawLine(d *drawing, from drawingCoord, to drawingCoord, offsetFrom int, offsetTo int) []drawingCoord {
+func (g *graph) drawLine(d *drawing, from drawingCoord, to drawingCoord, offsetFrom int, offsetTo int, stroke edgeStroke) []drawingCoord {
 	// Offset determines how far from the actual coord the line should start/stop.
 	direction := determineDirection(genericCoord(from), genericCoord(to))
 	drawnCoords := make([]drawingCoord, 0)
-	log.Debug("Drawing line from ", from, " to ", to, " direction: ", direction, " offsetFrom: ", offsetFrom, " offsetTo: ", offsetTo)
+	log.Debug("Drawing line from ", from, " to ", to, " direction: ", direction, " offsetFrom: ", offsetFrom, " offsetTo: ", offsetTo, " stroke: ", stroke)
 	if !g.useAscii {
 		switch direction {
 		case Up:
@@ -115,26 +115,43 @@ func (g *graph) drawLine(d *drawing, from drawingCoord, to drawingCoord, offsetF
 			}
 		}
 	} else {
+		// (ASCII-only) Vertical glyphs: solid "|", dotted ":", thick "I".
+		// Horizontal glyph: solid/dotted share "-" (dotted skips every other
+		// cell below), thick "=".
+		vertical := "|"
+		if stroke == strokeThick {
+			vertical = "I"
+		} else if stroke == strokeDotted {
+			vertical = ":"
+		}
+		horizontal := "-"
+		if stroke == strokeThick {
+			horizontal = "="
+		}
 		switch direction {
 		case Up:
 			for y := from.y - offsetFrom; y >= to.y-offsetTo; y-- {
 				drawnCoords = append(drawnCoords, drawingCoord{from.x, y})
-				(*d)[from.x][y] = "|"
+				(*d)[from.x][y] = vertical
 			}
 		case Down:
 			for y := from.y + offsetFrom; y <= to.y+offsetTo; y++ {
 				drawnCoords = append(drawnCoords, drawingCoord{from.x, y})
-				(*d)[from.x][y] = "|"
+				(*d)[from.x][y] = vertical
 			}
 		case Left:
-			for x := from.x - offsetFrom; x >= to.x-offsetTo; x-- {
+			for i, x := 0, from.x-offsetFrom; x >= to.x-offsetTo; i, x = i+1, x-1 {
 				drawnCoords = append(drawnCoords, drawingCoord{x, from.y})
-				(*d)[x][from.y] = "-"
+				if stroke != strokeDotted || i%2 == 0 {
+					(*d)[x][from.y] = horizontal
+				}
 			}
 		case Right:
-			for x := from.x + offsetFrom; x <= to.x+offsetTo; x++ {
+			for i, x := 0, from.x+offsetFrom; x <= to.x+offsetTo; i, x = i+1, x+1 {
 				drawnCoords = append(drawnCoords, drawingCoord{x, from.y})
-				(*d)[x][from.y] = "-"
+				if stroke != strokeDotted || i%2 == 0 {
+					(*d)[x][from.y] = horizontal
+				}
 			}
 		case UpperLeft:
 			for x, y := from.x, from.y-offsetFrom; x >= to.x-offsetTo && y >= to.y-offsetTo; x, y = x-1, y-1 {

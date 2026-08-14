@@ -42,6 +42,8 @@ type textEdge struct {
 	child           textNode
 	label           string
 	isBidirectional bool
+	stroke          edgeStroke
+	head            edgeHead
 }
 
 type textSubgraph struct {
@@ -145,14 +147,18 @@ func parseStyleClass(matchedLine []string) styleClass {
 	return styleClass{className, styleMap}
 }
 
-func setArrowWithLabel(lhs, rhs []textNode, label string, isBidirectional bool, gp *graphProperties) []textNode {
+func setArrowWithStyle(lhs, rhs []textNode, label string, isBidirectional bool, stroke edgeStroke, head edgeHead, gp *graphProperties) []textNode {
 	log.Debug("Setting arrow from ", lhs, " to ", rhs, " with label ", label)
 	for _, l := range lhs {
 		for _, r := range rhs {
-			setData(l, textEdge{l, r, label, isBidirectional}, gp.data, gp.nodeSpecs)
+			setData(l, textEdge{l, r, label, isBidirectional, stroke, head}, gp.data, gp.nodeSpecs)
 		}
 	}
 	return rhs
+}
+
+func setArrowWithLabel(lhs, rhs []textNode, label string, isBidirectional bool, gp *graphProperties) []textNode {
+	return setArrowWithStyle(lhs, rhs, label, isBidirectional, strokeSolid, headArrow, gp)
 }
 
 func setArrow(lhs, rhs []textNode, gp *graphProperties) []textNode {
@@ -204,8 +210,28 @@ func setData(parent textNode, edge textEdge, data *orderedmap.OrderedMap[string,
 
 // edgeArrowPattern matches the classic arrow (-->) plus the dotted, thick,
 // open, circle, and cross link operators Mermaid also supports (-.->, ==>,
-// ---, --o, --x).
-const edgeArrowPattern = `(?:-->|-\.->|==>|---|--o|--x)`
+// ---, --o, --x). It's a capturing group so classifyArrowToken can tell them
+// apart afterwards.
+const edgeArrowPattern = `(-->|-\.->|==>|---|--o|--x)`
+
+// classifyArrowToken maps a flowchart link operator to the line style and
+// arrowhead it renders with.
+func classifyArrowToken(token string) (edgeStroke, edgeHead) {
+	switch token {
+	case "-.->":
+		return strokeDotted, headArrow
+	case "==>":
+		return strokeThick, headArrow
+	case "---":
+		return strokeSolid, headNone
+	case "--o":
+		return strokeSolid, headCircle
+	case "--x":
+		return strokeSolid, headCross
+	default: // "-->"
+		return strokeSolid, headArrow
+	}
+}
 
 func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 	log.Debugf("Parsing line: %v", line)
@@ -253,10 +279,11 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 				if lhs, err = gp.parseString(match[0]); err != nil {
 					lhs = []textNode{parseNode(match[0])}
 				}
-				if rhs, err = gp.parseString(match[2]); err != nil {
-					rhs = []textNode{parseNode(match[2])}
+				if rhs, err = gp.parseString(match[3]); err != nil {
+					rhs = []textNode{parseNode(match[3])}
 				}
-				return setArrowWithLabel(lhs, rhs, match[1], false, gp), nil
+				stroke, head := classifyArrowToken(match[1])
+				return setArrowWithStyle(lhs, rhs, match[2], false, stroke, head, gp), nil
 			},
 		},
 		{
@@ -265,10 +292,11 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 				if lhs, err = gp.parseString(match[0]); err != nil {
 					lhs = []textNode{parseNode(match[0])}
 				}
-				if rhs, err = gp.parseString(match[1]); err != nil {
-					rhs = []textNode{parseNode(match[1])}
+				if rhs, err = gp.parseString(match[2]); err != nil {
+					rhs = []textNode{parseNode(match[2])}
 				}
-				return setArrow(lhs, rhs, gp), nil
+				stroke, head := classifyArrowToken(match[1])
+				return setArrowWithStyle(lhs, rhs, "", false, stroke, head, gp), nil
 			},
 		},
 		{

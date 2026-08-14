@@ -6,11 +6,36 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// edgeStroke is the line style drawn along an edge's path. Only ASCII
+// output (g.useAscii) currently distinguishes them; Unicode output always
+// renders a solid line regardless of stroke.
+type edgeStroke int
+
+const (
+	strokeSolid edgeStroke = iota
+	strokeDotted
+	strokeThick
+)
+
+// edgeHead is the glyph drawn at an edge's arrowhead end. headNone means no
+// glyph is drawn at all (an open link like ---). Only ASCII output currently
+// distinguishes them; Unicode output always draws a directional arrowhead.
+type edgeHead int
+
+const (
+	headArrow edgeHead = iota
+	headCircle
+	headCross
+	headNone
+)
+
 type edge struct {
 	from            *node
 	to              *node
 	text            string
 	isBidirectional bool
+	stroke          edgeStroke
+	head            edgeHead
 	path            []gridCoord
 	labelLine       []gridCoord
 	startDir        direction

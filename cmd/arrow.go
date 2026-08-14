@@ -111,11 +111,18 @@ func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) (*drawing, *dra
 	}
 	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, e.path)
 	dLabel := g.drawArrowLabel(e)
-	dPath, linesDrawn, lineDirs := g.drawPath(e.path)
+	dPath, linesDrawn, lineDirs := g.drawPath(e.path, e.stroke)
 	dBoxStart := g.drawBoxStart(e.path, linesDrawn[0])
-	dArrowHead := g.drawArrowHead(linesDrawn[len(linesDrawn)-1], lineDirs[len(lineDirs)-1])
-	if e.isBidirectional && len(linesDrawn) > 0 {
-		dStartArrowHead := g.drawArrowHead(reverseDrawingLine(linesDrawn[0]), lineDirs[0].getOpposite())
+	// Unicode output unchanged.
+	skipHead := g.useAscii && e.head == headNone
+	var dArrowHead *drawing
+	if skipHead {
+		dArrowHead = copyCanvas(g.drawing)
+	} else {
+		dArrowHead = g.drawArrowHead(linesDrawn[len(linesDrawn)-1], lineDirs[len(lineDirs)-1], e.head)
+	}
+	if e.isBidirectional && !skipHead && len(linesDrawn) > 0 {
+		dStartArrowHead := g.drawArrowHead(reverseDrawingLine(linesDrawn[0]), lineDirs[0].getOpposite(), e.head)
 		dArrowHead = g.mergeDrawings(dArrowHead, drawingCoord{0, 0}, dStartArrowHead)
 	}
 	dCorners := g.drawCorners(e.path)
@@ -160,7 +167,7 @@ func mergePath(path []gridCoord) []gridCoord {
 	return newPath
 }
 
-func (g *graph) drawPath(path []gridCoord) (*drawing, [][]drawingCoord, []direction) {
+func (g *graph) drawPath(path []gridCoord, stroke edgeStroke) (*drawing, [][]drawingCoord, []direction) {
 	d := copyCanvas(g.drawing)
 	previousCoord := path[0]
 	linesDrawn := make([][]drawingCoord, 0)
@@ -174,7 +181,7 @@ func (g *graph) drawPath(path []gridCoord) (*drawing, [][]drawingCoord, []direct
 			continue
 		}
 		dir := determineDirection(genericCoord(previousCoord), genericCoord(nextCoord))
-		s := g.drawLine(d, previousDrawingCoord, nextDrawingCoord, 1, -1)
+		s := g.drawLine(d, previousDrawingCoord, nextDrawingCoord, 1, -1, stroke)
 		if len(s) == 0 {
 			// drawLine may return no coords if offsets collapse the line. Use at least one point so arrow and junction logic
 			// can still infer a direction.
@@ -210,7 +217,7 @@ func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord) *drawin
 	return &d
 }
 
-func (g *graph) drawArrowHead(line []drawingCoord, fallback direction) *drawing {
+func (g *graph) drawArrowHead(line []drawingCoord, fallback direction, head edgeHead) *drawing {
 	d := *(copyCanvas(g.drawing))
 	if len(line) == 0 {
 		return &d
@@ -220,6 +227,16 @@ func (g *graph) drawArrowHead(line []drawingCoord, fallback direction) *drawing 
 	dir := determineDirection(genericCoord(from), genericCoord(lastPos))
 	if len(line) == 1 || dir == Middle {
 		dir = fallback
+	}
+
+	// ASCII-only.
+	if g.useAscii && (head == headCircle || head == headCross) {
+		char := "o"
+		if head == headCross {
+			char = "x"
+		}
+		d[lastPos.x][lastPos.y] = char
+		return &d
 	}
 
 	var char string
@@ -353,7 +370,7 @@ func insetLine(line []drawingCoord, insetStart, insetEnd int) []drawingCoord {
 	}
 	endInset := insetEnd
 	if insetEnd > 0 {
-			endInset = insetEnd - 1 // shift label right ~1 char so the start dash survives the centered placement
+		endInset = insetEnd - 1 // shift label right ~1 char so the start dash survives the centered placement
 	}
 	dir := determineDirection(genericCoord(line[0]), genericCoord(line[1]))
 	a, b := line[0], line[1]
