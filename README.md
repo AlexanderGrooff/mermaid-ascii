@@ -162,6 +162,42 @@ $ mermaid-ascii -f ./test.mermaid
 │         │          
 └─────────┘          
 
+# Other edge types
+Besides the default `-->` arrow, flowchart edges also accept `-.->` (dotted), `==>` (thick), `---` (open, no arrowhead), `--o` (circle head), and `--x` (cross head):
+$ cat test.mermaid
+graph TD
+A -.-> B
+A ==> C
+B --- C
+B --o|example| D
+D --x C
+$ mermaid-ascii -f ./test.mermaid
+┌──────────┐          
+│          │          
+│    A     │━━━━━━━┓  
+│          │       ┃  
+└─────┬────┘       ┃  
+      ┆            ┃  
+      ┆            ┃  
+      ┆            ┃  
+      ┆            ┃  
+      ▼            ▼  
+┌──────────┐     ┌───┐
+│          │     │   │
+│    B     ├─────┤ C │
+│          │     │   │
+└─────┬────┘     └───┘
+      │            ✕  
+      │            │  
+   example         │  
+      │            │  
+      ●            │  
+┌──────────┐       │  
+│          │       │  
+│    D     ├───────┘  
+│          │          
+└──────────┘          
+
 # Read from stdin
 $ cat test.mermaid | mermaid-ascii
 ┌───┐     ┌───┐     ┌───┐
