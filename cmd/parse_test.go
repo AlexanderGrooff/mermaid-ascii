@@ -175,6 +175,37 @@ func TestMermaidFileToMapUsesLatestExplicitLabel(t *testing.T) {
 	}
 }
 
+// Tests non-standard arrow operators.
+func TestMermaidFileToMapParsesNonStandardEdgeOperators(t *testing.T) {
+	for _, op := range []string{"-->", "-.->", "==>", "---", "--o", "--x"} {
+		t.Run(op, func(t *testing.T) {
+			properties, err := mermaidFileToMap("graph LR\nA "+op+" B", "cli")
+			if err != nil {
+				t.Fatalf("mermaidFileToMap() error = %v", err)
+			}
+			edges, ok := properties.data.Get("A")
+			if !ok || len(edges) != 1 || edges[0].child.name != "B" {
+				t.Fatalf("edges from A = %#v, want one edge to B", edges)
+			}
+		})
+	}
+}
+
+func TestMermaidFileToMapParsesChainedNonStandardEdges(t *testing.T) {
+	input := "graph LR\nA -.-> B\nB ==> C\nC --- D\nD --o E\nE --x F"
+	properties, err := mermaidFileToMap(input, "cli")
+	if err != nil {
+		t.Fatalf("mermaidFileToMap() error = %v", err)
+	}
+
+	for _, link := range [][2]string{{"A", "B"}, {"B", "C"}, {"C", "D"}, {"D", "E"}, {"E", "F"}} {
+		edges, ok := properties.data.Get(link[0])
+		if !ok || len(edges) != 1 || edges[0].child.name != link[1] {
+			t.Fatalf("edges from %q = %#v, want one edge to %q", link[0], edges, link[1])
+		}
+	}
+}
+
 // TestGraphTypeDetection verifies that the diagram declaration line is parsed
 // tolerantly: surrounding whitespace, a missing direction (defaults to
 // top-down), and the reverse directions RL/BT are all accepted.
