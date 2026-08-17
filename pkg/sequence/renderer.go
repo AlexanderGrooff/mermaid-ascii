@@ -150,10 +150,10 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 	// act carries the activation state past the body so an activation left open
 	// at the end of the diagram still marks the closing lifeline row, the way
 	// mermaid runs its activation box to the bottom.
-	act := newActivations()
+	act := newLifelineState(sd)
 	lines = append(lines, renderEvents(events, layout, chars, act)...)
 
-	lines = append(lines, act.overlay(buildLifeline(layout, chars), layout, chars))
+	lines = append(lines, buildLifeline(layout, chars, act))
 
 	// Participant-group boxes wrap their columns for the whole diagram height:
 	// a titled top border above the headers, side borders overlaid on every
@@ -327,12 +327,20 @@ func overlayBoxSides(line string, spans []boxSpan, chars BoxChars) string {
 // renderEvents paints the ordered body of the diagram — messages and fragment
 // frames — into text lines. It recurses into each loop/opt block, so nested
 // fragments (a loop containing an opt, say) render correctly.
-func renderEvents(events []Event, layout *diagramLayout, chars BoxChars, act *activations) []string {
+func renderEvents(events []Event, layout *diagramLayout, chars BoxChars, act *lifelineState) []string {
 	var lines []string
 	// emit appends body lines, marking any active lifelines they cross.
 	emit := func(rows ...string) {
 		for _, l := range rows {
-			lines = append(lines, act.overlay(l, layout, chars))
+			lines = append(lines, act.overlay(l, layout, chars, -1, -1))
+		}
+	}
+	// A note box covers the columns it spans, so junctions are only upgraded
+	// outside it: its own borders must survive untouched.
+	emitNote := func(n *Note) {
+		nl, nr := noteBoxColumns(n, layout)
+		for _, l := range renderNote(n, layout, chars, act) {
+			lines = append(lines, act.overlay(l, layout, chars, nl, nr))
 		}
 	}
 	for i := 0; i < len(events); {
@@ -344,9 +352,10 @@ func renderEvents(events []Event, layout *diagramLayout, chars BoxChars, act *ac
 			continue
 		}
 
-		// Activation boundaries draw nothing themselves: they change which
-		// lifelines are drawn active from here on.
-		if ev.Kind == EventActivate || ev.Kind == EventDeactivate {
+		// Lifeline boundaries draw nothing themselves: they change how the
+		// participant's lifeline is drawn from here on.
+		if ev.Kind == EventActivate || ev.Kind == EventDeactivate ||
+			ev.Kind == EventCreate || ev.Kind == EventDestroy {
 			act.apply(ev)
 			i++
 			continue
@@ -365,12 +374,12 @@ func renderEvents(events []Event, layout *diagramLayout, chars BoxChars, act *ac
 
 		if ev.Kind == EventNote {
 			for s := 0; s < layout.messageSpacing; s++ {
-				emit(buildLifeline(layout, chars))
+				emit(buildLifeline(layout, chars, act))
 			}
 			// The note box covers the lifelines it spans; overlay still marks
 			// any active lifeline outside it (it only rewrites lifeline glyphs,
 			// so the box itself is untouched).
-			emit(renderNote(ev.Note, layout, chars)...)
+			emitNote(ev.Note)
 			i++
 			continue
 		}
@@ -378,33 +387,71 @@ func renderEvents(events []Event, layout *diagramLayout, chars BoxChars, act *ac
 		// EventMessage.
 		msg := ev.Message
 		for s := 0; s < layout.messageSpacing; s++ {
-			emit(buildLifeline(layout, chars))
+			emit(buildLifeline(layout, chars, act))
 		}
 		if msg.From == msg.To {
-			emit(renderSelfMessage(msg, layout, chars)...)
+			emit(renderSelfMessage(msg, layout, chars, act)...)
 		} else {
-			emit(renderMessage(msg, layout, chars)...)
+			emit(renderMessage(msg, layout, chars, act)...)
 		}
 		i++
 	}
 	return lines
 }
 
-// activations tracks which lifelines are inside an activation period while the
-// body is rendered, so each emitted line can be drawn with a heavy stroke at
-// those columns. mermaid draws an activation box beside the lifeline; a heavy
-// lifeline conveys the same period without needing columns that ASCII output
-// would have to steal from the arrows.
-type activations struct {
-	depth map[*Participant]int
+// lifelineState tracks, while the body is rendered, which lifelines are inside
+// an activation period and which are not alive yet or already destroyed, so
+// each emitted line can be drawn accordingly at those columns.
+//
+// mermaid draws an activation box beside the lifeline; a heavy lifeline conveys
+// the same period without needing columns that ASCII output would have to steal
+// from the arrows.
+type lifelineState struct {
+	depth   map[*Participant]int  // open activation periods
+	unborn  map[*Participant]bool // declared by `create`, not reached yet
+	dead    map[*Participant]bool // destroyed
+	crossed map[*Participant]bool // whose end marker has been drawn
+	byIndex []*Participant        // column index -> participant
 }
 
-func newActivations() *activations {
-	return &activations{depth: map[*Participant]int{}}
+func newLifelineState(sd *SequenceDiagram) *lifelineState {
+	l := &lifelineState{
+		depth:   map[*Participant]int{},
+		unborn:  map[*Participant]bool{},
+		dead:    map[*Participant]bool{},
+		crossed: map[*Participant]bool{},
+	}
+	for _, p := range sd.Created {
+		l.unborn[p] = true
+	}
+	l.byIndex = sd.Participants
+	return l
 }
 
-// apply moves the active set across an activation boundary event.
-func (a *activations) apply(ev Event) {
+// glyph is the lifeline cell for the participant in column index i.
+func (a *lifelineState) glyph(i int, chars BoxChars) rune {
+	if i >= len(a.byIndex) {
+		return chars.Vertical
+	}
+	p := a.byIndex[i]
+	switch {
+	case a.unborn[p]:
+		return ' '
+	case a.dead[p]:
+		if a.crossed[p] {
+			return ' '
+		}
+		// The first lifeline row after the destroying message marks the end.
+		a.crossed[p] = true
+		return chars.CrossHead
+	case a.depth[p] > 0:
+		return chars.ActiveVertical
+	}
+	return chars.Vertical
+}
+
+// apply moves the state across a lifeline boundary event.
+func (a *lifelineState) apply(ev Event) {
 	switch ev.Kind {
 	case EventActivate:
 		a.depth[ev.Participant]++
@@ -414,21 +461,32 @@ func (a *activations) apply(ev Event) {
 		} else {
 			delete(a.depth, ev.Participant)
 		}
+	case EventCreate:
+		delete(a.unborn, ev.Participant)
+	case EventDestroy:
+		a.dead[ev.Participant] = true
+		delete(a.depth, ev.Participant)
 	}
 }
 
-// overlay redraws a body line's active lifelines with the heavy stroke,
-// keeping the junction shape where a message attaches or crosses.
-func (a *activations) overlay(line string, layout *diagramLayout, chars BoxChars) string {
+// overlay upgrades an already-drawn row's junctions where a message attaches
+// to or crosses an active lifeline, so the heavy stroke stays unbroken. It only
+// ever rewrites a light junction into its heavy twin at a participant's own
+// column, so labels, note boxes and frames are left untouched. Columns in
+// [skipFrom, skipTo] are left alone, which note rows use to protect their box.
+func (a *lifelineState) overlay(line string, layout *diagramLayout, chars BoxChars, skipFrom, skipTo int) string {
 	if len(a.depth) == 0 {
 		return line
 	}
 	var r []rune
 	for p, d := range a.depth {
-		if d == 0 || p.Index >= len(layout.participantCenters) {
+		if d == 0 || a.dead[p] || a.unborn[p] || p.Index >= len(layout.participantCenters) {
 			continue
 		}
 		c := layout.participantCenters[p.Index]
+		if c >= skipFrom && c <= skipTo {
+			continue
+		}
 		if r == nil {
 			r = []rune(line)
 		}
@@ -449,7 +507,7 @@ func (a *activations) overlay(line string, layout *diagramLayout, chars BoxChars
 	if r == nil {
 		return line
 	}
-	return string(r)
+	return strings.TrimRight(string(r), " ")
 }
 
 // fragmentDepth returns the maximum fragment nesting depth within events (0 if
@@ -574,7 +632,7 @@ func noteBoxColumns(note *Note, layout *diagramLayout) (int, int) {
 // renderNote draws a note annotation as a bordered box positioned over or
 // beside its participant lifelines. The box obscures any lifelines it covers,
 // while lifelines outside it stay continuous.
-func renderNote(note *Note, layout *diagramLayout, chars BoxChars) []string {
+func renderNote(note *Note, layout *diagramLayout, chars BoxChars, st *lifelineState) []string {
 	runes := noteRunes(note)
 	left, right := noteBoxColumns(note, layout)
 	if left < 0 { // safety; Render's note gutter should already prevent this
@@ -582,7 +640,7 @@ func renderNote(note *Note, layout *diagramLayout, chars BoxChars) []string {
 	}
 
 	border := func(l, r rune) string {
-		line := padRunes(buildLifeline(layout, chars), right+1)
+		line := padRunes(buildLifeline(layout, chars, st), right+1)
 		line[left] = l
 		for c := left + 1; c < right; c++ {
 			line[c] = chars.Horizontal
@@ -591,7 +649,7 @@ func renderNote(note *Note, layout *diagramLayout, chars BoxChars) []string {
 		return strings.TrimRight(string(line), " ")
 	}
 
-	mid := padRunes(buildLifeline(layout, chars), right+1)
+	mid := padRunes(buildLifeline(layout, chars, st), right+1)
 	for c := left; c <= right; c++ { // clear covered lifelines
 		mid[c] = ' '
 	}
@@ -616,7 +674,7 @@ func renderNote(note *Note, layout *diagramLayout, chars BoxChars) []string {
 
 // wrapFragment renders a loop/opt block: it paints the inner body, then draws a
 // labelled frame around the participants the block touches.
-func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars BoxChars, act *activations) []string {
+func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars BoxChars, act *lifelineState) []string {
 	// An alt block is split into sections by top-level "else" dividers (dividers
 	// nested inside child fragments belong to those fragments). Render each
 	// section, leaving a placeholder line where each divider will be drawn once
@@ -633,7 +691,7 @@ func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars Bo
 	}
 	// A trailing lifeline gives breathing room above the bottom border. It is
 	// part of the body, so it carries any activation still open here.
-	body = append(body, act.overlay(buildLifeline(layout, chars), layout, chars))
+	body = append(body, buildLifeline(layout, chars, act))
 
 	// The frame spans from just left of the leftmost involved lifeline to just
 	// right of the rightmost — the same participants the block's messages touch.
@@ -699,15 +757,15 @@ func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars Bo
 		}
 	}
 
-	out := []string{act.overlay(fragmentBorder(layout, chars, leftCol, rightCol, label, true), layout, chars)}
+	out := []string{fragmentBorder(layout, chars, leftCol, rightCol, label, true, act)}
 	for idx, l := range body {
 		if dl, ok := dividerAt[idx]; ok {
-			out = append(out, act.overlay(fragmentDivider(layout, chars, leftCol, rightCol, dl), layout, chars))
+			out = append(out, fragmentDivider(layout, chars, leftCol, rightCol, dl, act))
 		} else {
 			out = append(out, overlayFrameSides(l, chars, leftCol, rightCol))
 		}
 	}
-	out = append(out, act.overlay(fragmentBorder(layout, chars, leftCol, rightCol, "", false), layout, chars))
+	out = append(out, fragmentBorder(layout, chars, leftCol, rightCol, "", false, act))
 	return out
 }
 
@@ -741,8 +799,8 @@ func splitSections(inner []Event) ([][]Event, []string) {
 
 // fragmentDivider draws an alt "else" divider: a dashed line spanning the frame
 // and joined to its side borders, with an optional [label] tab near the left.
-func fragmentDivider(layout *diagramLayout, chars BoxChars, leftCol, rightCol int, label string) string {
-	line := padRunes(buildLifeline(layout, chars), rightCol+1)
+func fragmentDivider(layout *diagramLayout, chars BoxChars, leftCol, rightCol int, label string, st *lifelineState) string {
+	line := padRunes(buildLifeline(layout, chars, st), rightCol+1)
 	line[leftCol] = chars.TeeRight
 	for c := leftCol + 1; c < rightCol; c++ {
 		line[c] = chars.DottedLine
@@ -789,8 +847,8 @@ func involvedParticipants(events []Event, layout *diagramLayout) (int, int) {
 // so participant lines outside the frame stay continuous. When top is true and
 // label is non-empty, the label is embedded as a "[label]" tab near the left
 // corner.
-func fragmentBorder(layout *diagramLayout, chars BoxChars, leftCol, rightCol int, label string, top bool) string {
-	line := padRunes(buildLifeline(layout, chars), rightCol+1)
+func fragmentBorder(layout *diagramLayout, chars BoxChars, leftCol, rightCol int, label string, top bool, st *lifelineState) string {
+	line := padRunes(buildLifeline(layout, chars, st), rightCol+1)
 
 	leftCorner, rightCorner := chars.BottomLeft, chars.BottomRight
 	if top {
@@ -847,20 +905,29 @@ func buildLine(participants []*Participant, layout *diagramLayout, draw func(int
 	return sb.String()
 }
 
-func buildLifeline(layout *diagramLayout, chars BoxChars) string {
+// buildLifeline draws the bare lifeline row. st, when non-nil, decides each
+// participant's cell: blank before it is created or after it is destroyed, the
+// end marker on the first row after destruction, and the heavy stroke while it
+// is active. Drawing this here (rather than patching a finished row) means
+// message labels and note boxes painted afterwards are never disturbed.
+func buildLifeline(layout *diagramLayout, chars BoxChars, st *lifelineState) string {
 	line := make([]rune, layout.totalWidth+1)
 	for i := range line {
 		line[i] = ' '
 	}
-	for _, c := range layout.participantCenters {
-		if c < len(line) {
-			line[c] = chars.Vertical
+	for i, c := range layout.participantCenters {
+		if c >= len(line) {
+			continue
+		}
+		line[c] = chars.Vertical
+		if st != nil {
+			line[c] = st.glyph(i, chars)
 		}
 	}
 	return strings.TrimRight(string(line), " ")
 }
 
-func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string {
+func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars, st *lifelineState) []string {
 	var lines []string
 	from, to := layout.participantCenters[msg.From.Index], layout.participantCenters[msg.To.Index]
 
@@ -873,7 +940,7 @@ func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string
 		start := min(from, to) + labelLeftMargin
 		labelWidth := runewidth.StringWidth(label)
 		w := max(layout.totalWidth, start+labelWidth) + labelBufferSpace
-		line := []rune(buildLifeline(layout, chars))
+		line := []rune(buildLifeline(layout, chars, st))
 		if len(line) < w {
 			padding := make([]rune, w-len(line))
 			for k := range padding {
@@ -892,7 +959,7 @@ func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string
 		lines = append(lines, strings.TrimRight(string(line), " "))
 	}
 
-	line := []rune(buildLifeline(layout, chars))
+	line := []rune(buildLifeline(layout, chars, st))
 	style := chars.SolidLine
 	if msg.ArrowType.isDotted() {
 		style = chars.DottedLine
@@ -940,7 +1007,7 @@ func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string
 	return lines
 }
 
-func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []string {
+func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars, st *lifelineState) []string {
 	var lines []string
 	center := layout.participantCenters[msg.From.Index]
 	width := layout.selfMessageWidth
@@ -964,7 +1031,7 @@ func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []st
 	}
 
 	if label != "" {
-		line := ensureWidth(buildLifeline(layout, chars))
+		line := ensureWidth(buildLifeline(layout, chars, st))
 		start := center + labelLeftMargin
 		labelWidth := runewidth.StringWidth(label)
 		needed := start + labelWidth + labelBufferSpace
@@ -993,7 +1060,7 @@ func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []st
 		style = chars.DottedLine
 	}
 
-	l1 := ensureWidth(buildLifeline(layout, chars))
+	l1 := ensureWidth(buildLifeline(layout, chars, st))
 	l1[center] = chars.TeeRight
 	if msg.CentralFrom {
 		l1[center] = chars.Circle
@@ -1004,11 +1071,11 @@ func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars) []st
 	l1[center+width-1] = chars.SelfTopRight
 	lines = append(lines, strings.TrimRight(string(l1), " "))
 
-	l2 := ensureWidth(buildLifeline(layout, chars))
+	l2 := ensureWidth(buildLifeline(layout, chars, st))
 	l2[center+width-1] = chars.Vertical
 	lines = append(lines, strings.TrimRight(string(l2), " "))
 
-	l3 := ensureWidth(buildLifeline(layout, chars))
+	l3 := ensureWidth(buildLifeline(layout, chars, st))
 	l3[center] = chars.Vertical
 	if msg.CentralTo {
 		l3[center] = chars.Circle

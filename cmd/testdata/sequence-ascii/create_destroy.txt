@@ -1,0 +1,25 @@
+sequenceDiagram
+    Alice->>Bob: Hello Bob
+    create participant Carl
+    Alice->>Carl: Hi Carl
+    destroy Carl
+    Alice-xCarl: We are too many
+    destroy Bob
+    Bob->>Alice: I agree
+---
++-------+     +-----+     +------+
+| Alice |     | Bob |     | Carl |
++---+---+     +--+--+     +---+--+
+    |            |
+    | Hello Bob  |
+    +----------->|
+    |            |            |
+    | Hi Carl    |            |
+    +------------------------>|
+    |            |            |
+    | We are too many         |
+    +------------------------x|
+    |            |            x
+    | I agree    |
+    |<-----------+
+    |            x
