@@ -1,0 +1,22 @@
+sequenceDiagram
+    Alice->>+Bob: request
+    Bob->>+Carol: sub-request
+    Carol-->>-Bob: sub-reply
+    Bob-->>-Alice: reply
+---
++-------+     +-----+     +-------+
+| Alice |     | Bob |     | Carol |
++---+---+     +--+--+     +---+---+
+    |            |            |
+    | request    |            |
+    +----------->|            |
+    |            #            |
+    |            # sub-request|
+    |            #----------->|
+    |            #            #
+    |            # sub-reply  #
+    |            #<...........#
+    |            #            |
+    | reply      #            |
+    |<...........#            |
+    |            |            |

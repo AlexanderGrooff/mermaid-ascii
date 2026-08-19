@@ -1,0 +1,22 @@
+sequenceDiagram
+    A->>B: start
+    activate B
+    B->>B: work
+    deactivate B
+    B-->>A: done
+---
++---+     +---+
+| A |     | B |
++-+-+     +-+-+
+  |         |
+  | start   |
+  +-------->|
+  |         #
+  |         # work
+  |         #--+
+  |         #  |
+  |         #<-+
+  |         |
+  | done    |
+  |<........+
+  |         |

@@ -151,7 +151,8 @@ func TestMessageRegex(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		gotFrom, gotArrow, gotTo, gotLabel, _, _, ok := splitMessage(tt.input)
+		parts, ok := splitMessage(tt.input)
+		gotFrom, gotArrow, gotTo, gotLabel := parts.fromID, parts.arrow, parts.toID, parts.label
 		if !tt.wantMatch {
 			if ok {
 				t.Errorf("splitMessage should not match %q", tt.input)

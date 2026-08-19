@@ -71,6 +71,10 @@ var (
 	// boxHexColorRegex matches a leading #hex color token.
 	boxHexColorRegex = regexp.MustCompile(`^#[0-9a-fA-F]{3,8}\b`)
 
+	// activationRegex matches the standalone activation keywords:
+	// `activate A` / `deactivate A`. Group 1 is the keyword, group 2 the name.
+	activationRegex = regexp.MustCompile(`(?i)^\s*(activate|deactivate)\s+(.+)$`)
+
 	// brTagRegex matches <br> variants, which mermaid treats as line breaks;
 	// single-line ASCII titles render them as spaces.
 	brTagRegex = regexp.MustCompile(`(?i)<br\s*/?>`)
@@ -171,6 +175,8 @@ const (
 	EventFragmentDivider                  // an "else" section divider within an alt
 	EventFragmentEnd                      // the matching "end" line
 	EventNote                             // a note annotation
+	EventActivate                         // a participant becomes active
+	EventDeactivate                       // a participant stops being active
 )
 
 func (k EventKind) String() string {
@@ -185,6 +191,10 @@ func (k EventKind) String() string {
 		return "fragment-end"
 	case EventNote:
 		return "note"
+	case EventActivate:
+		return "activate"
+	case EventDeactivate:
+		return "deactivate"
 	default:
 		return fmt.Sprintf("EventKind(%d)", int(k))
 	}
@@ -199,6 +209,9 @@ type Event struct {
 	Message  *Message
 	Fragment *Fragment
 	Note     *Note
+	// Participant is set for EventActivate / EventDeactivate: the lifeline
+	// whose activation period starts or ends here.
+	Participant *Participant
 }
 
 // NotePlacement describes where a note box sits relative to its participant(s).
@@ -221,6 +234,9 @@ type Participant struct {
 	ID    string
 	Label string
 	Index int
+	// declared is true once a participant/actor statement names this
+	// participant, as opposed to it being created implicitly by a message.
+	declared bool
 }
 
 type Message struct {
@@ -372,6 +388,9 @@ func Parse(input string) (*SequenceDiagram, error) {
 	// grammar allows only participant declarations inside a box, and boxes
 	// cannot nest.
 	var openBox *Box
+	// active counts each participant's open activation periods, so deactivating
+	// an inactive participant is an error and stacked activations balance.
+	active := map[*Participant]int{}
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -389,14 +408,13 @@ func Parse(input string) (*SequenceDiagram, error) {
 			if boxStartRegex.MatchString(trimmed) {
 				return nil, fmt.Errorf("line %d: boxes cannot nest", i+2)
 			}
-			matched, err := sd.parseParticipant(trimmed, participantMap)
+			p, matched, err := sd.parseParticipant(trimmed, participantMap)
 			if err != nil {
 				return nil, fmt.Errorf("line %d: %w", i+2, err)
 			}
 			if !matched {
 				return nil, fmt.Errorf("line %d: only participant declarations are allowed inside a box: %q", i+2, trimmed)
 			}
-			p := sd.Participants[len(sd.Participants)-1]
 			if openBox.First == -1 {
 				openBox.First = p.Index
 			}
@@ -455,7 +473,7 @@ func Parse(input string) (*SequenceDiagram, error) {
 			continue
 		}
 
-		if matched, err := sd.parseParticipant(trimmed, participantMap); err != nil {
+		if _, matched, err := sd.parseParticipant(trimmed, participantMap); err != nil {
 			return nil, fmt.Errorf("line %d: %w", i+2, err)
 		} else if matched {
 			continue
@@ -464,9 +482,30 @@ func Parse(input string) (*SequenceDiagram, error) {
 		// Messages are checked before fragment keywords so a participant named
 		// "loop"/"opt"/"end" (e.g. "loop->>B: hi") is still read as a message —
 		// only bare openers like "loop retry" fall through to the checks below.
-		if matched, err := sd.parseMessage(trimmed, participantMap); err != nil {
+		if matched, err := sd.parseMessage(trimmed, participantMap, active); err != nil {
 			return nil, fmt.Errorf("line %d: %w", i+2, err)
 		} else if matched {
+			continue
+		}
+
+		// Standalone activation keywords. Checked after messages so a
+		// participant named "activate …" can still send one.
+		if m := activationRegex.FindStringSubmatch(trimmed); m != nil {
+			name, nameOK := parseName(m[2])
+			if !nameOK {
+				return nil, fmt.Errorf("line %d: invalid participant name %q", i+2, m[2])
+			}
+			p := sd.getParticipant(name, participantMap)
+			if strings.EqualFold(m[1], "activate") {
+				active[p]++
+				sd.Events = append(sd.Events, Event{Kind: EventActivate, Participant: p})
+			} else {
+				if active[p] == 0 {
+					return nil, fmt.Errorf("line %d: trying to deactivate an inactive participant %q", i+2, p.ID)
+				}
+				active[p]--
+				sd.Events = append(sd.Events, Event{Kind: EventDeactivate, Participant: p})
+			}
 			continue
 		}
 
@@ -537,10 +576,13 @@ func Parse(input string) (*SequenceDiagram, error) {
 	return sd, nil
 }
 
-func (sd *SequenceDiagram) parseParticipant(line string, participants map[string]*Participant) (bool, error) {
+// parseParticipant handles a participant/actor declaration. It reports whether
+// the line was one, and returns the participant it created or claimed so a
+// caller (the box block) can record which lifeline was declared.
+func (sd *SequenceDiagram) parseParticipant(line string, participants map[string]*Participant) (*Participant, bool, error) {
 	match := participantRegex.FindStringSubmatch(line)
 	if match == nil {
-		return false, nil
+		return nil, false, nil
 	}
 
 	rest := strings.TrimSpace(match[1])
@@ -551,25 +593,35 @@ func (sd *SequenceDiagram) parseParticipant(line string, participants map[string
 	}
 	id, idOK := parseName(id)
 	if !idOK {
-		return true, fmt.Errorf("invalid participant name %q", id)
+		return nil, true, fmt.Errorf("invalid participant name %q", id)
 	}
 	if label == "" {
 		label = id
 	}
 	label = strings.Trim(label, `"`)
 
-	if _, exists := participants[id]; exists {
-		return true, fmt.Errorf("duplicate participant %q", id)
+	// A participant already created implicitly by an earlier message may be
+	// declared afterwards to give it a label or put it in a box, as mermaid
+	// allows (addActor updates an existing actor). Only declaring the same
+	// participant twice is an error.
+	if existing, exists := participants[id]; exists {
+		if existing.declared {
+			return nil, true, fmt.Errorf("duplicate participant %q", id)
+		}
+		existing.declared = true
+		existing.Label = label
+		return existing, true, nil
 	}
 
 	p := &Participant{
-		ID:    id,
-		Label: label,
-		Index: len(sd.Participants),
+		ID:       id,
+		Label:    label,
+		Index:    len(sd.Participants),
+		declared: true,
 	}
 	sd.Participants = append(sd.Participants, p)
 	participants[id] = p
-	return true, nil
+	return p, true, nil
 }
 
 // parseBoxTitle extracts the display title from a box opener's argument:
@@ -664,11 +716,12 @@ func parseName(raw string) (string, bool) {
 // splitMessage breaks a line into [From][()][arrow][()][To]: [Label], where
 // "()" marks a central connection on that side. ok is false when the line is
 // not a message, so parsing can fall through to the other statement forms.
-func splitMessage(line string) (fromID, arrow, toID, label string, centralFrom, centralTo, ok bool) {
+func splitMessage(line string) (m messageParts, ok bool) {
 	idx, arrow := findArrow(line)
 	if idx < 0 {
 		return
 	}
+	m.arrow = arrow
 
 	left := strings.TrimSpace(line[:idx])
 	// A line opening with a fragment keyword is a fragment statement whose
@@ -678,14 +731,25 @@ func splitMessage(line string) (fromID, arrow, toID, label string, centralFrom, 
 		return
 	}
 	if strings.HasSuffix(left, "()") {
-		centralFrom = true
+		m.centralFrom = true
 		left = strings.TrimSpace(strings.TrimSuffix(left, "()"))
 	}
 	fromID, fromOK := parseName(left)
+	m.fromID = fromID
 
-	rest := strings.TrimSpace(line[idx+len(arrow):])
+	// A '+' or '-' after the arrow is the activation shorthand: '+' activates
+	// the receiver, '-' deactivates the sender. mermaid's lexer skips
+	// whitespace and no name may begin with a sign, so the sign is recognised
+	// either side of a space.
+	rest := strings.TrimLeft(line[idx+len(arrow):], " \t")
+	if rest != "" && (rest[0] == '+' || rest[0] == '-') {
+		m.activateTo = rest[0] == '+'
+		m.deactivateFrom = rest[0] == '-'
+		rest = rest[1:]
+	}
+	rest = strings.TrimSpace(rest)
 	if strings.HasPrefix(rest, "()") {
-		centralTo = true
+		m.centralTo = true
 		rest = strings.TrimSpace(strings.TrimPrefix(rest, "()"))
 	}
 	// The label starts at the first ':' after the (possibly quoted) to-name.
@@ -701,23 +765,33 @@ func splitMessage(line string) (fromID, arrow, toID, label string, centralFrom, 
 	}
 	colon += start
 	toID, toOK := parseName(rest[:colon])
-	label = strings.TrimSpace(rest[colon+1:])
+	m.toID = toID
+	m.label = strings.TrimSpace(rest[colon+1:])
 
 	ok = fromOK && toOK
 	return
 }
 
-func (sd *SequenceDiagram) parseMessage(line string, participants map[string]*Participant) (bool, error) {
-	fromID, arrow, toID, label, centralFrom, centralTo, ok := splitMessage(line)
+// messageParts is the decomposition of a message line: endpoints, arrow, label,
+// central-connection markers and the activation shorthand suffix.
+type messageParts struct {
+	fromID, arrow, toID, label string
+	centralFrom, centralTo     bool
+	activateTo                 bool // "+" after the arrow: activate the receiver
+	deactivateFrom             bool // "-" after the arrow: deactivate the sender
+}
+
+func (sd *SequenceDiagram) parseMessage(line string, participants map[string]*Participant, active map[*Participant]int) (bool, error) {
+	parts, ok := splitMessage(line)
 	if !ok {
 		return false, nil
 	}
 
-	from := sd.getParticipant(fromID, participants)
-	to := sd.getParticipant(toID, participants)
+	from := sd.getParticipant(parts.fromID, participants)
+	to := sd.getParticipant(parts.toID, participants)
 
 	var aType ArrowType
-	switch arrow {
+	switch parts.arrow {
 	case "->>":
 		aType = SolidArrow
 	case "-->>":
@@ -748,14 +822,28 @@ func (sd *SequenceDiagram) parseMessage(line string, participants map[string]*Pa
 	msg := &Message{
 		From:        from,
 		To:          to,
-		Label:       label,
+		Label:       parts.label,
 		ArrowType:   aType,
-		CentralFrom: centralFrom,
-		CentralTo:   centralTo,
+		CentralFrom: parts.centralFrom,
+		CentralTo:   parts.centralTo,
 		Number:      msgNumber,
 	}
 	sd.Messages = append(sd.Messages, msg)
 	sd.Events = append(sd.Events, Event{Kind: EventMessage, Message: msg})
+
+	// Activation shorthand: the period starts (or ends) after the message that
+	// carries the suffix, so the arrow itself sits on the boundary.
+	if parts.activateTo {
+		active[to]++
+		sd.Events = append(sd.Events, Event{Kind: EventActivate, Participant: to})
+	}
+	if parts.deactivateFrom {
+		if active[from] == 0 {
+			return true, fmt.Errorf("trying to deactivate an inactive participant %q", from.ID)
+		}
+		active[from]--
+		sd.Events = append(sd.Events, Event{Kind: EventDeactivate, Participant: from})
+	}
 	return true, nil
 }
 
