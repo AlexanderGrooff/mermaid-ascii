@@ -1,0 +1,16 @@
+sequenceDiagram
+    participant a as Alice
+    a->>b: Hello Bob?
+    create actor d as Donald
+    a->>d: Hello Donald?
+---
++-------+     +---+     +--------+
+| Alice |     | b |     | Donald |
++---+---+     +-+-+     +----+---+
+    |           |
+    | Hello Bob?|
+    +---------->|
+    |           |            |
+    | Hello Donald?          |
+    +----------------------->|
+    |           |            |

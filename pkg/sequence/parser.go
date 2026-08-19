@@ -75,6 +75,14 @@ var (
 	// `activate A` / `deactivate A`. Group 1 is the keyword, group 2 the name.
 	activationRegex = regexp.MustCompile(`(?i)^\s*(activate|deactivate)\s+(.+)$`)
 
+	// createRegex matches `create participant X` / `create actor X as Y`: the
+	// participant appears at the message that follows.
+	createRegex = regexp.MustCompile(`(?i)^\s*create\s+(participant|actor)\s+(.+)$`)
+
+	// destroyRegex matches `destroy X`: X's lifeline ends at the message that
+	// follows.
+	destroyRegex = regexp.MustCompile(`(?i)^\s*destroy\s+(.+)$`)
+
 	// brTagRegex matches <br> variants, which mermaid treats as line breaks;
 	// single-line ASCII titles render them as spaces.
 	brTagRegex = regexp.MustCompile(`(?i)<br\s*/?>`)
@@ -101,6 +109,9 @@ type SequenceDiagram struct {
 	// each wraps a contiguous run of participants (they are declared inside
 	// the block, so contiguity is inherent).
 	Boxes []*Box
+	// Created lists participants introduced by a `create` statement, whose
+	// lifelines begin partway down the diagram rather than at the top.
+	Created []*Participant
 }
 
 // Box is a participant group drawn as a frame around its participants'
@@ -177,6 +188,8 @@ const (
 	EventNote                             // a note annotation
 	EventActivate                         // a participant becomes active
 	EventDeactivate                       // a participant stops being active
+	EventCreate                           // a participant's lifeline begins here
+	EventDestroy                          // a participant's lifeline ends here
 )
 
 func (k EventKind) String() string {
@@ -195,6 +208,10 @@ func (k EventKind) String() string {
 		return "activate"
 	case EventDeactivate:
 		return "deactivate"
+	case EventCreate:
+		return "create"
+	case EventDestroy:
+		return "destroy"
 	default:
 		return fmt.Sprintf("EventKind(%d)", int(k))
 	}
@@ -391,6 +408,11 @@ func Parse(input string) (*SequenceDiagram, error) {
 	// active counts each participant's open activation periods, so deactivating
 	// an inactive participant is an error and stacked activations balance.
 	active := map[*Participant]int{}
+	// pendingCreate / pendingDestroy hold a participant named by a `create` or
+	// `destroy` statement. mermaid attaches each to the message that follows,
+	// which must involve that participant.
+	var pendingCreate, pendingDestroy *Participant
+	var createLine, destroyLine int
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -482,9 +504,64 @@ func Parse(input string) (*SequenceDiagram, error) {
 		// Messages are checked before fragment keywords so a participant named
 		// "loop"/"opt"/"end" (e.g. "loop->>B: hi") is still read as a message —
 		// only bare openers like "loop retry" fall through to the checks below.
-		if matched, err := sd.parseMessage(trimmed, participantMap, active); err != nil {
+		msgIdx := len(sd.Events)
+		if matched, err := sd.parseMessageEvent(trimmed, participantMap, active); err != nil {
 			return nil, fmt.Errorf("line %d: %w", i+2, err)
 		} else if matched {
+			// A create/destroy statement binds to this, the next message, which
+			// must involve its participant: mermaid requires a created
+			// participant to be the recipient (it cannot send the message that
+			// brings it into being) and a destroyed one to be at either end.
+			msg := sd.Events[msgIdx].Message
+			if p := pendingCreate; p != nil {
+				pendingCreate = nil
+				if msg.To != p {
+					return nil, fmt.Errorf("line %d: the created participant %q must receive the message that creates it", createLine, p.ID)
+				}
+				// The lifeline starts at this message, so the event precedes it.
+				sd.Events = append(sd.Events, Event{})
+				copy(sd.Events[msgIdx+1:], sd.Events[msgIdx:])
+				sd.Events[msgIdx] = Event{Kind: EventCreate, Participant: p}
+			}
+			if p := pendingDestroy; p != nil {
+				pendingDestroy = nil
+				if msg.From != p && msg.To != p {
+					return nil, fmt.Errorf("line %d: the destroyed participant %q is not involved in the following message", destroyLine, p.ID)
+				}
+				// The lifeline ends after this message.
+				sd.Events = append(sd.Events, Event{Kind: EventDestroy, Participant: p})
+			}
+			continue
+		}
+
+		// `create participant X` / `create actor X as Y`: declare X, then bind
+		// it to the message that follows.
+		if m := createRegex.FindStringSubmatch(trimmed); m != nil {
+			// mermaid rejects creating an id that already exists, even one only
+			// implied by an earlier message, and points at AS aliases instead.
+			if name, ok := parseName(nameBeforeAlias(m[2])); ok && participantMap[name] != nil {
+				return nil, fmt.Errorf("line %d: cannot create participant %q: the id already exists, use an \"as\" alias for a distinct participant", i+2, name)
+			}
+			p, err := sd.declareParticipant(m[2], participantMap)
+			if err != nil {
+				return nil, fmt.Errorf("line %d: %w", i+2, err)
+			}
+			pendingCreate, createLine = p, i+2
+			sd.Created = append(sd.Created, p)
+			continue
+		}
+
+		// `destroy X`: end X's lifeline at the message that follows.
+		if m := destroyRegex.FindStringSubmatch(trimmed); m != nil {
+			name, nameOK := parseName(m[1])
+			if !nameOK {
+				return nil, fmt.Errorf("line %d: invalid participant name %q", i+2, m[1])
+			}
+			p, exists := participantMap[name]
+			if !exists {
+				return nil, fmt.Errorf("line %d: cannot destroy unknown participant %q", i+2, name)
+			}
+			pendingDestroy, destroyLine = p, i+2
 			continue
 		}
 
@@ -553,6 +630,12 @@ func Parse(input string) (*SequenceDiagram, error) {
 		return nil, fmt.Errorf("line %d: invalid syntax: %q", i+2, trimmed)
 	}
 
+	if p := pendingCreate; p != nil {
+		return nil, fmt.Errorf("line %d: the created participant %q must be followed by a message involving it", createLine, p.ID)
+	}
+	if p := pendingDestroy; p != nil {
+		return nil, fmt.Errorf("line %d: the destroyed participant %q must be followed by a message involving it", destroyLine, p.ID)
+	}
 	if openBox != nil {
 		return nil, fmt.Errorf("unclosed box: missing \"end\"")
 	}
@@ -584,8 +667,23 @@ func (sd *SequenceDiagram) parseParticipant(line string, participants map[string
 	if match == nil {
 		return nil, false, nil
 	}
+	p, err := sd.declareParticipant(match[1], participants)
+	return p, true, err
+}
 
-	rest := strings.TrimSpace(match[1])
+// nameBeforeAlias returns the id portion of an "ID [as Label]" declaration.
+func nameBeforeAlias(rest string) string {
+	rest = strings.TrimSpace(rest)
+	if m := participantAsRegex.FindStringSubmatch(rest); m != nil {
+		return m[1]
+	}
+	return rest
+}
+
+// declareParticipant records a participant from the "[ID] [as Label]" part of a
+// declaration, shared by participant/actor statements and by `create`.
+func (sd *SequenceDiagram) declareParticipant(rest string, participants map[string]*Participant) (*Participant, error) {
+	rest = strings.TrimSpace(rest)
 	id := rest
 	label := ""
 	if asMatch := participantAsRegex.FindStringSubmatch(rest); asMatch != nil {
@@ -593,7 +691,7 @@ func (sd *SequenceDiagram) parseParticipant(line string, participants map[string
 	}
 	id, idOK := parseName(id)
 	if !idOK {
-		return nil, true, fmt.Errorf("invalid participant name %q", id)
+		return nil, fmt.Errorf("invalid participant name %q", id)
 	}
 	if label == "" {
 		label = id
@@ -606,11 +704,11 @@ func (sd *SequenceDiagram) parseParticipant(line string, participants map[string
 	// participant twice is an error.
 	if existing, exists := participants[id]; exists {
 		if existing.declared {
-			return nil, true, fmt.Errorf("duplicate participant %q", id)
+			return nil, fmt.Errorf("duplicate participant %q", id)
 		}
 		existing.declared = true
 		existing.Label = label
-		return existing, true, nil
+		return existing, nil
 	}
 
 	p := &Participant{
@@ -621,7 +719,7 @@ func (sd *SequenceDiagram) parseParticipant(line string, participants map[string
 	}
 	sd.Participants = append(sd.Participants, p)
 	participants[id] = p
-	return p, true, nil
+	return p, nil
 }
 
 // parseBoxTitle extracts the display title from a box opener's argument:
@@ -781,7 +879,7 @@ type messageParts struct {
 	deactivateFrom             bool // "-" after the arrow: deactivate the sender
 }
 
-func (sd *SequenceDiagram) parseMessage(line string, participants map[string]*Participant, active map[*Participant]int) (bool, error) {
+func (sd *SequenceDiagram) parseMessageEvent(line string, participants map[string]*Participant, active map[*Participant]int) (bool, error) {
 	parts, ok := splitMessage(line)
 	if !ok {
 		return false, nil
