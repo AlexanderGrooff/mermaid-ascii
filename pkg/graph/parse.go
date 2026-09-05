@@ -139,11 +139,23 @@ func parseNode(line string) textNode {
 
 	name := trimmedLine
 	labelText := trimmedLine
-	if open := strings.Index(trimmedLine, "["); open > 0 && strings.HasSuffix(trimmedLine, "]") {
-		name = strings.TrimSpace(trimmedLine[:open])
-		labelText = strings.TrimSpace(trimmedLine[open+1 : len(trimmedLine)-1])
-		labelText = strings.Trim(labelText, `"`)
-		return textNode{name: name, label: newGraphLabel(labelText), hasLabel: true, styleClass: styleClass}
+	for _, shape := range []struct {
+		open  string
+		close string
+	}{
+		{open: "[(", close: ")]"},
+		{open: "{{", close: "}}"},
+		{open: "{", close: "}"},
+		{open: "[", close: "]"},
+		{open: "(", close: ")"},
+		{open: ">", close: "]"},
+	} {
+		if open := strings.Index(trimmedLine, shape.open); open > 0 && strings.HasSuffix(trimmedLine, shape.close) {
+			name = strings.TrimSpace(trimmedLine[:open])
+			labelText = strings.TrimSpace(trimmedLine[open+len(shape.open) : len(trimmedLine)-len(shape.close)])
+			labelText = strings.Trim(labelText, `"`)
+			return textNode{name: name, label: newGraphLabel(labelText), hasLabel: true, styleClass: styleClass}
+		}
 	}
 
 	return textNode{name: name, label: newGraphLabel(labelText), styleClass: styleClass}
