@@ -75,6 +75,8 @@ func TestSequenceDiagramRendering(t *testing.T) {
 		"simple_two_participants.txt",
 		"single_message.txt",
 		"three_participants.txt",
+		"east_asian_participants.txt",
+		"mixed_width_cjk.txt",
 	}
 
 	for _, testFile := range testFiles {
@@ -122,6 +124,8 @@ func TestSequenceDiagramRendering_ASCII(t *testing.T) {
 		"self_message.txt",
 		"simple_two_participants.txt",
 		"three_participants.txt",
+		"east_asian_participants.txt",
+		"mixed_width_cjk.txt",
 	}
 
 	for _, testFile := range goldenFiles {
@@ -178,6 +182,7 @@ func TestSequenceDiagramRendering_ASCIISmokeTest(t *testing.T) {
 		"simple_two_participants.txt",
 		"single_message.txt",
 		"three_participants.txt",
+		"east_asian_participants.txt",
 	}
 
 	for _, testFile := range testFiles {
@@ -241,6 +246,7 @@ func TestSequenceDiagramRendering_EastAsian(t *testing.T) {
 	testFiles := []string{
 		"simple_two_participants.txt",
 		"three_participants.txt",
+		"east_asian_participants.txt",
 		"four_participants.txt",
 	}
 
