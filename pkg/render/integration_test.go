@@ -1,9 +1,10 @@
-package cmd
+package render
 
 import (
-	"github.com/AlexanderGrooff/mermaid-ascii/pkg/sequence"
 	"strings"
 	"testing"
+
+	"github.com/AlexanderGrooff/mermaid-ascii/pkg/sequence"
 
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
 )

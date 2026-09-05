@@ -1,4 +1,4 @@
-package cmd
+package graph
 
 func Min(x, y int) int {
 	if x < y {

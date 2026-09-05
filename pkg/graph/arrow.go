@@ -1,4 +1,4 @@
-package cmd
+package graph
 
 import (
 	"container/heap"

@@ -1,4 +1,4 @@
-package cmd
+package graph
 
 import "testing"
 
@@ -54,9 +54,9 @@ func TestParseNodeWithExplicitLabel(t *testing.T) {
 }
 
 func TestMermaidFileToMapPreservesEscapedLabelNewlines(t *testing.T) {
-	properties, err := mermaidFileToMap("graph LR\\nA[\"line1\\nline2\"] --> B", "cli")
+	properties, err := Parse("graph LR\\nA[\"line1\\nline2\"] --> B", "cli")
 	if err != nil {
-		t.Fatalf("mermaidFileToMap() error = %v", err)
+		t.Fatalf("Parse() error = %v", err)
 	}
 
 	spec := properties.nodeSpecs["A"]
@@ -69,9 +69,9 @@ func TestMermaidFileToMapPreservesEscapedLabelNewlines(t *testing.T) {
 }
 
 func TestMermaidFileToMapPreservesLiteralLabelNewlines(t *testing.T) {
-	properties, err := mermaidFileToMap("graph LR\nA[\"line1\nline2\"] --> B", "cli")
+	properties, err := Parse("graph LR\nA[\"line1\nline2\"] --> B", "cli")
 	if err != nil {
-		t.Fatalf("mermaidFileToMap() error = %v", err)
+		t.Fatalf("Parse() error = %v", err)
 	}
 
 	spec := properties.nodeSpecs["A"]
@@ -127,9 +127,9 @@ func TestParseSubgraphHeader(t *testing.T) {
 }
 
 func TestMermaidFileToMapParsesSubgraphIDAndTitle(t *testing.T) {
-	properties, err := mermaidFileToMap("graph LR\nsubgraph frontend [Frontend Services]\nA --> B\nend", "cli")
+	properties, err := Parse("graph LR\nsubgraph frontend [Frontend Services]\nA --> B\nend", "cli")
 	if err != nil {
-		t.Fatalf("mermaidFileToMap() error = %v", err)
+		t.Fatalf("Parse() error = %v", err)
 	}
 
 	if len(properties.subgraphs) != 1 {
@@ -146,9 +146,9 @@ func TestMermaidFileToMapParsesSubgraphIDAndTitle(t *testing.T) {
 }
 
 func TestMermaidFileToMapKeepsExplicitNodeLabelAcrossBareReferences(t *testing.T) {
-	properties, err := mermaidFileToMap("graph TD\nA[\"Foo\"] --> B[\"Bar\"]\nB --> C[\"Baz\"]", "cli")
+	properties, err := Parse("graph TD\nA[\"Foo\"] --> B[\"Bar\"]\nB --> C[\"Baz\"]", "cli")
 	if err != nil {
-		t.Fatalf("mermaidFileToMap() error = %v", err)
+		t.Fatalf("Parse() error = %v", err)
 	}
 
 	spec := properties.nodeSpecs["B"]
@@ -161,9 +161,9 @@ func TestMermaidFileToMapKeepsExplicitNodeLabelAcrossBareReferences(t *testing.T
 }
 
 func TestMermaidFileToMapUsesLatestExplicitLabel(t *testing.T) {
-	properties, err := mermaidFileToMap("graph TD\nA[\"Old\"] --> B\nA[\"New\"] --> C", "cli")
+	properties, err := Parse("graph TD\nA[\"Old\"] --> B\nA[\"New\"] --> C", "cli")
 	if err != nil {
-		t.Fatalf("mermaidFileToMap() error = %v", err)
+		t.Fatalf("Parse() error = %v", err)
 	}
 
 	spec := properties.nodeSpecs["A"]
@@ -179,9 +179,9 @@ func TestMermaidFileToMapUsesLatestExplicitLabel(t *testing.T) {
 func TestMermaidFileToMapParsesNonStandardEdgeOperators(t *testing.T) {
 	for _, op := range []string{"-->", "-.->", "==>", "---", "--o", "--x"} {
 		t.Run(op, func(t *testing.T) {
-			properties, err := mermaidFileToMap("graph LR\nA "+op+" B", "cli")
+			properties, err := Parse("graph LR\nA "+op+" B", "cli")
 			if err != nil {
-				t.Fatalf("mermaidFileToMap() error = %v", err)
+				t.Fatalf("Parse() error = %v", err)
 			}
 			edges, ok := properties.data.Get("A")
 			if !ok || len(edges) != 1 || edges[0].child.name != "B" {
@@ -193,9 +193,9 @@ func TestMermaidFileToMapParsesNonStandardEdgeOperators(t *testing.T) {
 
 func TestMermaidFileToMapParsesChainedNonStandardEdges(t *testing.T) {
 	input := "graph LR\nA -.-> B\nB ==> C\nC --- D\nD --o E\nE --x F"
-	properties, err := mermaidFileToMap(input, "cli")
+	properties, err := Parse(input, "cli")
 	if err != nil {
-		t.Fatalf("mermaidFileToMap() error = %v", err)
+		t.Fatalf("Parse() error = %v", err)
 	}
 
 	for _, link := range [][2]string{{"A", "B"}, {"B", "C"}, {"C", "D"}, {"D", "E"}, {"E", "F"}} {
@@ -241,7 +241,7 @@ func TestGraphTypeDetection(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			props, err := mermaidFileToMap(tt.input, "cli")
+			props, err := Parse(tt.input, "cli")
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got direction %q", props.graphDirection)

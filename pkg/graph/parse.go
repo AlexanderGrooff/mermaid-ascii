@@ -1,4 +1,4 @@
-package cmd
+package graph
 
 import (
 	"errors"
@@ -7,11 +7,26 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
 	"github.com/elliotchance/orderedmap/v2"
 	log "github.com/sirupsen/logrus"
 )
 
-type graphProperties struct {
+// Default layout settings, the same as diagram.DefaultConfig.
+const (
+	defaultBoxBorderPadding = 1
+	defaultPaddingX         = 5
+	defaultPaddingY         = 5
+)
+
+// Properties is a parsed graph together with its layout settings.
+// Parse fills in the graph and the defaults; Apply overrides the
+// settings from a Config.
+type Properties struct {
+	// ShowCoords overlays grid coordinates on the drawing, for
+	// debugging layout.
+	ShowCoords bool
+
 	data             *orderedmap.OrderedMap[string, []textEdge]
 	nodeSpecs        map[string]graphNodeSpec
 	styleClasses     *map[string]styleClass
@@ -147,7 +162,7 @@ func parseStyleClass(matchedLine []string) styleClass {
 	return styleClass{className, styleMap}
 }
 
-func setArrowWithStyle(lhs, rhs []textNode, label string, isBidirectional bool, stroke edgeStroke, head edgeHead, gp *graphProperties) []textNode {
+func setArrowWithStyle(lhs, rhs []textNode, label string, isBidirectional bool, stroke edgeStroke, head edgeHead, gp *Properties) []textNode {
 	log.Debug("Setting arrow from ", lhs, " to ", rhs, " with label ", label)
 	for _, l := range lhs {
 		for _, r := range rhs {
@@ -157,15 +172,15 @@ func setArrowWithStyle(lhs, rhs []textNode, label string, isBidirectional bool, 
 	return rhs
 }
 
-func setArrowWithLabel(lhs, rhs []textNode, label string, isBidirectional bool, gp *graphProperties) []textNode {
+func setArrowWithLabel(lhs, rhs []textNode, label string, isBidirectional bool, gp *Properties) []textNode {
 	return setArrowWithStyle(lhs, rhs, label, isBidirectional, strokeSolid, headArrow, gp)
 }
 
-func setArrow(lhs, rhs []textNode, gp *graphProperties) []textNode {
+func setArrow(lhs, rhs []textNode, gp *Properties) []textNode {
 	return setArrowWithLabel(lhs, rhs, "", false, gp)
 }
 
-func setBidirectionalArrow(lhs, rhs []textNode, gp *graphProperties) []textNode {
+func setBidirectionalArrow(lhs, rhs []textNode, gp *Properties) []textNode {
 	return setArrowWithLabel(lhs, rhs, "", true, gp)
 }
 
@@ -233,7 +248,7 @@ func classifyArrowToken(token string) (edgeStroke, edgeHead) {
 	}
 }
 
-func (gp *graphProperties) parseString(line string) ([]textNode, error) {
+func (gp *Properties) parseString(line string) ([]textNode, error) {
 	log.Debugf("Parsing line: %v", line)
 	var lhs, rhs []textNode
 	var err error
@@ -335,7 +350,9 @@ func (gp *graphProperties) parseString(line string) ([]textNode, error) {
 	return []textNode{}, errors.New("Could not parse line: " + line)
 }
 
-func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
+// Parse reads a flowchart or graph diagram. styleType is "cli" or
+// "web"; it selects how node styles are rendered.
+func Parse(mermaid, styleType string) (*Properties, error) {
 	rawLines := splitGraphLines(mermaid)
 
 	// Process lines to remove comments
@@ -364,15 +381,15 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 
 	data := orderedmap.NewOrderedMap[string, []textEdge]()
 	styleClasses := make(map[string]styleClass)
-	properties := graphProperties{
+	properties := Properties{
 		data:             data,
 		nodeSpecs:        make(map[string]graphNodeSpec),
 		styleClasses:     &styleClasses,
-		boxBorderPadding: boxBorderPadding,
+		boxBorderPadding: defaultBoxBorderPadding,
 		graphDirection:   "",
 		styleType:        styleType,
-		paddingX:         paddingBetweenX,
-		paddingY:         paddingBetweenY,
+		paddingX:         defaultPaddingX,
+		paddingY:         defaultPaddingY,
 		subgraphs:        []*textSubgraph{},
 	}
 
@@ -521,4 +538,20 @@ func mermaidFileToMap(mermaid, styleType string) (*graphProperties, error) {
 		}
 	}
 	return &properties, nil
+}
+
+// Apply takes the layout settings from config: padding, style type,
+// the ASCII / box-drawing character choice and the coordinate overlay.
+func (p *Properties) Apply(config *diagram.Config) {
+	if config == nil {
+		return
+	}
+	p.boxBorderPadding = config.BoxBorderPadding
+	p.paddingX = config.PaddingBetweenX
+	p.paddingY = config.PaddingBetweenY
+	if config.StyleType != "" {
+		p.styleType = config.StyleType
+	}
+	p.useAscii = config.UseAscii
+	p.ShowCoords = config.ShowCoords
 }
