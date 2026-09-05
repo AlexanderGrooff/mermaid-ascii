@@ -1,4 +1,4 @@
-package cmd
+package graph
 
 import (
 	"fmt"
@@ -196,7 +196,8 @@ func (g *graph) drawLine(d *drawing, from drawingCoord, to drawingCoord, offsetF
 	return drawnCoords
 }
 
-func drawMap(properties *graphProperties) string {
+// Draw lays out and renders a parsed graph as text.
+func Draw(properties *Properties) string {
 	g := mkGraph(properties.data, properties.nodeSpecs)
 	g.setStyleClasses(properties)
 	g.paddingX = properties.paddingX
@@ -205,7 +206,7 @@ func drawMap(properties *graphProperties) string {
 	g.setSubgraphs(properties.subgraphs)
 	g.createMapping()
 	d := g.draw()
-	if Coords {
+	if properties.ShowCoords {
 		d = d.debugDrawingWrapper()
 		d = d.debugCoordWrapper(g)
 	}

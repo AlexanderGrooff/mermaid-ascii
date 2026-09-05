@@ -1,4 +1,4 @@
-package cmd
+package graph
 
 import (
 	"os"
@@ -17,14 +17,14 @@ func verifyMap(t *testing.T, testCaseFile string, useAscii bool) {
 		t.Fatalf("Failed to read test case file: %v", err)
 	}
 
-	properties, err := mermaidFileToMap(tc.Mermaid, "cli")
+	properties, err := Parse(tc.Mermaid, "cli")
 	if err != nil {
 		log.Fatal("Failed to parse mermaid: ", err)
 	}
 	properties.paddingX = tc.PaddingX
 	properties.paddingY = tc.PaddingY
 	properties.useAscii = useAscii
-	actualMap := drawMap(properties)
+	actualMap := Draw(properties)
 	if tc.Expected != actualMap {
 		expectedWithSpaces := testutil.VisualizeWhitespace(tc.Expected)
 		actualWithSpaces := testutil.VisualizeWhitespace(actualMap)
@@ -97,7 +97,7 @@ A --> B`
 		GraphDirection:   "LR",
 		StyleType:        "cli",
 	}
-	asciiOutput, err := RenderDiagram(mermaidInput, asciiConfig)
+	asciiOutput, err := renderGraph(mermaidInput, asciiConfig)
 	if err != nil {
 		t.Fatalf("Failed to render with ASCII config: %v", err)
 	}
@@ -111,7 +111,7 @@ A --> B`
 		GraphDirection:   "LR",
 		StyleType:        "cli",
 	}
-	unicodeOutput, err := RenderDiagram(mermaidInput, unicodeConfig)
+	unicodeOutput, err := renderGraph(mermaidInput, unicodeConfig)
 	if err != nil {
 		t.Fatalf("Failed to render with Unicode config: %v", err)
 	}

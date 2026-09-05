@@ -1,4 +1,4 @@
-package cmd
+package graph
 
 import (
 	"fmt"
@@ -18,9 +18,9 @@ func TestRenderGraphHandlesLongChainWithoutPanic(t *testing.T) {
 		fmt.Fprintf(&b, "N%d --> N%d\n", i, i+1)
 	}
 
-	output, err := RenderDiagram(b.String(), config)
+	output, err := renderGraph(b.String(), config)
 	if err != nil {
-		t.Fatalf("RenderDiagram() error = %v", err)
+		t.Fatalf("renderGraph() error = %v", err)
 	}
 
 	if !strings.Contains(output, "N30") {
@@ -30,9 +30,9 @@ func TestRenderGraphHandlesLongChainWithoutPanic(t *testing.T) {
 
 func TestRenderGraphKeepsDisplayWidthForWideNodeLabels(t *testing.T) {
 	config := diagram.NewTestConfig(true, "cli")
-	output, err := RenderDiagram("graph LR\nA[\"中A\"] --> B", config)
+	output, err := renderGraph("graph LR\nA[\"中A\"] --> B", config)
 	if err != nil {
-		t.Fatalf("RenderDiagram() error = %v", err)
+		t.Fatalf("renderGraph() error = %v", err)
 	}
 
 	assertUniformDisplayWidth(t, output)
@@ -40,9 +40,9 @@ func TestRenderGraphKeepsDisplayWidthForWideNodeLabels(t *testing.T) {
 
 func TestRenderGraphKeepsDisplayWidthForWideSubgraphTitles(t *testing.T) {
 	config := diagram.NewTestConfig(true, "cli")
-	output, err := RenderDiagram("graph LR\nsubgraph sg [数据库]\nA --> B\nend", config)
+	output, err := renderGraph("graph LR\nsubgraph sg [数据库]\nA --> B\nend", config)
 	if err != nil {
-		t.Fatalf("RenderDiagram() error = %v", err)
+		t.Fatalf("renderGraph() error = %v", err)
 	}
 
 	assertUniformDisplayWidth(t, output)
@@ -50,9 +50,9 @@ func TestRenderGraphKeepsDisplayWidthForWideSubgraphTitles(t *testing.T) {
 
 func TestRenderGraphKeepsExplicitTargetLabelAfterBareReference(t *testing.T) {
 	config := diagram.NewTestConfig(true, "cli")
-	output, err := RenderDiagram("graph TD\nA[\"Foo\"] --> B[\"Bar\"]\nB --> C[\"Baz\"]", config)
+	output, err := renderGraph("graph TD\nA[\"Foo\"] --> B[\"Bar\"]\nB --> C[\"Baz\"]", config)
 	if err != nil {
-		t.Fatalf("RenderDiagram() error = %v", err)
+		t.Fatalf("renderGraph() error = %v", err)
 	}
 
 	if !strings.Contains(output, "Bar") {
@@ -65,9 +65,9 @@ func TestRenderGraphKeepsExplicitTargetLabelAfterBareReference(t *testing.T) {
 
 func TestRenderGraphKeepsStandaloneSubgraphLabelWhenReferencedLater(t *testing.T) {
 	config := diagram.NewTestConfig(true, "cli")
-	output, err := RenderDiagram("graph TD\nsubgraph one\n    A[\"VcpuManager\"]\nend\nA --> B", config)
+	output, err := renderGraph("graph TD\nsubgraph one\n    A[\"VcpuManager\"]\nend\nA --> B", config)
 	if err != nil {
-		t.Fatalf("RenderDiagram() error = %v", err)
+		t.Fatalf("renderGraph() error = %v", err)
 	}
 
 	if !strings.Contains(output, "VcpuManager") {
@@ -80,9 +80,9 @@ func TestRenderGraphKeepsStandaloneSubgraphLabelWhenReferencedLater(t *testing.T
 
 func TestRenderGraphSupportsLiteralNewlineInNodeLabel(t *testing.T) {
 	config := diagram.NewTestConfig(true, "cli")
-	output, err := RenderDiagram("graph LR\nA[\"line1\nline2\"] --> B", config)
+	output, err := renderGraph("graph LR\nA[\"line1\nline2\"] --> B", config)
 	if err != nil {
-		t.Fatalf("RenderDiagram() error = %v", err)
+		t.Fatalf("renderGraph() error = %v", err)
 	}
 
 	if !strings.Contains(output, "line1") || !strings.Contains(output, "line2") {
@@ -95,9 +95,9 @@ func TestRenderGraphSupportsLiteralNewlineInNodeLabel(t *testing.T) {
 
 func TestRenderGraphSeparatesDuplicateEdgeLabels(t *testing.T) {
 	config := diagram.NewTestConfig(true, "cli")
-	output, err := RenderDiagram("graph LR\nA -->|miss| B\nA -->|hit| B", config)
+	output, err := renderGraph("graph LR\nA -->|miss| B\nA -->|hit| B", config)
 	if err != nil {
-		t.Fatalf("RenderDiagram() error = %v", err)
+		t.Fatalf("renderGraph() error = %v", err)
 	}
 
 	if strings.Contains(output, "mhit") {
@@ -124,9 +124,9 @@ func TestRenderGraphSeparatesDuplicateEdgeLabels(t *testing.T) {
 
 func TestRenderGraphSeparatesBidirectionalEdgeLabelsLR(t *testing.T) {
 	config := diagram.NewTestConfig(true, "cli")
-	output, err := RenderDiagram("graph LR\nA -->|workload exits| B\nB -->|run| A", config)
+	output, err := renderGraph("graph LR\nA -->|workload exits| B\nB -->|run| A", config)
 	if err != nil {
-		t.Fatalf("RenderDiagram() error = %v", err)
+		t.Fatalf("renderGraph() error = %v", err)
 	}
 
 	if strings.Contains(output, "worklorunexits") {
@@ -153,9 +153,9 @@ func TestRenderGraphSeparatesBidirectionalEdgeLabelsLR(t *testing.T) {
 
 func TestRenderGraphSeparatesBidirectionalEdgeLabelsTD(t *testing.T) {
 	config := diagram.NewTestConfig(true, "cli")
-	output, err := RenderDiagram("graph TD\nA -->|forward| B\nB -->|back| A", config)
+	output, err := renderGraph("graph TD\nA -->|forward| B\nB -->|back| A", config)
 	if err != nil {
-		t.Fatalf("RenderDiagram() error = %v", err)
+		t.Fatalf("renderGraph() error = %v", err)
 	}
 
 	if strings.Contains(output, "fbackrd") {
@@ -180,4 +180,19 @@ func assertUniformDisplayWidth(t *testing.T, output string) {
 			t.Fatalf("line %d display width = %d, want %d\noutput:\n%s", i+2, got, want, output)
 		}
 	}
+}
+
+// renderGraph parses and draws src with config, the way
+// render.GraphDiagram does.
+func renderGraph(src string, config *diagram.Config) (string, error) {
+	styleType := config.StyleType
+	if styleType == "" {
+		styleType = "cli"
+	}
+	p, err := Parse(src, styleType)
+	if err != nil {
+		return "", err
+	}
+	p.Apply(config)
+	return Draw(p), nil
 }

@@ -1,4 +1,4 @@
-package cmd
+package graph
 
 import (
 	"errors"
@@ -115,7 +115,7 @@ func mkGraph(data *orderedmap.OrderedMap[string, []textEdge], nodeSpecs map[stri
 	return g
 }
 
-func (g *graph) setStyleClasses(properties *graphProperties) {
+func (g *graph) setStyleClasses(properties *Properties) {
 	log.Debugf("Setting style classes to %v", properties.styleClasses)
 	g.styleClasses = *properties.styleClasses
 	g.styleType = properties.styleType

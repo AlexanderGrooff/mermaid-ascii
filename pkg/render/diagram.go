@@ -1,4 +1,4 @@
-package cmd
+package render
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/er"
+	"github.com/AlexanderGrooff/mermaid-ascii/pkg/graph"
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/sequence"
 )
 
@@ -62,11 +63,11 @@ func (sd *SequenceDiagram) Type() string {
 }
 
 type GraphDiagram struct {
-	properties *graphProperties
+	properties *graph.Properties
 }
 
 func (gd *GraphDiagram) Parse(input string) error {
-	properties, err := mermaidFileToMap(input, "cli")
+	properties, err := graph.Parse(input, "cli")
 	if err != nil {
 		return err
 	}
@@ -83,17 +84,9 @@ func (gd *GraphDiagram) Render(config *diagram.Config) (string, error) {
 		config = diagram.DefaultConfig()
 	}
 
-	styleType := config.StyleType
-	if styleType == "" {
-		styleType = "cli"
-	}
-	gd.properties.boxBorderPadding = config.BoxBorderPadding
-	gd.properties.paddingX = config.PaddingBetweenX
-	gd.properties.paddingY = config.PaddingBetweenY
-	gd.properties.styleType = styleType
-	gd.properties.useAscii = config.UseAscii
+	gd.properties.Apply(config)
 
-	return drawMap(gd.properties), nil
+	return graph.Draw(gd.properties), nil
 }
 
 func (gd *GraphDiagram) Type() string {
