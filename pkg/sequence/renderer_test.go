@@ -79,6 +79,7 @@ func TestSequenceDiagramRendering(t *testing.T) {
 		"mixed_width_cjk.txt",
 		"combining_marks_mixed_width.txt",
 		"leading_combining_marks.txt",
+		"literal_control_character.txt",
 	}
 
 	for _, testFile := range testFiles {
@@ -253,6 +254,7 @@ func TestSequenceDiagramRendering_EastAsian(t *testing.T) {
 		"east_asian_participants.txt",
 		"four_participants.txt",
 		"leading_combining_marks.txt",
+		"literal_control_character.txt",
 	}
 
 	for _, testFile := range testFiles {
@@ -263,14 +265,20 @@ func TestSequenceDiagramRendering_EastAsian(t *testing.T) {
 }
 
 func TestPutTextLeadingCombiningMarkSkipsPadding(t *testing.T) {
-	line := []textCell{" ", " ", " ", cellRune('|')}
+	line := []textCell{cellRune(' '), cellRune(' '), cellRune(' '), cellRune('|')}
 	putText(line, 2, "\u0301A")
 
-	if line[1] != " " {
-		t.Fatalf("leading mark attached to padding cell: %q", line[1])
+	if line[1] != cellRune(' ') {
+		t.Fatalf("leading mark attached to padding cell: %#v", line[1])
 	}
 	if line[2] != textualCell("\u0301A") {
-		t.Fatalf("text cell = %q, want %q", line[2], textualCell("\u0301A"))
+		t.Fatalf("text cell = %#v, want %#v", line[2], textualCell("\u0301A"))
+	}
+
+	line = []textCell{cellRune(' '), cellRune(' '), cellRune(' ')}
+	putText(line, 1, "\u0301")
+	if line[1] != cellRune(' ') {
+		t.Fatalf("leading mark mutated padding: %#v", line[1])
 	}
 }
 
@@ -280,22 +288,54 @@ func TestPutTextKeepsLeadingMarksWithBase(t *testing.T) {
 		text string
 		want []textCell
 	}{
-		{name: "ASCII base", text: "\u0301A", want: []textCell{" ", textualCell("\u0301A")}},
-		{name: "wide base", text: "\u0301用́", want: []textCell{" ", textualCell("\u0301用́"), continuationCell}},
-		{name: "format mark", text: "\u200bA", want: []textCell{" ", textualCell("\u200bA")}},
+		{name: "ASCII base", text: "\u0301A", want: []textCell{cellRune(' '), textualCell("\u0301A")}},
+		{name: "wide base", text: "\u0301用́", want: []textCell{cellRune(' '), textualCell("\u0301用́"), continuationCell}},
+		{name: "format mark", text: "\u200bA", want: []textCell{cellRune(' '), textualCell("\u200bA")}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			line := make([]textCell, 8)
 			for i := range line {
-				line[i] = " "
+				line[i] = cellRune(' ')
 			}
 			putText(line, 1, tc.text)
 			for i, want := range tc.want {
 				if line[i] != want {
-					t.Errorf("cell[%d] = %q, want %q", i, line[i], want)
+					t.Errorf("cell[%d] = %#v, want %#v", i, line[i], want)
 				}
 			}
 		})
+	}
+}
+
+func TestLiteralControlCharacterPreservedInRendererText(t *testing.T) {
+	control := "\x01"
+	if got := trimCells(textCells("left" + control + "right")); got != "left"+control+"right" {
+		t.Fatalf("literal control character lost from cell text: %q", got)
+	}
+
+	a := &Participant{ID: "a", Label: "A" + control + "ctor", Index: 0}
+	b := &Participant{ID: "b", Label: "B", Index: 1}
+	sd := &SequenceDiagram{
+		Participants: []*Participant{a, b},
+		Boxes:        []*Box{{Title: "box" + control + "title", First: 0, Last: 1}},
+		Events: []Event{
+			{Kind: EventFragmentStart, Fragment: &Fragment{Type: FragmentLoop, Label: "fragment" + control + "label"}},
+			{Kind: EventMessage, Message: &Message{From: a, To: b, Label: "send" + control + "message", ArrowType: SolidArrow}},
+			{Kind: EventFragmentEnd},
+			{Kind: EventNote, Note: &Note{Placement: NoteOver, Participants: []*Participant{a}, Text: "note" + control + "text"}},
+		},
+	}
+	for _, useASCII := range []bool{false, true} {
+		config := diagram.NewTestConfig(useASCII, "cli")
+		got, err := Render(sd, config)
+		if err != nil {
+			t.Fatalf("Render(useASCII=%t): %v", useASCII, err)
+		}
+		for _, want := range []string{"A" + control + "ctor", "send" + control + "message", "note" + control + "text", "box" + control + "title", "fragment" + control + "label"} {
+			if !strings.Contains(got, want) {
+				t.Errorf("Render(useASCII=%t) missing literal control text %q in %q", useASCII, want, got)
+			}
+		}
 	}
 }
 
@@ -307,9 +347,10 @@ func TestTextCellsAttachCombiningMarks(t *testing.T) {
 	}{
 		{name: "ASCII base", input: "é", cells: []textCell{textualCell("é")}},
 		{name: "leading combining mark", input: "\u0301A", cells: []textCell{textualCell("\u0301A")}},
-		{name: "mark after padding", input: "  \u0301A", cells: []textCell{" ", " ", textualCell("\u0301A")}},
+		{name: "mark after padding", input: "  \u0301A", cells: []textCell{cellRune(' '), cellRune(' '), textualCell("\u0301A")}},
 		{name: "zero-width format", input: "A\u200bB", cells: []textCell{textualCell("A\u200b"), textualCell("B")}},
-		{name: "mark after border", input: "| \u0301A", cells: []textCell{cellRune('|'), " ", textualCell("\u0301A")}},
+		{name: "mark after border", input: "| \u0301A", cells: []textCell{cellRune('|'), cellRune(' '), textualCell("\u0301A")}},
+		{name: "leading mark before border", input: "\u0301| A", cells: []textCell{cellRune('|'), cellRune(' '), textualCell("\u0301A")}},
 		{name: "CJK base", input: "用́", cells: []textCell{textualCell("用́"), continuationCell}},
 		{name: "mixed text", input: "A用́B", cells: []textCell{textualCell("A"), textualCell("用́"), continuationCell, textualCell("B")}},
 	} {
@@ -320,7 +361,7 @@ func TestTextCellsAttachCombiningMarks(t *testing.T) {
 			}
 			for i := range tc.cells {
 				if got[i] != tc.cells[i] {
-					t.Errorf("textCells(%q)[%d] = %q, want %q", tc.input, i, got[i], tc.cells[i])
+					t.Errorf("textCells(%q)[%d] = %#v, want %#v", tc.input, i, got[i], tc.cells[i])
 				}
 			}
 			if displayWidth(tc.input) != len(got) {

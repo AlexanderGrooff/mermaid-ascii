@@ -40,58 +40,40 @@ func isStructuralRune(r rune) bool {
 	return isDrawingRune(r) || strings.ContainsRune("+-|.<>#^v", r)
 }
 
-func markText(s string) string {
-	var b strings.Builder
-	for _, r := range s {
-		if r != ' ' && runeCellWidth(r) > 0 {
-			b.WriteRune(textualCellMarker)
-		}
-		b.WriteRune(r)
-	}
-	return b.String()
+// A cell stores all runes rendered at one terminal column. Metadata stays
+// separate from cell content so user text cannot be mistaken for renderer state.
+type textCell struct {
+	content      string
+	textual      bool
+	continuation bool
 }
 
-// A cell stores all runes rendered at one terminal column. A private marker
-// records textual cells while rows are passed between renderer stages.
-type textCell string
+var continuationCell = textCell{continuation: true}
 
-const (
-	textualCellMarker rune     = '\x01'
-	continuationCell  textCell = "\x00"
-)
+func cellRune(r rune) textCell { return textCell{content: string(r)} }
 
-func cellRune(r rune) textCell { return textCell(string(r)) }
-
-func textualCell(s string) textCell { return textCell(string(textualCellMarker) + s) }
-
-func isTextualCell(cell textCell) bool {
-	return strings.HasPrefix(string(cell), string(textualCellMarker))
+func isRuneCell(cell textCell, r rune) bool {
+	return !cell.textual && !cell.continuation && cell.content == string(r)
 }
+
+func textualCell(s string) textCell { return textCell{content: s, textual: true} }
+
+func isTextualCell(cell textCell) bool { return cell.textual && !cell.continuation }
 
 func appendCellText(cell textCell, s string) textCell {
-	if isTextualCell(cell) {
-		return cell + textCell(s)
-	}
-	return textualCell(s)
-}
-
-func stripTextualCellMarker(s string) string {
-	return strings.ReplaceAll(s, string(textualCellMarker), "")
+	cell.content += s
+	cell.textual = true
+	return cell
 }
 
 func textCells(s string) []textCell {
 	cells := make([]textCell, 0, displayWidth(s))
 	pending := ""
-	marked := false
 	for _, r := range s {
-		if r == textualCellMarker {
-			marked = true
-			continue
-		}
 		width := runeCellWidth(r)
 		if width == 0 {
 			i := len(cells) - 1
-			for i >= 0 && cells[i] == continuationCell {
+			for i >= 0 && cells[i].continuation {
 				i--
 			}
 			if i >= 0 && isTextualCell(cells[i]) {
@@ -102,27 +84,27 @@ func textCells(s string) []textCell {
 			continue
 		}
 
-		content := pending + string(r)
-		pending = ""
-		textual := marked || (r != ' ' && !isStructuralRune(r))
+		textual := r != ' ' && !isStructuralRune(r)
+		content := string(r)
+		if textual && pending != "" {
+			content = pending + content
+			pending = ""
+		}
 		if textual {
 			cells = append(cells, textualCell(content))
 		} else {
-			cells = append(cells, cellRuneWithText(r, content))
+			cells = append(cells, cellRune(r))
 		}
-		marked = false
 		for i := 1; i < width; i++ {
 			cells = append(cells, continuationCell)
 		}
 	}
-	return cells
-}
-
-func cellRuneWithText(r rune, content string) textCell {
-	if content != string(r) {
-		return textualCell(content)
+	if pending != "" {
+		// A zero-width character with no valid base still belongs to the
+		// rendered text; retain it in a textual cell rather than dropping it.
+		cells = append(cells, textualCell(pending))
 	}
-	return cellRune(r)
+	return cells
 }
 
 func runeCellWidth(r rune) int {
@@ -160,20 +142,20 @@ func putTextBefore(line []textCell, col int, text string, end int) {
 		}
 		col += width
 	}
-	if pending != "" && col >= 0 && col < len(line) && col < end && line[col] != continuationCell {
+	if pending != "" && col >= 0 && col < len(line) && col < end && isTextualCell(line[col]) {
 		line[col] = appendCellText(line[col], pending)
 	}
 }
 
 func trimCells(line []textCell) string {
 	end := len(line)
-	for end > 0 && line[end-1] == " " {
+	for end > 0 && !line[end-1].textual && !line[end-1].continuation && line[end-1].content == " " {
 		end--
 	}
 	var sb strings.Builder
 	for _, cell := range line[:end] {
-		if cell != continuationCell {
-			sb.WriteString(string(cell))
+		if !cell.continuation {
+			sb.WriteString(cell.content)
 		}
 	}
 	return sb.String()
@@ -293,7 +275,7 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 		w := layout.participantWidths[i]
 		labelLen := displayWidth(sd.Participants[i].Label)
 		pad := (w - labelLen) / 2
-		return string(chars.Vertical) + strings.Repeat(" ", pad) + markText(sd.Participants[i].Label) +
+		return string(chars.Vertical) + strings.Repeat(" ", pad) + sd.Participants[i].Label +
 			strings.Repeat(" ", w-pad-labelLen) + string(chars.Vertical)
 	}))
 
@@ -324,7 +306,7 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 		lines = append(lines, boxBorder(spans, chars, false))
 	}
 
-	return stripTextualCellMarker(strings.Join(lines, "\n") + "\n"), nil
+	return strings.Join(lines, "\n") + "\n", nil
 }
 
 // boxSpan is a participant group's on-canvas extent: its border columns and
@@ -433,7 +415,7 @@ func boxBorder(spans []boxSpan, chars BoxChars, top bool) string {
 	}
 	line := make([]textCell, width)
 	for i := range line {
-		line[i] = " "
+		line[i] = cellRune(' ')
 	}
 	for _, s := range spans {
 		leftCorner, rightCorner := chars.BottomLeft, chars.BottomRight
@@ -464,10 +446,9 @@ func overlayBoxSides(line string, spans []boxSpan, chars BoxChars) string {
 	r := padRunes(line, width)
 	for _, s := range spans {
 		for _, c := range []int{s.left, s.right} {
-			switch r[c] {
-			case " ":
+			if isRuneCell(r[c], ' ') {
 				r[c] = cellRune(chars.Vertical)
-			case textCell(string(chars.Horizontal)), textCell(string(chars.DottedLine)):
+			} else if isRuneCell(r[c], chars.Horizontal) || isRuneCell(r[c], chars.DottedLine) {
 				r[c] = cellRune(chars.Cross)
 			}
 		}
@@ -644,14 +625,13 @@ func (a *lifelineState) overlay(line string, layout *diagramLayout, chars BoxCha
 		if c >= len(r) {
 			continue
 		}
-		switch r[c] {
-		case textCell(string(chars.Vertical)):
+		if isRuneCell(r[c], chars.Vertical) {
 			r[c] = cellRune(chars.ActiveVertical)
-		case textCell(string(chars.TeeRight)):
+		} else if isRuneCell(r[c], chars.TeeRight) {
 			r[c] = cellRune(chars.ActiveTeeRight)
-		case textCell(string(chars.TeeLeft)):
+		} else if isRuneCell(r[c], chars.TeeLeft) {
 			r[c] = cellRune(chars.ActiveTeeLeft)
-		case textCell(string(chars.Cross)):
+		} else if isRuneCell(r[c], chars.Cross) {
 			r[c] = cellRune(chars.ActiveCross)
 		}
 	}
@@ -802,7 +782,7 @@ func renderNote(note *Note, layout *diagramLayout, chars BoxChars, st *lifelineS
 
 	mid := padRunes(buildLifeline(layout, chars, st), right+1)
 	for c := left; c <= right; c++ { // clear covered lifelines
-		mid[c] = " "
+		mid[c] = cellRune(' ')
 	}
 	mid[left] = cellRune(chars.Vertical)
 	mid[right] = cellRune(chars.Vertical)
@@ -1019,7 +999,7 @@ func overlayFrameSides(line string, chars BoxChars, leftCol, rightCol int) strin
 func padRunes(s string, width int) []textCell {
 	r := textCells(s)
 	for len(r) < width {
-		r = append(r, " ")
+		r = append(r, cellRune(' '))
 	}
 	return r
 }
@@ -1047,7 +1027,7 @@ func buildLine(participants []*Participant, layout *diagramLayout, draw func(int
 func buildLifeline(layout *diagramLayout, chars BoxChars, st *lifelineState) string {
 	line := make([]textCell, layout.totalWidth+1)
 	for i := range line {
-		line[i] = " "
+		line[i] = cellRune(' ')
 	}
 	for i, c := range layout.participantCenters {
 		if c >= len(line) {
