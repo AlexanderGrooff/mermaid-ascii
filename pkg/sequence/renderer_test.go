@@ -78,6 +78,7 @@ func TestSequenceDiagramRendering(t *testing.T) {
 		"east_asian_participants.txt",
 		"mixed_width_cjk.txt",
 		"combining_marks_mixed_width.txt",
+		"leading_combining_marks.txt",
 	}
 
 	for _, testFile := range testFiles {
@@ -128,6 +129,7 @@ func TestSequenceDiagramRendering_ASCII(t *testing.T) {
 		"east_asian_participants.txt",
 		"mixed_width_cjk.txt",
 		"combining_marks_mixed_width.txt",
+		"leading_combining_marks.txt",
 	}
 
 	for _, testFile := range goldenFiles {
@@ -250,11 +252,49 @@ func TestSequenceDiagramRendering_EastAsian(t *testing.T) {
 		"three_participants.txt",
 		"east_asian_participants.txt",
 		"four_participants.txt",
+		"leading_combining_marks.txt",
 	}
 
 	for _, testFile := range testFiles {
 		t.Run(testFile, func(t *testing.T) {
 			verifySequenceDiagramWithCharset(t, filepath.Join(testDataPath, testFile), false)
+		})
+	}
+}
+
+func TestPutTextLeadingCombiningMarkSkipsPadding(t *testing.T) {
+	line := []textCell{" ", " ", " ", cellRune('|')}
+	putText(line, 2, "\u0301A")
+
+	if line[1] != " " {
+		t.Fatalf("leading mark attached to padding cell: %q", line[1])
+	}
+	if line[2] != textualCell("\u0301A") {
+		t.Fatalf("text cell = %q, want %q", line[2], textualCell("\u0301A"))
+	}
+}
+
+func TestPutTextKeepsLeadingMarksWithBase(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		text string
+		want []textCell
+	}{
+		{name: "ASCII base", text: "\u0301A", want: []textCell{" ", textualCell("\u0301A")}},
+		{name: "wide base", text: "\u0301用́", want: []textCell{" ", textualCell("\u0301用́"), continuationCell}},
+		{name: "format mark", text: "\u200bA", want: []textCell{" ", textualCell("\u200bA")}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			line := make([]textCell, 8)
+			for i := range line {
+				line[i] = " "
+			}
+			putText(line, 1, tc.text)
+			for i, want := range tc.want {
+				if line[i] != want {
+					t.Errorf("cell[%d] = %q, want %q", i, line[i], want)
+				}
+			}
 		})
 	}
 }
@@ -265,11 +305,13 @@ func TestTextCellsAttachCombiningMarks(t *testing.T) {
 		input string
 		cells []textCell
 	}{
-		{name: "ASCII base", input: "é", cells: []textCell{"é"}},
-		{name: "leading combining mark", input: "\u0301A", cells: []textCell{"\u0301A"}},
-		{name: "zero-width format", input: "A\u200bB", cells: []textCell{"A\u200b", "B"}},
-		{name: "CJK base", input: "用́", cells: []textCell{"用́", continuationCell}},
-		{name: "mixed text", input: "A用́B", cells: []textCell{"A", "用́", continuationCell, "B"}},
+		{name: "ASCII base", input: "é", cells: []textCell{textualCell("é")}},
+		{name: "leading combining mark", input: "\u0301A", cells: []textCell{textualCell("\u0301A")}},
+		{name: "mark after padding", input: "  \u0301A", cells: []textCell{" ", " ", textualCell("\u0301A")}},
+		{name: "zero-width format", input: "A\u200bB", cells: []textCell{textualCell("A\u200b"), textualCell("B")}},
+		{name: "mark after border", input: "| \u0301A", cells: []textCell{cellRune('|'), " ", textualCell("\u0301A")}},
+		{name: "CJK base", input: "用́", cells: []textCell{textualCell("用́"), continuationCell}},
+		{name: "mixed text", input: "A用́B", cells: []textCell{textualCell("A"), textualCell("用́"), continuationCell, textualCell("B")}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := textCells(tc.input)

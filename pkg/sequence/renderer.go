@@ -25,11 +25,7 @@ const (
 func displayWidth(s string) int {
 	width := 0
 	for _, r := range s {
-		if isDrawingRune(r) {
-			width++
-			continue
-		}
-		if w := runewidth.RuneWidth(r); w > 0 {
+		if w := runeCellWidth(r); w > 0 {
 			width += w
 		}
 	}
@@ -40,43 +36,93 @@ func isDrawingRune(r rune) bool {
 	return r >= 0x2500 && r <= 0x257f || r == '►' || r == '◄' || r == '×'
 }
 
-// A cell stores all runes rendered at one terminal column. In particular,
-// combining marks stay attached to their base rune instead of consuming a
-// second cell. The continuation marker occupies the extra column of a wide
-// rune and is omitted when converting cells back to text.
+func isStructuralRune(r rune) bool {
+	return isDrawingRune(r) || strings.ContainsRune("+-|.<>#^v", r)
+}
+
+func markText(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r != ' ' && runeCellWidth(r) > 0 {
+			b.WriteRune(textualCellMarker)
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// A cell stores all runes rendered at one terminal column. A private marker
+// records textual cells while rows are passed between renderer stages.
 type textCell string
+
+const (
+	textualCellMarker rune     = '\x01'
+	continuationCell  textCell = "\x00"
+)
 
 func cellRune(r rune) textCell { return textCell(string(r)) }
 
-const continuationCell textCell = "\x00"
+func textualCell(s string) textCell { return textCell(string(textualCellMarker) + s) }
+
+func isTextualCell(cell textCell) bool {
+	return strings.HasPrefix(string(cell), string(textualCellMarker))
+}
+
+func appendCellText(cell textCell, s string) textCell {
+	if isTextualCell(cell) {
+		return cell + textCell(s)
+	}
+	return textualCell(s)
+}
+
+func stripTextualCellMarker(s string) string {
+	return strings.ReplaceAll(s, string(textualCellMarker), "")
+}
 
 func textCells(s string) []textCell {
 	cells := make([]textCell, 0, displayWidth(s))
 	pending := ""
+	marked := false
 	for _, r := range s {
+		if r == textualCellMarker {
+			marked = true
+			continue
+		}
 		width := runeCellWidth(r)
 		if width == 0 {
-			// A mark after a wide rune follows its continuation cell. Find the
-			// actual base cell so the mark does not consume another column.
-			for i := len(cells) - 1; i >= 0; i-- {
-				if cells[i] != continuationCell {
-					cells[i] += textCell(string(r))
-					break
-				}
+			i := len(cells) - 1
+			for i >= 0 && cells[i] == continuationCell {
+				i--
 			}
-			if len(cells) == 0 {
-				// Preserve a leading mark by attaching it to the next base rune.
+			if i >= 0 && isTextualCell(cells[i]) {
+				cells[i] = appendCellText(cells[i], string(r))
+			} else {
 				pending += string(r)
 			}
 			continue
 		}
-		cells = append(cells, textCell(pending+string(r)))
+
+		content := pending + string(r)
 		pending = ""
+		textual := marked || (r != ' ' && !isStructuralRune(r))
+		if textual {
+			cells = append(cells, textualCell(content))
+		} else {
+			cells = append(cells, cellRuneWithText(r, content))
+		}
+		marked = false
 		for i := 1; i < width; i++ {
 			cells = append(cells, continuationCell)
 		}
 	}
 	return cells
+}
+
+func cellRuneWithText(r rune, content string) textCell {
+	if content != string(r) {
+		return textualCell(content)
+	}
+	return cellRune(r)
 }
 
 func runeCellWidth(r rune) int {
@@ -92,21 +138,13 @@ func putText(line []textCell, col int, text string) {
 
 func putTextBefore(line []textCell, col int, text string, end int) {
 	pending := ""
+	lastBase := -1
 	for _, r := range text {
 		width := runeCellWidth(r)
 		if width == 0 {
-			// Attach to the preceding base cell, skipping a wide rune's
-			// continuation cell. If there is no preceding cell, hold the mark
-			// until the next base rune so no new cell is allocated.
-			attached := false
-			for i := min(col-1, len(line)-1); i >= 0; i-- {
-				if line[i] != continuationCell {
-					line[i] += textCell(string(r))
-					attached = true
-					break
-				}
-			}
-			if !attached {
+			if lastBase >= 0 {
+				line[lastBase] = appendCellText(line[lastBase], string(r))
+			} else {
 				pending += string(r)
 			}
 			continue
@@ -114,17 +152,16 @@ func putTextBefore(line []textCell, col int, text string, end int) {
 		if col < 0 || col+width > end || col >= len(line) {
 			return
 		}
-		line[col] = textCell(pending + string(r))
+		line[col] = textualCell(pending + string(r))
 		pending = ""
+		lastBase = col
 		for i := 1; i < width && col+i < len(line); i++ {
 			line[col+i] = continuationCell
 		}
 		col += width
 	}
-	// A text consisting only of leading marks can still be retained in an
-	// already allocated target cell without changing the canvas width.
-	if pending != "" && col >= 0 && col < len(line) && col < end {
-		line[col] += textCell(pending)
+	if pending != "" && col >= 0 && col < len(line) && col < end && line[col] != continuationCell {
+		line[col] = appendCellText(line[col], pending)
 	}
 }
 
@@ -256,7 +293,7 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 		w := layout.participantWidths[i]
 		labelLen := displayWidth(sd.Participants[i].Label)
 		pad := (w - labelLen) / 2
-		return string(chars.Vertical) + strings.Repeat(" ", pad) + sd.Participants[i].Label +
+		return string(chars.Vertical) + strings.Repeat(" ", pad) + markText(sd.Participants[i].Label) +
 			strings.Repeat(" ", w-pad-labelLen) + string(chars.Vertical)
 	}))
 
@@ -287,7 +324,7 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 		lines = append(lines, boxBorder(spans, chars, false))
 	}
 
-	return strings.Join(lines, "\n") + "\n", nil
+	return stripTextualCellMarker(strings.Join(lines, "\n") + "\n"), nil
 }
 
 // boxSpan is a participant group's on-canvas extent: its border columns and
@@ -999,7 +1036,7 @@ func buildLine(participants []*Participant, layout *diagramLayout, draw func(int
 		}
 		sb.WriteString(draw(i))
 	}
-	return sb.String()
+	return trimCells(textCells(sb.String()))
 }
 
 // buildLifeline draws the bare lifeline row. st, when non-nil, decides each
