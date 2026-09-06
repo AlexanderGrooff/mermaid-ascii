@@ -142,7 +142,17 @@ func containsUnquotedClosingDelimiter(labelText, close string) bool {
 			inQuotes = !inQuotes
 			continue
 		}
-		if !inQuotes && strings.ContainsRune(close, rune(labelText[i])) {
+		if !strings.ContainsRune(close, rune(labelText[i])) {
+			continue
+		}
+		if !inQuotes {
+			return true
+		}
+
+		// An unmatched quote must not hide a structural delimiter that follows
+		// it. A later quote would close the quoted section, so only treat this
+		// delimiter as structural when no such quote exists.
+		if !strings.ContainsRune(labelText[i+1:], '"') {
 			return true
 		}
 	}
