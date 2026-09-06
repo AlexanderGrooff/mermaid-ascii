@@ -53,6 +53,35 @@ func TestParseNodeWithExplicitLabel(t *testing.T) {
 	}
 }
 
+func TestParseNodePreservesLiteralBoundaryQuote(t *testing.T) {
+	node := parseNode(`A{literal"}`)
+
+	if node.name != "A" {
+		t.Fatalf("name = %q, want %q", node.name, "A")
+	}
+	if len(node.label.lines) != 1 || node.label.lines[0] != `literal"` {
+		t.Fatalf("label lines = %#v, want %q", node.label.lines, `literal"`)
+	}
+	if !node.hasLabel {
+		t.Fatal("expected shape declaration to have an explicit label")
+	}
+}
+
+func TestParseNodeFallsBackForExtraClosingDelimiter(t *testing.T) {
+	declaration := `A{bad}}`
+	node := parseNode(declaration)
+
+	if node.name != declaration {
+		t.Fatalf("name = %q, want bare declaration %q", node.name, declaration)
+	}
+	if len(node.label.lines) != 1 || node.label.lines[0] != declaration {
+		t.Fatalf("label lines = %#v, want [%s]", node.label.lines, declaration)
+	}
+	if node.hasLabel {
+		t.Fatal("malformed shape should not be treated as an explicit label")
+	}
+}
+
 func TestParseNodeShapes(t *testing.T) {
 	tests := []struct {
 		name        string
