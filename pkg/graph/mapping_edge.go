@@ -159,13 +159,32 @@ func (g *graph) determineLabelLine(e *edge) {
 			}
 			continue
 		}
-		if lineWidth >= lenLabel {
-			largestLine = line
-			break
+		if g.labelLineAvailable(e, line) {
+			if lineWidth >= lenLabel {
+				largestLine = line
+				break
+			}
+			if lineWidth > largestLineSize {
+				largestLineSize = lineWidth
+				largestLine = line
+			}
 		}
-		if lineWidth > largestLineSize {
-			largestLineSize = lineWidth
-			largestLine = line
+	}
+	if largestLine == nil {
+		// A fan-out can share the first corridor while offering a later
+		// corridor wide enough for a label. Look for a short, unused section
+		// centered on a free column rather than overwriting another label or
+		// widening a node column.
+		for _, line := range g.unusedLabelSubsegments(e) {
+			lineWidth := g.calculateLineWidth(line)
+			if lineWidth >= lenLabel {
+				largestLine = line
+				break
+			}
+			if lineWidth > largestLineSize {
+				largestLineSize = lineWidth
+				largestLine = line
+			}
 		}
 	}
 	if largestLine == nil {
@@ -194,6 +213,79 @@ func labelMiddleX(line []gridCoord) int {
 		minX, maxX = maxX, minX
 	}
 	return minX + (maxX-minX)/2
+}
+
+func (g *graph) labelLineAvailable(edge *edge, line []gridCoord) bool {
+	for _, other := range g.edges {
+		if other == edge || len(other.labelLine) == 0 {
+			continue
+		}
+		if labelsOverlap(g, edge, line, other) {
+			return false
+		}
+	}
+	return true
+}
+
+func labelsOverlap(g *graph, firstEdge *edge, firstLine []gridCoord, secondEdge *edge) bool {
+	firstDrawingLine := g.lineToDrawing(firstLine)
+	secondDrawingLine := g.lineToDrawing(secondEdge.labelLine)
+	if firstEdge.isBidirectional {
+		firstDrawingLine = insetLine(firstDrawingLine, 2, 2)
+	} else {
+		firstDrawingLine = insetLine(firstDrawingLine, 1, 2)
+	}
+	if secondEdge.isBidirectional {
+		secondDrawingLine = insetLine(secondDrawingLine, 2, 2)
+	} else {
+		secondDrawingLine = insetLine(secondDrawingLine, 1, 2)
+	}
+	firstStart, firstEnd, firstY := labelBounds(firstDrawingLine, firstEdge.text)
+	secondStart, secondEnd, secondY := labelBounds(secondDrawingLine, secondEdge.text)
+	return firstY == secondY && rangesOverlap(firstStart, firstEnd, secondStart, secondEnd)
+}
+
+func labelBounds(line []drawingCoord, label string) (int, int, int) {
+	middleX := line[0].x + (line[1].x-line[0].x)/2
+	middleY := line[0].y + (line[1].y-line[0].y)/2
+	start := middleX - len(label)/2
+	return start, start + len(label) - 1, middleY
+}
+
+func rangesOverlap(firstStart, firstEnd, secondStart, secondEnd int) bool {
+	firstMin, firstMax := firstStart, firstEnd
+	if firstMin > firstMax {
+		firstMin, firstMax = firstMax, firstMin
+	}
+	secondMin, secondMax := secondStart, secondEnd
+	if secondMin > secondMax {
+		secondMin, secondMax = secondMax, secondMin
+	}
+	return firstMin <= secondMax && secondMin <= firstMax
+}
+
+func (g *graph) unusedLabelSubsegments(edge *edge) [][]gridCoord {
+	var segments [][]gridCoord
+	for i, start := range edge.path[:len(edge.path)-1] {
+		end := edge.path[i+1]
+		if start.y != end.y || start.x == end.x {
+			continue
+		}
+		minX, maxX := start.x, end.x
+		if minX > maxX {
+			minX, maxX = maxX, minX
+		}
+		for middleX := minX + 1; middleX < maxX; middleX++ {
+			if g.isNodeColumn(middleX) {
+				continue
+			}
+			line := []gridCoord{{x: middleX - 1, y: start.y}, {x: middleX + 1, y: start.y}}
+			if g.labelLineAvailable(edge, line) {
+				segments = append(segments, line)
+			}
+		}
+	}
+	return segments
 }
 
 // isNodeColumn reports whether grid column x is occupied by any node.
