@@ -128,6 +128,37 @@ func splitGraphLines(mermaid string) []string {
 	return append(lines, current.String())
 }
 
+func trimIntentionalOuterQuotes(labelText string) string {
+	if len(labelText) >= 2 && labelText[0] == '"' && labelText[len(labelText)-1] == '"' {
+		return labelText[1 : len(labelText)-1]
+	}
+	return labelText
+}
+
+func containsUnquotedClosingDelimiter(labelText, close string) bool {
+	inQuotes := false
+	for i := 0; i < len(labelText); i++ {
+		if labelText[i] == '"' {
+			inQuotes = !inQuotes
+			continue
+		}
+		if !strings.ContainsRune(close, rune(labelText[i])) {
+			continue
+		}
+		if !inQuotes {
+			return true
+		}
+
+		// An unmatched quote must not hide a structural delimiter that follows
+		// it. A later quote would close the quoted section, so only treat this
+		// delimiter as structural when no such quote exists.
+		if !strings.ContainsRune(labelText[i+1:], '"') {
+			return true
+		}
+	}
+	return false
+}
+
 func parseNode(line string) textNode {
 	// Trim any whitespace from the line that might be left after comment removal
 	trimmedLine := strings.TrimSpace(line)
@@ -139,11 +170,26 @@ func parseNode(line string) textNode {
 
 	name := trimmedLine
 	labelText := trimmedLine
-	if open := strings.Index(trimmedLine, "["); open > 0 && strings.HasSuffix(trimmedLine, "]") {
-		name = strings.TrimSpace(trimmedLine[:open])
-		labelText = strings.TrimSpace(trimmedLine[open+1 : len(trimmedLine)-1])
-		labelText = strings.Trim(labelText, `"`)
-		return textNode{name: name, label: newGraphLabel(labelText), hasLabel: true, styleClass: styleClass}
+	for _, shape := range []struct {
+		open  string
+		close string
+	}{
+		{open: "[(", close: ")]"},
+		{open: "{{", close: "}}"},
+		{open: "{", close: "}"},
+		{open: "[", close: "]"},
+		{open: "(", close: ")"},
+		{open: ">", close: "]"},
+	} {
+		if open := strings.Index(trimmedLine, shape.open); open > 0 && strings.HasSuffix(trimmedLine, shape.close) {
+			candidateLabel := strings.TrimSpace(trimmedLine[open+len(shape.open) : len(trimmedLine)-len(shape.close)])
+			if containsUnquotedClosingDelimiter(candidateLabel, shape.close) {
+				continue
+			}
+			name = strings.TrimSpace(trimmedLine[:open])
+			labelText = trimIntentionalOuterQuotes(candidateLabel)
+			return textNode{name: name, label: newGraphLabel(labelText), hasLabel: true, styleClass: styleClass}
+		}
 	}
 
 	return textNode{name: name, label: newGraphLabel(labelText), styleClass: styleClass}

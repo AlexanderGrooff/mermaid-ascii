@@ -53,6 +53,110 @@ func TestParseNodeWithExplicitLabel(t *testing.T) {
 	}
 }
 
+func TestParseNodePreservesLiteralBoundaryQuote(t *testing.T) {
+	node := parseNode(`A{literal"}`)
+
+	if node.name != "A" {
+		t.Fatalf("name = %q, want %q", node.name, "A")
+	}
+	if len(node.label.lines) != 1 || node.label.lines[0] != `literal"` {
+		t.Fatalf("label lines = %#v, want %q", node.label.lines, `literal"`)
+	}
+	if !node.hasLabel {
+		t.Fatal("expected shape declaration to have an explicit label")
+	}
+}
+
+func TestParseNodeFallsBackForExtraClosingDelimiter(t *testing.T) {
+	declaration := `A{bad}}`
+	node := parseNode(declaration)
+
+	if node.name != declaration {
+		t.Fatalf("name = %q, want bare declaration %q", node.name, declaration)
+	}
+	if len(node.label.lines) != 1 || node.label.lines[0] != declaration {
+		t.Fatalf("label lines = %#v, want [%s]", node.label.lines, declaration)
+	}
+	if node.hasLabel {
+		t.Fatal("malformed shape should not be treated as an explicit label")
+	}
+}
+
+func TestParseNodeFallsBackForUnmatchedQuoteBeforeClosingDelimiter(t *testing.T) {
+	declaration := `A{bad\"}}`
+	node := parseNode(declaration)
+
+	if node.name != declaration {
+		t.Fatalf("name = %q, want bare declaration %q", node.name, declaration)
+	}
+	if len(node.label.lines) != 1 || node.label.lines[0] != declaration {
+		t.Fatalf("label lines = %#v, want [%s]", node.label.lines, declaration)
+	}
+	if node.hasLabel {
+		t.Fatal("malformed shape should not be treated as an explicit label")
+	}
+}
+
+func TestParseNodeShapes(t *testing.T) {
+	tests := []struct {
+		name        string
+		declaration string
+		wantName    string
+		wantLabel   string
+	}{
+		{name: "braced", declaration: "A{Decision}", wantName: "A", wantLabel: "Decision"},
+		{name: "parenthesized", declaration: "B(Round)", wantName: "B", wantLabel: "Round"},
+		{name: "double braced", declaration: "C{{Hexagon}}", wantName: "C", wantLabel: "Hexagon"},
+		{name: "cylindrical", declaration: "D[(Database)]", wantName: "D", wantLabel: "Database"},
+		{name: "asymmetric", declaration: "E>Asymmetric]", wantName: "E", wantLabel: "Asymmetric"},
+		{name: "square bracket", declaration: `F["Rectangle"]`, wantName: "F", wantLabel: "Rectangle"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			node := parseNode(tt.declaration)
+			if node.name != tt.wantName {
+				t.Fatalf("name = %q, want %q", node.name, tt.wantName)
+			}
+			if len(node.label.lines) != 1 || node.label.lines[0] != tt.wantLabel {
+				t.Fatalf("label lines = %#v, want [%s]", node.label.lines, tt.wantLabel)
+			}
+			if !node.hasLabel {
+				t.Fatal("expected shape declaration to have an explicit label")
+			}
+		})
+	}
+}
+
+func TestMermaidFileToMapKeepsShapedNodeLabelsAcrossBareReferences(t *testing.T) {
+	properties, err := Parse("graph LR\\nA{Decision}\\nB(Round)\\nC{{Hexagon}}\\nD[(Database)]\\nE>Asymmetric]\\nA --> B\\nB --> C\\nC --> D\\nD --> E", "cli")
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	for _, node := range []struct {
+		name  string
+		label string
+	}{
+		{name: "A", label: "Decision"},
+		{name: "B", label: "Round"},
+		{name: "C", label: "Hexagon"},
+		{name: "D", label: "Database"},
+		{name: "E", label: "Asymmetric"},
+	} {
+		spec, ok := properties.nodeSpecs[node.name]
+		if !ok {
+			t.Fatalf("missing node spec for %s", node.name)
+		}
+		if len(spec.label.lines) != 1 || spec.label.lines[0] != node.label {
+			t.Errorf("label for %s = %#v, want [%s]", node.name, spec.label.lines, node.label)
+		}
+		if !spec.labelIsExplicit {
+			t.Errorf("label for %s should remain explicit", node.name)
+		}
+	}
+}
+
 func TestMermaidFileToMapPreservesEscapedLabelNewlines(t *testing.T) {
 	properties, err := Parse("graph LR\\nA[\"line1\\nline2\"] --> B", "cli")
 	if err != nil {
