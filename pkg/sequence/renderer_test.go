@@ -77,6 +77,7 @@ func TestSequenceDiagramRendering(t *testing.T) {
 		"three_participants.txt",
 		"east_asian_participants.txt",
 		"mixed_width_cjk.txt",
+		"cjk_matrix.txt",
 		"combining_marks_mixed_width.txt",
 		"leading_combining_marks.txt",
 		"literal_control_character.txt",
@@ -129,6 +130,7 @@ func TestSequenceDiagramRendering_ASCII(t *testing.T) {
 		"three_participants.txt",
 		"east_asian_participants.txt",
 		"mixed_width_cjk.txt",
+		"cjk_matrix.txt",
 		"combining_marks_mixed_width.txt",
 		"leading_combining_marks.txt",
 	}
@@ -261,6 +263,55 @@ func TestSequenceDiagramRendering_EastAsian(t *testing.T) {
 		t.Run(testFile, func(t *testing.T) {
 			verifySequenceDiagramWithCharset(t, filepath.Join(testDataPath, testFile), false)
 		})
+	}
+}
+
+func TestCJKFeatureMatrixKeepsTextAcrossCharsets(t *testing.T) {
+	input := `sequenceDiagram
+box 日本語サービス
+participant A as 顧客
+participant B as 服务
+end
+actor C as 監査
+participant D as 数据库
+A->>B: 注文
+B-->>A: 応答
+B->>B: 自己
+Note over A,B: 注記
+alt 成功
+ A-xC: 失敗
+else 失敗
+ C-)D: 完了
+end
+loop 再試行
+ D<<->>A: 再送
+end
+activate B
+B-->>D: 更新
+deactivate B
+create participant E as 新規
+D->>E: 作成
+destroy E
+A-xE: 終了`
+
+	for _, useASCII := range []bool{false, true} {
+		d, err := Parse(input)
+		if err != nil {
+			t.Fatalf("Parse(useASCII=%t): %v", useASCII, err)
+		}
+		config := diagram.NewTestConfig(useASCII, "cli")
+		output, err := Render(d, config)
+		if err != nil {
+			t.Fatalf("Render(useASCII=%t): %v", useASCII, err)
+		}
+		for _, text := range []string{
+			"日本語サービス", "顧客", "服务", "監査", "数据库", "注文", "応答", "自己",
+			"注記", "成功", "失敗", "完了", "再試行", "再送", "更新", "新規", "作成", "終了",
+		} {
+			if !strings.Contains(output, text) {
+				t.Errorf("Render(useASCII=%t) missing CJK text %q:\n%s", useASCII, text, output)
+			}
+		}
 	}
 }
 

@@ -74,6 +74,39 @@ func TestWideRuneAlignment(t *testing.T) {
 	}
 }
 
+// TestCJKFeatureMatrix keeps aliases, attributes, relationship decorations, and
+// self/multiple relationships intact in both display modes.
+func TestCJKFeatureMatrix(t *testing.T) {
+	d, err := Parse(`erDiagram
+ 顧客["顧客エイリアス"] {
+  string 名前 PK "氏名"
+  int 番号 "識別子"
+ }
+ 注文["注文エイリアス"] {
+  string 状態
+ }
+ 顧客 ||--o{ 注文 : 発注
+ 顧客 }o..o| 顧客 : 紹介
+ 注文 ||--|| 注文 : 改訂`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, useASCII := range []bool{false, true} {
+		out := Render(d, useASCII)
+		for _, text := range []string{
+			"顧客エイリアス", "注文エイリアス", "名前", "番号", "氏名", "識別子", "状態",
+			"発注", "紹介", "改訂",
+		} {
+			if !strings.Contains(out, text) {
+				t.Errorf("Render(useASCII=%t) missing CJK text %q:\n%s", useASCII, text, out)
+			}
+		}
+		if !strings.Contains(out, "||") || !strings.Contains(out, "o{") {
+			t.Errorf("Render(useASCII=%t) lost relationship cardinality tokens:\n%s", useASCII, out)
+		}
+	}
+}
+
 // TestSelfLoopTokensIntact checks both cardinality tokens of a self-loop
 // survive even on boxes with short names.
 func TestSelfLoopTokensIntact(t *testing.T) {
