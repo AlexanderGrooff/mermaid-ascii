@@ -153,13 +153,13 @@ func (g *graph) determineLabelLine(e *edge) {
 		prevStep = step
 		lineWidth := g.calculateLineWidth(line)
 		if g.isNodeColumn(labelMiddleX(line)) {
-			if lineWidth > fallbackLineSize {
+			if g.labelBoundsAvailable(e, line) && lineWidth > fallbackLineSize {
 				fallbackLineSize = lineWidth
 				fallbackLine = line
 			}
 			continue
 		}
-		if g.labelLineAvailable(e, line) {
+		if g.labelLineAvailable(e, line) && g.labelBoundsAvailable(e, line) {
 			if lineWidth >= lenLabel {
 				largestLine = line
 				break
@@ -197,12 +197,10 @@ func (g *graph) determineLabelLine(e *edge) {
 	}
 
 	middleX := labelMiddleX(largestLine)
-	labelPadding := 3 // Wrap with -{label}-> (dashes + end arrowhead, 3 char)
-	if e.isBidirectional {
-		labelPadding = 4 // Wrap with <-{label}-> (start arrowhead+ dashes + end arrowhead, 4 char)
-	}
+	labelPadding := labelPaddingForEdge(e)
 	log.Debugf("Increasing column width for column %v from size %v to %v", middleX, g.columnWidth[middleX], lenLabel+labelPadding)
 	g.columnWidth[middleX] = Max(g.columnWidth[middleX], lenLabel+labelPadding)
+	g.ensureLabelLineClear(e, largestLine)
 	log.Debugf("New column sizes: %v", g.columnWidth)
 	e.labelLine = largestLine
 }
@@ -225,6 +223,120 @@ func (g *graph) labelLineAvailable(edge *edge, line []gridCoord) bool {
 		}
 	}
 	return true
+}
+
+func labelPaddingForEdge(e *edge) int {
+	if e.isBidirectional {
+		return 4 // start arrowhead + dashes + end arrowhead
+	}
+	return 3 // dashes + end arrowhead
+}
+
+// labelBoundsAvailable keeps the label layer from overwriting drawing elements
+// that are not redrawn after labels are merged. It is intentionally based on
+// coordinates rather than glyphs so it also protects non-ASCII arrowheads.
+func (g *graph) labelBoundsAvailable(e *edge, line []gridCoord) bool {
+	drawingLine := g.lineToDrawing(line)
+	if e.isBidirectional {
+		drawingLine = insetLine(drawingLine, 2, 2)
+	} else {
+		drawingLine = insetLine(drawingLine, 1, 2)
+	}
+	start, end, y := labelBounds(drawingLine, e.text)
+	for _, other := range g.edges {
+		if len(other.path) < 2 || other.head == headNone {
+			continue
+		}
+		arrow := g.arrowheadPosition(other)
+		if arrow.y == y && rangesOverlap(start, end, arrow.x, arrow.x) {
+			return false
+		}
+		if other.isBidirectional {
+			arrow = g.arrowheadPositionFromStart(other)
+			if arrow.y == y && rangesOverlap(start, end, arrow.x, arrow.x) {
+				return false
+			}
+		}
+	}
+	for _, n := range g.nodes {
+		if g.labelOverlapsNodeBorder(n, start, end, y) {
+			return false
+		}
+	}
+	return true
+}
+
+func (g *graph) arrowheadPosition(e *edge) drawingCoord {
+	last := g.gridToDrawingCoord(e.path[len(e.path)-1], nil)
+	if len(e.path) < 2 {
+		return last
+	}
+	previous := g.gridToDrawingCoord(e.path[len(e.path)-2], nil)
+	dir := determineDirection(genericCoord(previous), genericCoord(last))
+	dx, dy := drawingStep(dir)
+	return drawingCoord{x: last.x - dx, y: last.y - dy}
+}
+
+func (g *graph) arrowheadPositionFromStart(e *edge) drawingCoord {
+	first := g.gridToDrawingCoord(e.path[0], nil)
+	if len(e.path) < 2 {
+		return first
+	}
+	next := g.gridToDrawingCoord(e.path[1], nil)
+	dir := determineDirection(genericCoord(next), genericCoord(first))
+	dx, dy := drawingStep(dir)
+	return drawingCoord{x: first.x - dx, y: first.y - dy}
+}
+
+func drawingStep(dir direction) (int, int) {
+	switch dir {
+	case Up:
+		return 0, -1
+	case Down:
+		return 0, 1
+	case Left:
+		return -1, 0
+	case Right:
+		return 1, 0
+	}
+	return 0, 0
+}
+
+func (g *graph) labelOverlapsNodeBorder(n *node, start, end, y int) bool {
+	if n.gridCoord == nil {
+		return false
+	}
+	from := g.gridToDrawingCoord(*n.gridCoord, nil)
+	to := drawingCoord{
+		x: from.x + g.columnWidth[n.gridCoord.x] + g.columnWidth[n.gridCoord.x+1],
+		y: from.y + g.rowHeight[n.gridCoord.y] + g.rowHeight[n.gridCoord.y+1],
+	}
+	if y != from.y && y != to.y {
+		return false
+	}
+	return rangesOverlap(start, end, from.x, to.x)
+}
+
+// ensureLabelLineClear relocates a label corridor only when its rendered
+// bounds would touch a node border or arrowhead. Increasing the gap's grid
+// dimension preserves the existing path and leaves normal-spacing layouts
+// unchanged.
+func (g *graph) ensureLabelLineClear(e *edge, line []gridCoord) {
+	for attempt := 0; attempt < 8 && !g.labelBoundsAvailable(e, line); attempt++ {
+		dir := determineDirection(genericCoord(line[0]), genericCoord(line[1]))
+		switch dir {
+		case Down:
+			g.rowHeight[line[0].y+1] += 2
+		case Up:
+			g.rowHeight[line[0].y-1] += 2
+		case Right:
+			g.columnWidth[line[0].x+1] += 2
+		case Left:
+			g.columnWidth[line[0].x-1] += 2
+		default:
+			return
+		}
+	}
 }
 
 func labelsOverlap(g *graph, firstEdge *edge, firstLine []gridCoord, secondEdge *edge) bool {
@@ -280,7 +392,7 @@ func (g *graph) unusedLabelSubsegments(edge *edge) [][]gridCoord {
 				continue
 			}
 			line := []gridCoord{{x: middleX - 1, y: start.y}, {x: middleX + 1, y: start.y}}
-			if g.labelLineAvailable(edge, line) {
+			if g.labelLineAvailable(edge, line) && g.labelBoundsAvailable(edge, line) {
 				segments = append(segments, line)
 			}
 		}
