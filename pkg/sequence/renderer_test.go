@@ -77,6 +77,7 @@ func TestSequenceDiagramRendering(t *testing.T) {
 		"three_participants.txt",
 		"east_asian_participants.txt",
 		"mixed_width_cjk.txt",
+		"combining_marks_mixed_width.txt",
 	}
 
 	for _, testFile := range testFiles {
@@ -126,6 +127,7 @@ func TestSequenceDiagramRendering_ASCII(t *testing.T) {
 		"three_participants.txt",
 		"east_asian_participants.txt",
 		"mixed_width_cjk.txt",
+		"combining_marks_mixed_width.txt",
 	}
 
 	for _, testFile := range goldenFiles {
@@ -253,6 +255,35 @@ func TestSequenceDiagramRendering_EastAsian(t *testing.T) {
 	for _, testFile := range testFiles {
 		t.Run(testFile, func(t *testing.T) {
 			verifySequenceDiagramWithCharset(t, filepath.Join(testDataPath, testFile), false)
+		})
+	}
+}
+
+func TestTextCellsAttachCombiningMarks(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		input string
+		cells []textCell
+	}{
+		{name: "ASCII base", input: "é", cells: []textCell{"é"}},
+		{name: "leading combining mark", input: "\u0301A", cells: []textCell{"\u0301A"}},
+		{name: "zero-width format", input: "A\u200bB", cells: []textCell{"A\u200b", "B"}},
+		{name: "CJK base", input: "用́", cells: []textCell{"用́", continuationCell}},
+		{name: "mixed text", input: "A用́B", cells: []textCell{"A", "用́", continuationCell, "B"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := textCells(tc.input)
+			if len(got) != len(tc.cells) {
+				t.Fatalf("textCells(%q) has %d cells, want %d: %#v", tc.input, len(got), len(tc.cells), got)
+			}
+			for i := range tc.cells {
+				if got[i] != tc.cells[i] {
+					t.Errorf("textCells(%q)[%d] = %q, want %q", tc.input, i, got[i], tc.cells[i])
+				}
+			}
+			if displayWidth(tc.input) != len(got) {
+				t.Errorf("displayWidth(%q) = %d, want cell count %d", tc.input, displayWidth(tc.input), len(got))
+			}
 		})
 	}
 }
