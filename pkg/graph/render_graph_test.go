@@ -166,6 +166,87 @@ func TestRenderGraphSeparatesBidirectionalEdgeLabelsTD(t *testing.T) {
 	}
 }
 
+func TestRenderGraphAlignsFanoutLabels(t *testing.T) {
+	cases := []struct {
+		name   string
+		labels []string
+		tail   string
+	}{
+		{"three", []string{"alpha", "beta", "gamma"}, ""},
+		{"five", []string{"alpha", "beta", "gamma", "delta", "epsilon"}, ""},
+		{"wide", []string{"long first label", "猫猫猫", "last choice"}, ""},
+		{"unlabeled branch", []string{"alpha", "", "a longer last label"}, ""},
+		{"downstream", []string{"alpha", "beta", "gamma"}, "B --> X\nC --> Y\nD --> Z\n"},
+	}
+	for _, tc := range cases {
+		for _, ascii := range []bool{true, false} {
+			for _, padding := range []int{0, 1, 5, 12} {
+				t.Run(fmt.Sprintf("%s/ascii=%v/padding=%d", tc.name, ascii, padding), func(t *testing.T) {
+					config := diagram.NewTestConfig(ascii, "cli")
+					config.PaddingBetweenX, config.PaddingBetweenY = padding, padding
+					var source strings.Builder
+					source.WriteString("flowchart TB\n")
+					for i, label := range tc.labels {
+						if label == "" {
+							fmt.Fprintf(&source, "A --> %c\n", 'B'+i)
+						} else {
+							fmt.Fprintf(&source, "A -->|%s| %c\n", label, 'B'+i)
+						}
+					}
+					source.WriteString(tc.tail)
+					output, err := renderGraph(source.String(), config)
+					if err != nil {
+						t.Fatal(err)
+					}
+					assertUniformDisplayWidth(t, output)
+					lines := strings.Split(output, "\n")
+					labelRow := -1
+					for i, label := range tc.labels {
+						if label == "" {
+							continue
+						}
+						if strings.Count(output, label) != 1 {
+							t.Fatalf("expected label %q exactly once\n%s", label, output)
+						}
+						for row, line := range lines {
+							index := strings.Index(line, label)
+							if index < 0 {
+								continue
+							}
+							if labelRow != -1 && labelRow != row {
+								t.Fatalf("expected aligned labels\n%s", output)
+							}
+							labelRow = row
+							center := runewidth.StringWidth(line[:index]) + runewidth.StringWidth(label)/2
+							vertical, arrow, border := "|", "v", "|"
+							if !ascii {
+								vertical, arrow, border = "│", "▼", "│"
+							}
+							if row == 0 || row+2 >= len(lines) || string([]rune(lines[row-1])[center]) != vertical || string([]rune(lines[row+1])[center]) != vertical {
+								t.Fatalf("label %q must sit on its branch with clearance\n%s", label, output)
+							}
+							nodeText := fmt.Sprintf("%s %c %s", border, 'B'+i, border)
+							foundTarget := false
+							for targetRow := row + 2; targetRow < len(lines); targetRow++ {
+								if target := strings.Index(lines[targetRow], nodeText); target >= 0 {
+									if runewidth.StringWidth(lines[targetRow][:target])+2 != center || string([]rune(lines[targetRow-3])[center]) != arrow {
+										t.Fatalf("label %q must align with its target and arrowhead\n%s", label, output)
+									}
+									foundTarget = true
+									break
+								}
+							}
+							if !foundTarget {
+								t.Fatalf("expected unchanged target box %q\n%s", nodeText, output)
+							}
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
 func assertUniformDisplayWidth(t *testing.T, output string) {
 	t.Helper()
 

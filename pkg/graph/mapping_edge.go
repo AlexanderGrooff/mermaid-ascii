@@ -38,6 +38,7 @@ type edge struct {
 	head            edgeHead
 	path            []gridCoord
 	labelLine       []gridCoord
+	fanout          bool
 	startDir        direction
 	endDir          direction
 }

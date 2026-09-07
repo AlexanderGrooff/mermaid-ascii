@@ -111,7 +111,7 @@ func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) (*drawing, *dra
 	}
 	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, e.path)
 	dLabel := g.drawArrowLabel(e)
-	dPath, linesDrawn, lineDirs := g.drawPath(e.path, e.stroke)
+	dPath, linesDrawn, lineDirs := g.drawPath(e)
 	dBoxStart := g.drawBoxStart(e.path, linesDrawn[0], e.stroke)
 	skipHead := e.head == headNone
 	if skipHead && len(linesDrawn) > 0 {
@@ -132,7 +132,7 @@ func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) (*drawing, *dra
 		dStartArrowHead := g.drawArrowHead(reverseDrawingLine(linesDrawn[0]), lineDirs[0].getOpposite(), e.head)
 		dArrowHead = g.mergeDrawings(dArrowHead, drawingCoord{0, 0}, dStartArrowHead)
 	}
-	dCorners := g.drawCorners(e.path, e.stroke)
+	dCorners := g.drawCorners(e)
 	return dPath, dBoxStart, dArrowHead, dCorners, dLabel
 }
 
@@ -174,15 +174,16 @@ func mergePath(path []gridCoord) []gridCoord {
 	return newPath
 }
 
-func (g *graph) drawPath(path []gridCoord, stroke edgeStroke) (*drawing, [][]drawingCoord, []direction) {
+func (g *graph) drawPath(e *edge) (*drawing, [][]drawingCoord, []direction) {
+	path, stroke := e.path, e.stroke
 	d := copyCanvas(g.drawing)
 	previousCoord := path[0]
 	linesDrawn := make([][]drawingCoord, 0)
 	lineDirs := make([]direction, 0)
 	var previousDrawingCoord drawingCoord
 	for _, nextCoord := range path[1:] {
-		previousDrawingCoord = g.gridToDrawingCoord(previousCoord, nil)
-		nextDrawingCoord := g.gridToDrawingCoord(nextCoord, nil)
+		previousDrawingCoord = g.edgeDrawingCoord(e, previousCoord)
+		nextDrawingCoord := g.edgeDrawingCoord(e, nextCoord)
 		if previousDrawingCoord.Equals(nextDrawingCoord) {
 			log.Debugf("Skipping drawing identical line on %v", nextCoord)
 			continue
@@ -355,7 +356,8 @@ func (g *graph) drawArrowHead(line []drawingCoord, fallback direction, head edge
 	return &d
 }
 
-func (g *graph) drawCorners(path []gridCoord, stroke edgeStroke) *drawing {
+func (g *graph) drawCorners(e *edge) *drawing {
+	path, stroke := e.path, e.stroke
 	d := copyCanvas(g.drawing)
 	// Thick edges get the heavy box-drawing corner glyphs to match their
 	// heavy line/arrowhead; ASCII has no distinct "thick corner" (still
@@ -366,7 +368,7 @@ func (g *graph) drawCorners(path []gridCoord, stroke edgeStroke) *drawing {
 		if idx == 0 || idx == len(path)-1 {
 			continue
 		}
-		drawingCoord := g.gridToDrawingCoord(coord, nil)
+		drawingCoord := g.edgeDrawingCoord(e, coord)
 
 		prevDir := determineDirection(genericCoord(path[idx-1]), genericCoord(coord))
 		nextDir := determineDirection(genericCoord(coord), genericCoord(path[idx+1]))
@@ -410,6 +412,12 @@ func (g *graph) drawArrowLabel(e *edge) *drawing {
 	d := copyCanvas(g.drawing)
 	lenLabel := len(e.text)
 	if lenLabel == 0 {
+		return d
+	}
+
+	if e.fanout {
+		x, _, y := g.fanoutLabelBounds(e)
+		d.drawText(drawingCoord{x: x, y: y}, e.text)
 		return d
 	}
 
