@@ -1,0 +1,12 @@
+sequenceDiagram
+participant A as Actor
+participant B
+A->>B: sendmessage
+---
++-------+     +---+
+| Actor |     | B |
++---+---+     +-+-+
+    |           |
+    | sendmessage
+    +---------->|
+    |           |

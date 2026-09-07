@@ -9,6 +9,12 @@ import (
 	"strings"
 )
 
+const expectedSpaceMarker = "␠"
+
+func decodeExpectedOutput(line string) string {
+	return strings.ReplaceAll(line, expectedSpaceMarker, " ")
+}
+
 // TestCase represents a test case for diagram rendering.
 // It contains the input Mermaid syntax and expected output.
 type TestCase struct {
@@ -71,7 +77,7 @@ func ReadTestCase(filePath string) (*TestCase, error) {
 			mermaidStarted = true
 			mermaid.WriteString(line + "\n")
 		} else {
-			expected.WriteString(line + "\n")
+			expected.WriteString(decodeExpectedOutput(line) + "\n")
 		}
 	}
 

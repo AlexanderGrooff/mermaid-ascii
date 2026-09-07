@@ -1,0 +1,32 @@
+sequenceDiagram
+participant A as 用户́
+participant B as Service
+A->>B: é 混合
+Note over A,B: 注́ note
+loop ループ é
+ A-->>B: 回́ return
+end
+B->>B: 自́ self
+---
++------+     +---------+
+| 用户́ |     | Service |
++---+--+     +----+----+
+    |             |
+    | é 混合      |
+    +------------>|
+    |             |
+   +---------------+
+   |    注́ note    |
+   +---------------+
+  +-[loop ループ é]-+
+  | |             | |
+  | | 回́ return   | |
+  | +............>| |
+  | |             | |
+  +-----------------+
+    |             |
+    |             | 自́ self
+    |             +--+
+    |             |  |
+    |             |<-+
+    |             |

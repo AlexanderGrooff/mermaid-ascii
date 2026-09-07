@@ -22,6 +22,145 @@ const (
 	frameLabelInset           = 2 // columns from the left corner to the "[label]" tab
 )
 
+func displayWidth(s string) int {
+	width := 0
+	for _, r := range s {
+		if w := runeCellWidth(r); w > 0 {
+			width += w
+		}
+	}
+	return width
+}
+
+func isDrawingRune(r rune) bool {
+	return r >= 0x2500 && r <= 0x257f || r == '►' || r == '◄' || r == '×'
+}
+
+func isStructuralRune(r rune) bool {
+	return isDrawingRune(r) || strings.ContainsRune("+-|.<>#^v", r)
+}
+
+// A cell stores all runes rendered at one terminal column. Metadata stays
+// separate from cell content so user text cannot be mistaken for renderer state.
+type textCell struct {
+	content      string
+	textual      bool
+	continuation bool
+}
+
+var continuationCell = textCell{continuation: true}
+
+func cellRune(r rune) textCell { return textCell{content: string(r)} }
+
+func isRuneCell(cell textCell, r rune) bool {
+	return !cell.textual && !cell.continuation && cell.content == string(r)
+}
+
+func textualCell(s string) textCell { return textCell{content: s, textual: true} }
+
+func isTextualCell(cell textCell) bool { return cell.textual && !cell.continuation }
+
+func appendCellText(cell textCell, s string) textCell {
+	cell.content += s
+	cell.textual = true
+	return cell
+}
+
+func textCells(s string) []textCell {
+	cells := make([]textCell, 0, displayWidth(s))
+	pending := ""
+	for _, r := range s {
+		width := runeCellWidth(r)
+		if width == 0 {
+			i := len(cells) - 1
+			for i >= 0 && cells[i].continuation {
+				i--
+			}
+			if i >= 0 && isTextualCell(cells[i]) {
+				cells[i] = appendCellText(cells[i], string(r))
+			} else {
+				pending += string(r)
+			}
+			continue
+		}
+
+		textual := r != ' ' && !isStructuralRune(r)
+		content := string(r)
+		if textual && pending != "" {
+			content = pending + content
+			pending = ""
+		}
+		if textual {
+			cells = append(cells, textualCell(content))
+		} else {
+			cells = append(cells, cellRune(r))
+		}
+		for i := 1; i < width; i++ {
+			cells = append(cells, continuationCell)
+		}
+	}
+	if pending != "" {
+		// A zero-width character with no valid base still belongs to the
+		// rendered text; retain it in a textual cell rather than dropping it.
+		cells = append(cells, textualCell(pending))
+	}
+	return cells
+}
+
+func runeCellWidth(r rune) int {
+	if isDrawingRune(r) {
+		return 1
+	}
+	return runewidth.RuneWidth(r)
+}
+
+func putText(line []textCell, col int, text string) {
+	putTextBefore(line, col, text, len(line))
+}
+
+func putTextBefore(line []textCell, col int, text string, end int) {
+	pending := ""
+	lastBase := -1
+	for _, r := range text {
+		width := runeCellWidth(r)
+		if width == 0 {
+			if lastBase >= 0 {
+				line[lastBase] = appendCellText(line[lastBase], string(r))
+			} else {
+				pending += string(r)
+			}
+			continue
+		}
+		if col < 0 || col+width > end || col >= len(line) {
+			return
+		}
+		line[col] = textualCell(pending + string(r))
+		pending = ""
+		lastBase = col
+		for i := 1; i < width && col+i < len(line); i++ {
+			line[col+i] = continuationCell
+		}
+		col += width
+	}
+	if pending != "" && col >= 0 && col < len(line) && col < end && isTextualCell(line[col]) {
+		line[col] = appendCellText(line[col], pending)
+	}
+}
+
+func trimCells(line []textCell) string {
+	end := len(line)
+	for end > 0 && !line[end-1].textual && !line[end-1].continuation && line[end-1].content == " " {
+		end--
+	}
+	var sb strings.Builder
+	for _, cell := range line[:end] {
+		if !cell.continuation {
+			sb.WriteString(cell.content)
+		}
+	}
+	return sb.String()
+}
+
 type diagramLayout struct {
 	participantWidths  []int
 	participantCenters []int
@@ -38,7 +177,7 @@ func calculateLayout(sd *SequenceDiagram, config *diagram.Config) *diagramLayout
 
 	widths := make([]int, len(sd.Participants))
 	for i, p := range sd.Participants {
-		w := runewidth.StringWidth(p.Label) + boxPaddingLeftRight
+		w := displayWidth(p.Label) + boxPaddingLeftRight
 		if w < minBoxWidth {
 			w = minBoxWidth
 		}
@@ -134,7 +273,7 @@ func Render(sd *SequenceDiagram, config *diagram.Config) (string, error) {
 
 	lines = append(lines, buildLine(sd.Participants, layout, func(i int) string {
 		w := layout.participantWidths[i]
-		labelLen := runewidth.StringWidth(sd.Participants[i].Label)
+		labelLen := displayWidth(sd.Participants[i].Label)
 		pad := (w - labelLen) / 2
 		return string(chars.Vertical) + strings.Repeat(" ", pad) + sd.Participants[i].Label +
 			strings.Repeat(" ", w-pad-labelLen) + string(chars.Vertical)
@@ -200,7 +339,7 @@ func applyBoxSpacing(sd *SequenceDiagram, layout *diagramLayout, events []Event)
 
 		// The top border must hold: corner, inset, " title ", and at least one
 		// horizontal cell before the right corner.
-		need := frameLabelInset + runewidth.StringWidth(b.Title) + 4
+		need := frameLabelInset + displayWidth(b.Title) + 4
 		got := boxInnerWidth(b, layout) + 2*sidePad
 		rightExtra[bi] = max(0, need-got)
 
@@ -216,7 +355,7 @@ func applyBoxSpacing(sd *SequenceDiagram, layout *diagramLayout, events []Event)
 			if m.From.Index < b.First || m.From.Index > b.Last {
 				continue
 			}
-			labelW := runewidth.StringWidth(m.Label)
+			labelW := displayWidth(m.Label)
 			if sd.Autonumber {
 				labelW += 4 // room for the "NN. " prefix
 			}
@@ -274,31 +413,25 @@ func boxBorder(spans []boxSpan, chars BoxChars, top bool) string {
 	for _, s := range spans {
 		width = max(width, s.right+1)
 	}
-	line := make([]rune, width)
+	line := make([]textCell, width)
 	for i := range line {
-		line[i] = ' '
+		line[i] = cellRune(' ')
 	}
 	for _, s := range spans {
 		leftCorner, rightCorner := chars.BottomLeft, chars.BottomRight
 		if top {
 			leftCorner, rightCorner = chars.TopLeft, chars.TopRight
 		}
-		line[s.left] = leftCorner
+		line[s.left] = cellRune(leftCorner)
 		for c := s.left + 1; c < s.right; c++ {
-			line[c] = chars.Horizontal
+			line[c] = cellRune(chars.Horizontal)
 		}
-		line[s.right] = rightCorner
+		line[s.right] = cellRune(rightCorner)
 		if top && s.title != "" {
-			col := s.left + frameLabelInset
-			for _, r := range " " + s.title + " " {
-				if col < s.right {
-					line[col] = r
-					col++
-				}
-			}
+			putTextBefore(line, s.left+frameLabelInset, " "+s.title+" ", s.right)
 		}
 	}
-	return strings.TrimRight(string(line), " ")
+	return trimCells(line)
 }
 
 // overlayBoxSides draws every box's vertical borders onto a body line. A cell
@@ -313,15 +446,14 @@ func overlayBoxSides(line string, spans []boxSpan, chars BoxChars) string {
 	r := padRunes(line, width)
 	for _, s := range spans {
 		for _, c := range []int{s.left, s.right} {
-			switch r[c] {
-			case ' ':
-				r[c] = chars.Vertical
-			case chars.Horizontal, chars.DottedLine:
-				r[c] = chars.Cross
+			if isRuneCell(r[c], ' ') {
+				r[c] = cellRune(chars.Vertical)
+			} else if isRuneCell(r[c], chars.Horizontal) || isRuneCell(r[c], chars.DottedLine) {
+				r[c] = cellRune(chars.Cross)
 			}
 		}
 	}
-	return strings.TrimRight(string(r), " ")
+	return trimCells(r)
 }
 
 // renderEvents paints the ordered body of the diagram — messages and fragment
@@ -478,7 +610,7 @@ func (a *lifelineState) overlay(line string, layout *diagramLayout, chars BoxCha
 	if len(a.depth) == 0 {
 		return line
 	}
-	var r []rune
+	var r []textCell
 	for p, d := range a.depth {
 		if d == 0 || a.dead[p] || a.unborn[p] || p.Index >= len(layout.participantCenters) {
 			continue
@@ -488,26 +620,25 @@ func (a *lifelineState) overlay(line string, layout *diagramLayout, chars BoxCha
 			continue
 		}
 		if r == nil {
-			r = []rune(line)
+			r = padRunes(line, max(layout.totalWidth+1, displayWidth(line)))
 		}
 		if c >= len(r) {
 			continue
 		}
-		switch r[c] {
-		case chars.Vertical:
-			r[c] = chars.ActiveVertical
-		case chars.TeeRight:
-			r[c] = chars.ActiveTeeRight
-		case chars.TeeLeft:
-			r[c] = chars.ActiveTeeLeft
-		case chars.Cross:
-			r[c] = chars.ActiveCross
+		if isRuneCell(r[c], chars.Vertical) {
+			r[c] = cellRune(chars.ActiveVertical)
+		} else if isRuneCell(r[c], chars.TeeRight) {
+			r[c] = cellRune(chars.ActiveTeeRight)
+		} else if isRuneCell(r[c], chars.TeeLeft) {
+			r[c] = cellRune(chars.ActiveTeeLeft)
+		} else if isRuneCell(r[c], chars.Cross) {
+			r[c] = cellRune(chars.ActiveCross)
 		}
 	}
 	if r == nil {
 		return line
 	}
-	return strings.TrimRight(string(r), " ")
+	return trimCells(r)
 }
 
 // fragmentDepth returns the maximum fragment nesting depth within events (0 if
@@ -587,14 +718,14 @@ func noteLeftGutter(events []Event, layout *diagramLayout) int {
 	return gutter
 }
 
-// noteRunes returns a note's display text with mermaid line breaks collapsed to
+// noteText returns a note's display text with mermaid line breaks collapsed to
 // spaces (ASCII output is single-line).
-func noteRunes(note *Note) []rune {
+func noteText(note *Note) string {
 	text := note.Text
 	for _, br := range []string{"<br/>", "<br />", "<br>"} {
 		text = strings.ReplaceAll(text, br, " ")
 	}
-	return []rune(text)
+	return text
 }
 
 // noteBoxColumns returns the [left, right] columns a note's box occupies. For
@@ -603,7 +734,7 @@ func noteRunes(note *Note) []rune {
 // left may be negative when a left-of box extends past column 0 — Render
 // reserves a gutter so that never happens at draw time.
 func noteBoxColumns(note *Note, layout *diagramLayout) (int, int) {
-	boxW := len(noteRunes(note)) + 4 // "│ text │"
+	boxW := displayWidth(noteText(note)) + 4 // "│ text │"
 	centers := layout.participantCenters
 	first := centers[note.Participants[0].Index]
 	last := centers[note.Participants[len(note.Participants)-1].Index]
@@ -633,7 +764,7 @@ func noteBoxColumns(note *Note, layout *diagramLayout) (int, int) {
 // beside its participant lifelines. The box obscures any lifelines it covers,
 // while lifelines outside it stay continuous.
 func renderNote(note *Note, layout *diagramLayout, chars BoxChars, st *lifelineState) []string {
-	runes := noteRunes(note)
+	text := noteText(note)
 	left, right := noteBoxColumns(note, layout)
 	if left < 0 { // safety; Render's note gutter should already prevent this
 		left = 0
@@ -641,33 +772,28 @@ func renderNote(note *Note, layout *diagramLayout, chars BoxChars, st *lifelineS
 
 	border := func(l, r rune) string {
 		line := padRunes(buildLifeline(layout, chars, st), right+1)
-		line[left] = l
+		line[left] = cellRune(l)
 		for c := left + 1; c < right; c++ {
-			line[c] = chars.Horizontal
+			line[c] = cellRune(chars.Horizontal)
 		}
-		line[right] = r
-		return strings.TrimRight(string(line), " ")
+		line[right] = cellRune(r)
+		return trimCells(line)
 	}
 
 	mid := padRunes(buildLifeline(layout, chars, st), right+1)
 	for c := left; c <= right; c++ { // clear covered lifelines
-		mid[c] = ' '
+		mid[c] = cellRune(' ')
 	}
-	mid[left] = chars.Vertical
-	mid[right] = chars.Vertical
+	mid[left] = cellRune(chars.Vertical)
+	mid[right] = cellRune(chars.Vertical)
 	// Centre the text within the box interior [left+1, right-1].
 	inner := right - left - 1
-	col := left + 1 + (inner-len(runes))/2
-	for _, ch := range runes {
-		if col > left && col < right {
-			mid[col] = ch
-		}
-		col++
-	}
+	col := left + 1 + (inner-displayWidth(text))/2
+	putText(mid, col, text)
 
 	return []string{
 		border(chars.TopLeft, chars.TopRight),
-		strings.TrimRight(string(mid), " "),
+		trimCells(mid),
 		border(chars.BottomLeft, chars.BottomRight),
 	}
 }
@@ -732,7 +858,7 @@ func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars Bo
 	// Message labels can extend well past the rightmost lifeline, so widen the
 	// frame to clear the longest inner line.
 	for _, l := range body {
-		if w := len([]rune(l)) + 1; w > rightCol {
+		if w := displayWidth(l) + 1; w > rightCol {
 			rightCol = w
 		}
 	}
@@ -746,7 +872,7 @@ func wrapFragment(frag *Fragment, inner []Event, layout *diagramLayout, chars Bo
 	// corner; make sure the frame is wide enough to hold it (and every "else"
 	// divider label) without truncation.
 	widen := func(text string) {
-		if end := leftCol + frameLabelInset + len([]rune("["+text+"]")) + 1; end > rightCol {
+		if end := leftCol + frameLabelInset + displayWidth("["+text+"]") + 1; end > rightCol {
 			rightCol = end
 		}
 	}
@@ -801,21 +927,15 @@ func splitSections(inner []Event) ([][]Event, []string) {
 // and joined to its side borders, with an optional [label] tab near the left.
 func fragmentDivider(layout *diagramLayout, chars BoxChars, leftCol, rightCol int, label string, st *lifelineState) string {
 	line := padRunes(buildLifeline(layout, chars, st), rightCol+1)
-	line[leftCol] = chars.TeeRight
+	line[leftCol] = cellRune(chars.TeeRight)
 	for c := leftCol + 1; c < rightCol; c++ {
-		line[c] = chars.DottedLine
+		line[c] = cellRune(chars.DottedLine)
 	}
-	line[rightCol] = chars.TeeLeft
+	line[rightCol] = cellRune(chars.TeeLeft)
 	if label != "" {
-		col := leftCol + frameLabelInset
-		for _, r := range "[" + label + "]" {
-			if col < rightCol {
-				line[col] = r
-				col++
-			}
-		}
+		putTextBefore(line, leftCol+frameLabelInset, "["+label+"]", rightCol)
 	}
-	return strings.TrimRight(string(line), " ")
+	return trimCells(line)
 }
 
 // involvedParticipants returns the smallest and largest participant indices
@@ -854,38 +974,32 @@ func fragmentBorder(layout *diagramLayout, chars BoxChars, leftCol, rightCol int
 	if top {
 		leftCorner, rightCorner = chars.TopLeft, chars.TopRight
 	}
-	line[leftCol] = leftCorner
+	line[leftCol] = cellRune(leftCorner)
 	for c := leftCol + 1; c < rightCol; c++ {
-		line[c] = chars.Horizontal
+		line[c] = cellRune(chars.Horizontal)
 	}
-	line[rightCol] = rightCorner
+	line[rightCol] = cellRune(rightCorner)
 
 	if label != "" {
-		col := leftCol + frameLabelInset
-		for _, r := range "[" + label + "]" {
-			if col < rightCol {
-				line[col] = r
-				col++
-			}
-		}
+		putTextBefore(line, leftCol+frameLabelInset, "["+label+"]", rightCol)
 	}
-	return strings.TrimRight(string(line), " ")
+	return trimCells(line)
 }
 
 // overlayFrameSides draws the left and right vertical borders of a frame onto an
 // already-rendered content line.
 func overlayFrameSides(line string, chars BoxChars, leftCol, rightCol int) string {
 	r := padRunes(line, rightCol+1)
-	r[leftCol] = chars.Vertical
-	r[rightCol] = chars.Vertical
-	return strings.TrimRight(string(r), " ")
+	r[leftCol] = cellRune(chars.Vertical)
+	r[rightCol] = cellRune(chars.Vertical)
+	return trimCells(r)
 }
 
-// padRunes returns s as a rune slice right-padded with spaces to at least width.
-func padRunes(s string, width int) []rune {
-	r := []rune(s)
+// padRunes returns s as a cell-indexed slice right-padded with spaces to at least width.
+func padRunes(s string, width int) []textCell {
+	r := textCells(s)
 	for len(r) < width {
-		r = append(r, ' ')
+		r = append(r, cellRune(' '))
 	}
 	return r
 }
@@ -896,13 +1010,13 @@ func buildLine(participants []*Participant, layout *diagramLayout, draw func(int
 		boxWidth := layout.participantWidths[i] + boxBorderWidth
 		left := layout.participantCenters[i] - boxWidth/2
 
-		needed := left - len([]rune(sb.String()))
+		needed := left - displayWidth(sb.String())
 		if needed > 0 {
 			sb.WriteString(strings.Repeat(" ", needed))
 		}
 		sb.WriteString(draw(i))
 	}
-	return sb.String()
+	return trimCells(textCells(sb.String()))
 }
 
 // buildLifeline draws the bare lifeline row. st, when non-nil, decides each
@@ -911,20 +1025,20 @@ func buildLine(participants []*Participant, layout *diagramLayout, draw func(int
 // is active. Drawing this here (rather than patching a finished row) means
 // message labels and note boxes painted afterwards are never disturbed.
 func buildLifeline(layout *diagramLayout, chars BoxChars, st *lifelineState) string {
-	line := make([]rune, layout.totalWidth+1)
+	line := make([]textCell, layout.totalWidth+1)
 	for i := range line {
-		line[i] = ' '
+		line[i] = cellRune(' ')
 	}
 	for i, c := range layout.participantCenters {
 		if c >= len(line) {
 			continue
 		}
-		line[c] = chars.Vertical
+		line[c] = cellRune(chars.Vertical)
 		if st != nil {
-			line[c] = st.glyph(i, chars)
+			line[c] = cellRune(st.glyph(i, chars))
 		}
 	}
-	return strings.TrimRight(string(line), " ")
+	return trimCells(line)
 }
 
 func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars, st *lifelineState) []string {
@@ -938,72 +1052,59 @@ func renderMessage(msg *Message, layout *diagramLayout, chars BoxChars, st *life
 
 	if label != "" {
 		start := min(from, to) + labelLeftMargin
-		labelWidth := runewidth.StringWidth(label)
+		labelWidth := displayWidth(label)
 		w := max(layout.totalWidth, start+labelWidth) + labelBufferSpace
-		line := []rune(buildLifeline(layout, chars, st))
-		if len(line) < w {
-			padding := make([]rune, w-len(line))
-			for k := range padding {
-				padding[k] = ' '
-			}
-			line = append(line, padding...)
-		}
+		line := padRunes(buildLifeline(layout, chars, st), w)
 
-		col := start
-		for _, r := range label {
-			if col < len(line) {
-				line[col] = r
-				col++
-			}
-		}
-		lines = append(lines, strings.TrimRight(string(line), " "))
+		putText(line, start, label)
+		lines = append(lines, trimCells(line))
 	}
 
-	line := []rune(buildLifeline(layout, chars, st))
-	style := chars.SolidLine
+	line := padRunes(buildLifeline(layout, chars, st), layout.totalWidth+1)
+	style := cellRune(chars.SolidLine)
 	if msg.ArrowType.isDotted() {
-		style = chars.DottedLine
+		style = cellRune(chars.DottedLine)
 	}
 
 	if from < to {
-		line[from] = chars.TeeRight
+		line[from] = cellRune(chars.TeeRight)
 		for i := from + 1; i < to; i++ {
 			line[i] = style
 		}
 		// Open arrows (-> / -->) have no head: draw the line right up to the
 		// target lifeline instead of an arrowhead.
 		if head, ok := msg.ArrowType.head(chars, true); ok {
-			line[to-1] = head
+			line[to-1] = cellRune(head)
 		}
 		// Bidirectional arrows carry a head at the source end too. This can
 		// never clobber the target head: participant centers are always ≥6
 		// columns apart (box width ≥5 plus spacing ≥1), so from+1 < to-1.
 		if msg.ArrowType.isBidirectional() {
-			line[from+1] = chars.ArrowLeft
+			line[from+1] = cellRune(chars.ArrowLeft)
 		}
-		line[to] = chars.Vertical
+		line[to] = cellRune(chars.Vertical)
 	} else {
-		line[to] = chars.Vertical
+		line[to] = cellRune(chars.Vertical)
 		line[to+1] = style
 		if head, ok := msg.ArrowType.head(chars, false); ok {
-			line[to+1] = head
+			line[to+1] = cellRune(head)
 		}
 		for i := to + 2; i < from; i++ {
 			line[i] = style
 		}
 		if msg.ArrowType.isBidirectional() {
-			line[from-1] = chars.ArrowRight
+			line[from-1] = cellRune(chars.ArrowRight)
 		}
-		line[from] = chars.TeeLeft
+		line[from] = cellRune(chars.TeeLeft)
 	}
 	// Central connections replace the lifeline attachment with a circle.
 	if msg.CentralFrom {
-		line[from] = chars.Circle
+		line[from] = cellRune(chars.Circle)
 	}
 	if msg.CentralTo {
-		line[to] = chars.Circle
+		line[to] = cellRune(chars.Circle)
 	}
-	lines = append(lines, strings.TrimRight(string(line), " "))
+	lines = append(lines, trimCells(line))
 	return lines
 }
 
@@ -1012,17 +1113,8 @@ func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars, st *
 	center := layout.participantCenters[msg.From.Index]
 	width := layout.selfMessageWidth
 
-	ensureWidth := func(l string) []rune {
-		target := layout.totalWidth + width + 1
-		r := []rune(l)
-		if len(r) < target {
-			pad := make([]rune, target-len(r))
-			for i := range pad {
-				pad[i] = ' '
-			}
-			r = append(r, pad...)
-		}
-		return r
+	ensureWidth := func(l string) []textCell {
+		return padRunes(l, layout.totalWidth+width+1)
 	}
 
 	label := msg.Label
@@ -1031,67 +1123,54 @@ func renderSelfMessage(msg *Message, layout *diagramLayout, chars BoxChars, st *
 	}
 
 	if label != "" {
-		line := ensureWidth(buildLifeline(layout, chars, st))
 		start := center + labelLeftMargin
-		labelWidth := runewidth.StringWidth(label)
+		labelWidth := displayWidth(label)
 		needed := start + labelWidth + labelBufferSpace
-		if len(line) < needed {
-			pad := make([]rune, needed-len(line))
-			for i := range pad {
-				pad[i] = ' '
-			}
-			line = append(line, pad...)
-		}
-		col := start
-		for _, c := range label {
-			if col < len(line) {
-				line[col] = c
-				col++
-			}
-		}
-		lines = append(lines, strings.TrimRight(string(line), " "))
+		line := padRunes(buildLifeline(layout, chars, st), needed)
+		putText(line, start, label)
+		lines = append(lines, trimCells(line))
 	}
 
 	// Solid arrows keep the solid horizontal glyph; dotted arrows (-->>/-->) use
 	// the dotted line. For solid arrows style == chars.Horizontal, so output is
 	// unchanged from before.
-	style := chars.Horizontal
+	style := cellRune(chars.Horizontal)
 	if msg.ArrowType.isDotted() {
-		style = chars.DottedLine
+		style = cellRune(chars.DottedLine)
 	}
 
 	l1 := ensureWidth(buildLifeline(layout, chars, st))
-	l1[center] = chars.TeeRight
+	l1[center] = cellRune(chars.TeeRight)
 	if msg.CentralFrom {
-		l1[center] = chars.Circle
+		l1[center] = cellRune(chars.Circle)
 	}
 	for i := 1; i < width; i++ {
 		l1[center+i] = style
 	}
-	l1[center+width-1] = chars.SelfTopRight
-	lines = append(lines, strings.TrimRight(string(l1), " "))
+	l1[center+width-1] = cellRune(chars.SelfTopRight)
+	lines = append(lines, trimCells(l1))
 
 	l2 := ensureWidth(buildLifeline(layout, chars, st))
-	l2[center+width-1] = chars.Vertical
-	lines = append(lines, strings.TrimRight(string(l2), " "))
+	l2[center+width-1] = cellRune(chars.Vertical)
+	lines = append(lines, trimCells(l2))
 
 	l3 := ensureWidth(buildLifeline(layout, chars, st))
-	l3[center] = chars.Vertical
+	l3[center] = cellRune(chars.Vertical)
 	if msg.CentralTo {
-		l3[center] = chars.Circle
+		l3[center] = cellRune(chars.Circle)
 	}
 	// Open arrows have no head. A bidirectional self-message collapses to a
 	// single head: both of its ends sit on the same lifeline, and the return
 	// head is where they coincide.
 	l3[center+1] = style
 	if head, ok := msg.ArrowType.head(chars, false); ok {
-		l3[center+1] = head
+		l3[center+1] = cellRune(head)
 	}
 	for i := 2; i < width-1; i++ {
 		l3[center+i] = style
 	}
-	l3[center+width-1] = chars.SelfBottom
-	lines = append(lines, strings.TrimRight(string(l3), " "))
+	l3[center+width-1] = cellRune(chars.SelfBottom)
+	lines = append(lines, trimCells(l3))
 
 	return lines
 }
