@@ -294,6 +294,7 @@ D->>E: 作成
 destroy E
 A-xE: 終了`
 
+	var unicodeOutput, asciiOutput string
 	for _, useASCII := range []bool{false, true} {
 		d, err := Parse(input)
 		if err != nil {
@@ -312,7 +313,313 @@ A-xE: 終了`
 				t.Errorf("Render(useASCII=%t) missing CJK text %q:\n%s", useASCII, text, output)
 			}
 		}
+		assertCJKFeatureAlignment(t, output, useASCII)
+		if useASCII {
+			asciiOutput = output
+		} else {
+			unicodeOutput = output
+		}
 	}
+	assertCJKFeatureRowsHaveConsistentWidth(t, unicodeOutput, asciiOutput)
+}
+
+func assertCJKFeatureRowsHaveConsistentWidth(t *testing.T, unicodeOutput, asciiOutput string) {
+	t.Helper()
+	unicodeRows := strings.Split(strings.TrimRight(unicodeOutput, "\n"), "\n")
+	asciiRows := strings.Split(strings.TrimRight(asciiOutput, "\n"), "\n")
+	if len(unicodeRows) != len(asciiRows) {
+		t.Fatalf("Unicode and ASCII row counts differ: %d vs %d", len(unicodeRows), len(asciiRows))
+	}
+	for i := range unicodeRows {
+		unicodeWidth := displayWidth(unicodeRows[i])
+		asciiWidth := displayWidth(asciiRows[i])
+		if unicodeWidth != len(textCells(unicodeRows[i])) || asciiWidth != len(textCells(asciiRows[i])) {
+			t.Errorf("row %d display width does not match text cells: Unicode=%d ASCII=%d", i, unicodeWidth, asciiWidth)
+		}
+		if unicodeWidth != asciiWidth {
+			t.Errorf("row %d display widths differ: Unicode=%d ASCII=%d", i, unicodeWidth, asciiWidth)
+		}
+	}
+}
+
+func assertCJKFeatureAlignment(t *testing.T, output string, useASCII bool) {
+	t.Helper()
+	lines := strings.Split(strings.TrimSuffix(output, "\n"), "\n")
+	labels := []string{"顧客", "服务", "監査", "数据库", "新規"}
+	columns := participantColumns(t, lines, labels, useASCII)
+
+	for _, message := range []struct {
+		label, from, to string
+	}{
+		{"注文", "顧客", "服务"},
+		{"応答", "服务", "顧客"},
+		{"失敗", "顧客", "監査"},
+		{"完了", "監査", "数据库"},
+		{"再送", "数据库", "顧客"},
+		{"更新", "服务", "数据库"},
+		{"作成", "数据库", "新規"},
+		{"終了", "顧客", "新規"},
+	} {
+		assertAlignedMessage(t, lines, message.label, columns[message.from], columns[message.to], useASCII)
+	}
+	assertAlignedSelfMessage(t, lines, "自己", columns["服务"])
+	assertAlignedNote(t, lines, "注記", columns["顧客"], columns["服务"], useASCII)
+	assertAlignedContainer(t, lines, "[alt 成功]", map[string]int{
+		"顧客": columns["顧客"], "服务": columns["服务"], "監査": columns["監査"], "数据库": columns["数据库"],
+	}, useASCII, true, "fragment")
+	assertAlignedContainer(t, lines, "日本語サービス", map[string]int{
+		"顧客": columns["顧客"], "服务": columns["服务"],
+	}, useASCII, false, "box")
+
+	activationRow := findTextRow(lines, "更新", 0)
+	active := '┃'
+	if useASCII {
+		active = '#'
+	}
+	if !isRuneCell(cellAt(lines[activationRow], columns["服务"]), active) {
+		t.Errorf("useASCII=%t activation lifeline for 更新 is not aligned at 服务 column %d", useASCII, columns["服务"])
+	}
+	assertMessageEndpoint(t, lines, "終了", columns["新規"], useASCII, '×', 'x')
+}
+
+func participantColumns(t *testing.T, lines, labels []string, useASCII bool) map[string]int {
+	t.Helper()
+	headerRow := -1
+	for i, line := range lines {
+		allPresent := true
+		for _, label := range labels {
+			if !strings.Contains(line, label) {
+				allPresent = false
+				break
+			}
+		}
+		if allPresent {
+			headerRow = i
+			break
+		}
+	}
+	if headerRow < 0 || headerRow+1 >= len(lines) {
+		t.Fatalf("participant header row not found in rendered output")
+	}
+
+	header := lines[headerRow]
+	bottom := textCells(lines[headerRow+1])
+	junction := '┬'
+	if useASCII {
+		junction = '+'
+	}
+	columns := make(map[string]int, len(labels))
+	for _, label := range labels {
+		labelColumn, ok := textColumn(header, label)
+		if !ok {
+			t.Fatalf("label %q has no display-cell column", label)
+		}
+		labelCenter := labelColumn + displayWidth(label)/2
+		best, bestDistance := -1, len(bottom)+1
+		for column, cell := range bottom {
+			if isRuneCell(cell, junction) && abs(column-labelCenter) < bestDistance {
+				best, bestDistance = column, abs(column-labelCenter)
+			}
+		}
+		if best < 0 {
+			t.Fatalf("participant %q has no header junction near display column %d", label, labelColumn)
+		}
+		columns[label] = best
+	}
+	return columns
+}
+
+func assertAlignedMessage(t *testing.T, lines []string, label string, from, to int, useASCII bool) {
+	t.Helper()
+	labelRow := findTextRow(lines, label, 0)
+	arrowRow := findMessageRow(lines, labelRow+1, from, to, useASCII)
+	if arrowRow < 0 {
+		t.Errorf("message %q has no arrow row spanning display columns %d and %d", label, from, to)
+		return
+	}
+	for _, column := range []int{from, to} {
+		if isBlankCell(cellAt(lines[arrowRow], column)) {
+			t.Errorf("message %q arrow is blank at display column %d", label, column)
+		}
+	}
+}
+
+func assertAlignedSelfMessage(t *testing.T, lines []string, label string, from int) {
+	t.Helper()
+	labelRow := findTextRow(lines, label, 0)
+	right := from + defaultSelfMessageWidth - 1
+	for row := labelRow + 1; row <= labelRow+3 && row < len(lines); row++ {
+		if !isBlankCell(cellAt(lines[row], from)) && !isBlankCell(cellAt(lines[row], right)) {
+			return
+		}
+	}
+	t.Errorf("self-message %q does not keep its loop anchored at display columns %d and %d", label, from, right)
+}
+
+func assertAlignedNote(t *testing.T, lines []string, label string, first, last int, useASCII bool) {
+	t.Helper()
+	row := findTextRow(lines, label, 0)
+	cells := textCells(lines[row])
+	border := '│'
+	if useASCII {
+		border = '|'
+	}
+	labelColumn := textColumnMust(lines[row], label)
+	left, right := nearestRune(cells, labelColumn, border, -1), nearestRune(cells, labelColumn, border, 1)
+	if left < 0 || right < 0 || !(left < first && last < right) {
+		t.Errorf("note %q does not span participant columns %d..%d: borders %d..%d", label, first, last, left, right)
+		return
+	}
+	for _, borderRow := range []int{row - 1, row + 1} {
+		if borderRow < 0 || isBlankCell(cellAt(lines[borderRow], left)) || isBlankCell(cellAt(lines[borderRow], right)) {
+			t.Errorf("note %q border is not aligned with columns %d and %d", label, left, right)
+		}
+	}
+}
+
+func assertAlignedContainer(t *testing.T, lines []string, label string, columns map[string]int, useASCII, useFurthestRight bool, kind string) {
+	t.Helper()
+	row := findTextRow(lines, label, 0)
+	labelColumn := textColumnMust(lines[row], label)
+	cells := textCells(lines[row])
+	leftRune, rightRune := '┌', '┐'
+	if useASCII {
+		leftRune, rightRune = '+', '+'
+	}
+	left := nearestRune(cells, labelColumn, leftRune, -1)
+	right := nearestRune(cells, labelColumn, rightRune, 1)
+	if useFurthestRight {
+		right = furthestRune(cells, labelColumn, rightRune, 1)
+	}
+	for participant, column := range columns {
+		if left < 0 || right < 0 || !(left < column && column < right) {
+			t.Errorf("%s %q does not contain %s lifeline column %d: %s %d..%d", kind, label, participant, column, kind, left, right)
+		}
+	}
+}
+
+func assertMessageEndpoint(t *testing.T, lines []string, label string, target int, useASCII bool, unicodeRune, asciiRune rune) {
+	t.Helper()
+	labelRow := findTextRow(lines, label, 0)
+	for row := labelRow + 1; row < len(lines) && row <= labelRow+8; row++ {
+		if !isBlankCell(cellAt(lines[row], target)) && (hasCellContent(cellAt(lines[row], target), unicodeRune) || hasCellContent(cellAt(lines[row], target), asciiRune)) {
+			return
+		}
+	}
+	t.Errorf("message %q has no expected endpoint at display column %d (ASCII=%t)", label, target, useASCII)
+}
+
+func findTextRow(lines []string, text string, start int) int {
+	for i := start; i < len(lines); i++ {
+		if strings.Contains(lines[i], text) {
+			return i
+		}
+	}
+	return -1
+}
+
+func findMessageRow(lines []string, start, from, to int, useASCII bool) int {
+	for row := start; row < len(lines) && row <= start+8; row++ {
+		cells := textCells(lines[row])
+		lo, hi := from, to
+		if lo > hi {
+			lo, hi = hi, lo
+		}
+		strokes := 0
+		for column := lo; column <= hi; column++ {
+			if isHorizontalCell(cellAtCells(cells, column), useASCII) {
+				strokes++
+			}
+		}
+		if strokes > 0 && !isBlankCell(cellAtCells(cells, from)) && !isBlankCell(cellAtCells(cells, to)) {
+			return row
+		}
+	}
+	return -1
+}
+
+func textColumnMust(line, text string) int {
+	column, ok := textColumn(line, text)
+	if !ok {
+		return -1
+	}
+	return column
+}
+
+func textColumn(line, text string) (int, bool) {
+	cells := textCells(line)
+	for start, cell := range cells {
+		if !isTextualCell(cell) {
+			continue
+		}
+		var got strings.Builder
+		for end := start; end < len(cells); end++ {
+			if !cells[end].continuation {
+				got.WriteString(cells[end].content)
+			}
+			value := got.String()
+			if strings.HasPrefix(value, text) {
+				return start, true
+			}
+			if !strings.HasPrefix(text, value) {
+				break
+			}
+		}
+	}
+	return 0, false
+}
+
+func nearestRune(cells []textCell, start int, target rune, direction int) int {
+	for column := start + direction; column >= 0 && column < len(cells); column += direction {
+		if isRuneCell(cells[column], target) {
+			return column
+		}
+	}
+	return -1
+}
+
+func furthestRune(cells []textCell, start int, target rune, direction int) int {
+	found := -1
+	for column := start + direction; column >= 0 && column < len(cells); column += direction {
+		if isRuneCell(cells[column], target) {
+			found = column
+		}
+	}
+	return found
+}
+
+func cellAt(line string, column int) textCell { return cellAtCells(textCells(line), column) }
+
+func cellAtCells(cells []textCell, column int) textCell {
+	if column < 0 || column >= len(cells) {
+		return cellRune(' ')
+	}
+	return cells[column]
+}
+
+func isBlankCell(cell textCell) bool {
+	return !cell.textual && !cell.continuation && cell.content == " "
+}
+
+func hasCellContent(cell textCell, content rune) bool {
+	return !cell.continuation && cell.content == string(content)
+}
+
+func isHorizontalCell(cell textCell, useASCII bool) bool {
+	if cell.textual || cell.continuation {
+		return false
+	}
+	if useASCII {
+		return cell.content == "-" || cell.content == "."
+	}
+	return cell.content == "─" || cell.content == "┈"
+}
+
+func abs(value int) int {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
 
 func TestPutTextLeadingCombiningMarkSkipsPadding(t *testing.T) {
