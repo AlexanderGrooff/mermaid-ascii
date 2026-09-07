@@ -1,0 +1,23 @@
+paddingX=1
+paddingY=1
+flowchart TB
+    A -->|alpha| B
+    A -->|beta| C
+    A -->|gamma| D
+---
++---+              
+|   |              
+| A |              
+|   |              
++---+              
+  |                
+  +------+-----+   
+  |      |     |   
+alpha  beta  gamma 
+  |      |     |   
+  v      v     v   
++---+  +---+ +---+ 
+|   |  |   | |   | 
+| B |  | C | | D | 
+|   |  |   | |   | 
++---+  +---+ +---+ 

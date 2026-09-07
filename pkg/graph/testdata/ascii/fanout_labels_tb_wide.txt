@@ -1,0 +1,23 @@
+paddingX=1
+paddingY=1
+flowchart TB
+    A -->|long first label| B
+    A -->|猫猫猫| C
+    A -->|last choice| D
+---
+      +---+                           
+      |   |                           
+      | A |                           
+      |   |                           
+      +---+                           
+        |                             
+        +------------+---------+      
+        |            |         |      
+long first label  猫猫猫  last choice 
+        |            |         |      
+        v            v         v      
+      +---+        +---+     +---+    
+      |   |        |   |     |   |    
+      | B |        | C |     | D |    
+      |   |        |   |     |   |    
+      +---+        +---+     +---+    

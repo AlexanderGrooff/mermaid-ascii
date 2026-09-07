@@ -298,7 +298,11 @@ func (g *graph) createMapping() {
 		g.setColumnWidth(n)
 	}
 
+	g.layoutFanouts()
 	for _, e := range g.edges {
+		if e.fanout {
+			continue
+		}
 		g.determinePath(e)
 		g.increaseGridSizeForPath(e.path)
 		g.determineLabelLine(e)
