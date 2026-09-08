@@ -22,13 +22,15 @@ type TestCase struct {
 	Expected string
 	PaddingX int
 	PaddingY int
+	MaxWidth int
 }
 
-// ReadTestCase reads a test case file with optional padding configuration.
+// ReadTestCase reads a test case file with optional layout configuration.
 // File format:
 //
 //	[paddingX = N]  // optional
 //	[paddingY = N]  // optional
+//	[maxWidth = N]  // optional
 //	<mermaid code>
 //	---
 //	<expected output>
@@ -47,7 +49,7 @@ func ReadTestCase(filePath string) (*TestCase, error) {
 	var mermaid, expected strings.Builder
 	inMermaid := true
 	mermaidStarted := false
-	paddingRegex := regexp.MustCompile(`^(?i)(padding[xy])\s*=\s*(\d+)\s*$`)
+	paddingRegex := regexp.MustCompile(`^(?i)(padding[xy]|maxwidth)\s*=\s*(\d+)\s*$`)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -68,8 +70,10 @@ func ReadTestCase(filePath string) (*TestCase, error) {
 					}
 					if strings.EqualFold(match[1], "paddingX") {
 						tc.PaddingX = paddingValue
-					} else {
+					} else if strings.EqualFold(match[1], "paddingY") {
 						tc.PaddingY = paddingValue
+					} else {
+						tc.MaxWidth = paddingValue
 					}
 					continue
 				}

@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/render"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // Global flags
@@ -19,6 +22,7 @@ var paddingBetweenX = 5
 var paddingBetweenY = 5
 var graphDirection = "LR"
 var useAscii = false
+var maxWidth string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -64,13 +68,22 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("Invalid configuration: %v", err)
 		}
+		config.MaxWidth, err = resolveMaxWidth(maxWidth, os.Stdout)
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		// Render diagram (automatically detects type)
-		output, err := render.RenderDiagram(string(mermaid), config)
+		output, widthStatus, err := render.RenderDiagramWithStatus(string(mermaid), config)
 		if err != nil {
 			log.Fatal(err)
 		}
 		fmt.Print(output)
+		if widthStatus.Requested && widthStatus.Compacted && widthStatus.Met {
+			fmt.Fprintf(os.Stderr, "note: graph exceeded --max-width %d; used compact spacing (%d columns)\n", widthStatus.Limit, widthStatus.Width)
+		} else if widthStatus.Requested && !widthStatus.Met {
+			fmt.Fprintf(os.Stderr, "warning: graph is %d columns wide; it could not fit --max-width %d even with compact spacing\n", widthStatus.Width, widthStatus.Limit)
+		}
 	},
 }
 
@@ -81,6 +94,29 @@ func Execute() {
 	if err != nil {
 		os.Exit(1)
 	}
+}
+
+func resolveMaxWidth(value string, stdout *os.File) (int, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, nil
+	}
+	if strings.EqualFold(value, "auto") {
+		if stdout == nil || !term.IsTerminal(int(stdout.Fd())) {
+			return 0, fmt.Errorf("--max-width=auto requires stdout to be a terminal")
+		}
+		width, _, err := term.GetSize(int(stdout.Fd()))
+		if err != nil || width <= 0 {
+			return 0, fmt.Errorf("could not detect terminal width for --max-width=auto")
+		}
+		return width, nil
+	}
+
+	width, err := strconv.Atoi(value)
+	if err != nil || width <= 0 {
+		return 0, fmt.Errorf("invalid --max-width %q: use a positive number or auto", value)
+	}
+	return width, nil
 }
 
 func init() {
@@ -94,6 +130,7 @@ func init() {
 	rootCmd.PersistentFlags().IntVarP(&paddingBetweenX, "paddingX", "x", paddingBetweenX, "Horizontal space between nodes")
 	rootCmd.PersistentFlags().IntVarP(&paddingBetweenY, "paddingY", "y", paddingBetweenY, "Vertical space between nodes")
 	rootCmd.PersistentFlags().IntVarP(&boxBorderPadding, "borderPadding", "p", boxBorderPadding, "Padding between text and border")
+	rootCmd.PersistentFlags().StringVar(&maxWidth, "max-width", "", "Maximum graph width in terminal columns (positive number or auto)")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
