@@ -47,23 +47,76 @@ func (g *graph) drawEdge(e *edge) (*drawing, *drawing, *drawing, *drawing, *draw
 	return g.drawArrow(from, to, e)
 }
 
+type textCell struct {
+	text  string
+	width int
+}
+
+// textCells keeps combining marks and ZWJ sequences with the visible
+// character they modify. Drawing each rune separately would shift later text.
+func textCells(text string) []textCell {
+	cells := make([]textCell, 0, len(text))
+	var cluster strings.Builder
+	clusterWidth := 0
+	joinNext := false
+	flush := func() {
+		if cluster.Len() == 0 {
+			return
+		}
+		value := cluster.String()
+		cells = append(cells, textCell{text: value, width: runewidth.StringWidth(value)})
+		cluster.Reset()
+		clusterWidth = 0
+	}
+
+	for _, r := range text {
+		runeWidth := runewidth.RuneWidth(r)
+		if cluster.Len() > 0 && runeWidth > 0 && clusterWidth > 0 && !joinNext {
+			flush()
+		}
+		cluster.WriteRune(r)
+		if runeWidth > 0 && clusterWidth == 0 {
+			clusterWidth = runeWidth
+		}
+		if r == '\u200d' {
+			joinNext = true
+		} else if runeWidth > 0 {
+			joinNext = false
+		}
+	}
+	flush()
+	return cells
+}
+
+func drawTextCells(d *drawing, start drawingCoord, text string, style func(string) string) {
+	textX := start.x
+	lastCellX := start.x
+	for _, cell := range textCells(text) {
+		if cell.width == 0 {
+			if lastCellX >= 0 && lastCellX < len(*d) && start.y >= 0 && start.y < len((*d)[lastCellX]) {
+				(*d)[lastCellX][start.y] += style(cell.text)
+			}
+			continue
+		}
+		if textX < 0 || textX >= len(*d) || start.y < 0 || start.y >= len((*d)[textX]) {
+			break
+		}
+		(*d)[textX][start.y] = style(cell.text)
+		for offset := 1; offset < cell.width && textX+offset < len(*d); offset++ {
+			(*d)[textX+offset][start.y] = ""
+		}
+		lastCellX = textX
+		textX += cell.width
+	}
+}
+
 func (d *drawing) drawText(start drawingCoord, text string) {
 	// Increase dimensions if necessary. Use the visual width so multibyte
 	// (e.g. Cyrillic, CJK) runes reserve the correct number of cells.
 	textWidth := runewidth.StringWidth(text)
 	d.increaseSize(start.x+textWidth, start.y)
 	log.Debug("Drawing '", text, "' from ", start, " to ", drawingCoord{x: start.x + textWidth, y: start.y})
-	// Iterate over runes (not bytes) so multibyte characters are placed in a
-	// single cell instead of being split into invalid byte fragments.
-	textX := start.x
-	for _, r := range text {
-		runeWidth := Max(runewidth.RuneWidth(r), 1)
-		(*d)[textX][start.y] = string(r)
-		for offset := 1; offset < runeWidth; offset++ {
-			(*d)[textX+offset][start.y] = ""
-		}
-		textX += runeWidth
-	}
+	drawTextCells(d, start, text, func(value string) string { return value })
 }
 
 func (g *graph) drawLine(d *drawing, from drawingCoord, to drawingCoord, offsetFrom int, offsetTo int, stroke edgeStroke) []drawingCoord {
@@ -282,14 +335,12 @@ func drawBox(n *node, g graph) *drawing {
 		textY := contentTop + lineIdx*(graphLabelLineGap+1)
 		textWidth := runewidth.StringWidth(line)
 		textX := from.x + w/2 - CeilDiv(textWidth, 2) + 1
-		for _, r := range line {
-			runeWidth := Max(runewidth.RuneWidth(r), 1)
-			boxDrawing[textX][textY] = wrapTextInColor(string(r), n.styleClass.styles["color"], g.styleType)
-			for offset := 1; offset < runeWidth; offset++ {
-				boxDrawing[textX+offset][textY] = ""
-			}
-			textX += runeWidth
+		if textWidth == 0 {
+			textX = from.x + 1
 		}
+		drawTextCells(&boxDrawing, drawingCoord{x: textX, y: textY}, line, func(value string) string {
+			return wrapTextInColor(value, n.styleClass.styles["color"], g.styleType)
+		})
 	}
 
 	return &boxDrawing
@@ -381,16 +432,12 @@ func drawSubgraphLabel(sg *subgraph, g graph) (*drawing, drawingCoord) {
 		if labelX < from.x+1 {
 			labelX = from.x + 1
 		}
-		for _, char := range line {
-			runeWidth := Max(runewidth.RuneWidth(char), 1)
-			if labelX < to.x {
-				labelDrawing[labelX][labelY] = string(char)
-			}
-			for offset := 1; offset < runeWidth && labelX+offset < to.x; offset++ {
-				labelDrawing[labelX+offset][labelY] = ""
-			}
-			labelX += runeWidth
+		if runewidth.StringWidth(line) == 0 && labelX >= to.x {
+			labelX = to.x - 1
 		}
+		drawTextCells(&labelDrawing, drawingCoord{x: labelX, y: labelY}, line, func(value string) string {
+			return value
+		})
 	}
 
 	// Return label drawing and its offset position

@@ -48,6 +48,28 @@ func TestGraphMaxWidthGolden(t *testing.T) {
 	}
 }
 
+func TestMaxWidthHandlesUnicodeClusterLabels(t *testing.T) {
+	for _, label := range []string{"👩‍💻", "á́́́́"} {
+		t.Run(label, func(t *testing.T) {
+			config := diagram.NewTestConfig(true, "cli")
+			config.MaxWidth = 12
+			output, status, err := RenderDiagramWithStatus("graph LR\nA[\""+label+"\"] --> B", config)
+			if err != nil {
+				t.Fatalf("RenderDiagramWithStatus() error = %v", err)
+			}
+			if !status.Compacted || !status.Met {
+				t.Fatalf("status = %+v, want compact fit", status)
+			}
+			if status.Width > config.MaxWidth {
+				t.Fatalf("width = %d, want <= %d", status.Width, config.MaxWidth)
+			}
+			if !strings.Contains(output, label) || !strings.Contains(output, " B ") {
+				t.Fatalf("output lost Unicode label or target node %q:\n%s", label, output)
+			}
+		})
+	}
+}
+
 func TestMaxWidthPreservesGraphContentAndDoesNotAffectSequence(t *testing.T) {
 	graphConfig := diagram.NewTestConfig(true, "cli")
 	graphConfig.MaxWidth = 20
