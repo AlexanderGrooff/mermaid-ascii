@@ -310,6 +310,50 @@ func TestMermaidFileToMapParsesChainedNonStandardEdges(t *testing.T) {
 	}
 }
 
+func TestParsePreservesQuotedLabelMarkersAndUnquotedClassShorthand(t *testing.T) {
+	properties, err := Parse(`graph LR
+A["literal %% and ::: text"]:::primary --> B`, "cli")
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	spec := properties.nodeSpecs["A"]
+	if len(spec.label.lines) != 1 || spec.label.lines[0] != "literal %% and ::: text" {
+		t.Fatalf("label lines = %#v, want [literal %% and ::: text]", spec.label.lines)
+	}
+	if spec.styleClass != "primary" {
+		t.Fatalf("styleClass = %q, want %q", spec.styleClass, "primary")
+	}
+}
+
+func TestParseNodeDoesNotTreatQuotedClassMarkerAsShorthand(t *testing.T) {
+	node := parseNode(`A["literal ::: text"]`)
+
+	if node.name != "A" {
+		t.Fatalf("name = %q, want %q", node.name, "A")
+	}
+	if node.styleClass != "" {
+		t.Fatalf("styleClass = %q, want empty class", node.styleClass)
+	}
+	if len(node.label.lines) != 1 || node.label.lines[0] != "literal ::: text" {
+		t.Fatalf("label lines = %#v, want [literal ::: text]", node.label.lines)
+	}
+}
+
+func TestParseRejectsMalformedClassDefWithoutPanicking(t *testing.T) {
+	for _, declaration := range []string{
+		"classDef broken fill",
+		"classDef broken fill:#f00,stroke",
+		"classDef broken fill:#f00,",
+	} {
+		t.Run(declaration, func(t *testing.T) {
+			if _, err := Parse("graph LR\\n"+declaration, "cli"); err == nil {
+				t.Fatal("Parse() succeeded for malformed classDef")
+			}
+		})
+	}
+}
+
 // TestGraphTypeDetection verifies that the diagram declaration line is parsed
 // tolerantly: surrounding whitespace, a missing direction (defaults to
 // top-down), and the reverse directions RL/BT are all accepted.
