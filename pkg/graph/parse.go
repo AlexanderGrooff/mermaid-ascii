@@ -89,6 +89,44 @@ func parseSubgraphHeader(header string) textSubgraph {
 	}
 }
 
+func isEscaped(text string, index int) bool {
+	backslashes := 0
+	for i := index - 1; i >= 0 && text[i] == '\\'; i-- {
+		backslashes++
+	}
+	return backslashes%2 == 1
+}
+
+func stripUnquotedComment(line string) string {
+	inQuotes := false
+	for i := 0; i < len(line); i++ {
+		if line[i] == '"' && !isEscaped(line, i) {
+			inQuotes = !inQuotes
+			continue
+		}
+		if !inQuotes && strings.HasPrefix(line[i:], "%%") {
+			return strings.TrimSpace(line[:i])
+		}
+	}
+	return strings.TrimSpace(line)
+}
+
+func lastUnquotedSubstring(text, substring string) int {
+	last := -1
+	inQuotes := false
+	for i := 0; i < len(text); i++ {
+		if text[i] == '"' && !isEscaped(text, i) {
+			inQuotes = !inQuotes
+			continue
+		}
+		if !inQuotes && strings.HasPrefix(text[i:], substring) {
+			last = i
+			i += len(substring) - 1
+		}
+	}
+	return last
+}
+
 func splitGraphLines(mermaid string) []string {
 	lines := []string{}
 	var current strings.Builder
@@ -98,7 +136,9 @@ func splitGraphLines(mermaid string) []string {
 	for i := 0; i < len(mermaid); i++ {
 		switch mermaid[i] {
 		case '"':
-			inQuotes = !inQuotes
+			if !isEscaped(mermaid, i) {
+				inQuotes = !inQuotes
+			}
 		case '[':
 			if !inQuotes {
 				bracketDepth++
@@ -163,7 +203,7 @@ func parseNode(line string) textNode {
 	// Trim any whitespace from the line that might be left after comment removal
 	trimmedLine := strings.TrimSpace(line)
 	styleClass := ""
-	if idx := strings.LastIndex(trimmedLine, ":::"); idx != -1 {
+	if idx := lastUnquotedSubstring(trimmedLine, ":::"); idx != -1 {
 		styleClass = strings.TrimSpace(trimmedLine[idx+3:])
 		trimmedLine = strings.TrimSpace(trimmedLine[:idx])
 	}
@@ -195,17 +235,27 @@ func parseNode(line string) textNode {
 	return textNode{name: name, label: newGraphLabel(labelText), styleClass: styleClass}
 }
 
-func parseStyleClass(matchedLine []string) styleClass {
-	className := matchedLine[0]
-	styles := matchedLine[1]
-	// Styles are comma separated and key-values are separated by colon
+func parseStyleClass(matchedLine []string) (styleClass, error) {
+	if len(matchedLine) < 2 {
+		return styleClass{}, errors.New("classDef requires a class name and styles")
+	}
+	className := strings.TrimSpace(matchedLine[0])
+	styles := strings.TrimSpace(matchedLine[1])
+	if className == "" || styles == "" {
+		return styleClass{}, errors.New("classDef requires a class name and styles")
+	}
+
+	// Styles are comma separated and key-values are separated by a colon.
 	// Example: fill:#f9f,stroke:#333,stroke-width:4px
 	styleMap := make(map[string]string)
 	for _, style := range strings.Split(styles, ",") {
-		kv := strings.Split(style, ":")
-		styleMap[kv[0]] = kv[1]
+		kv := strings.SplitN(strings.TrimSpace(style), ":", 2)
+		if len(kv) != 2 || strings.TrimSpace(kv[0]) == "" || strings.TrimSpace(kv[1]) == "" {
+			return styleClass{}, fmt.Errorf("invalid classDef style %q", style)
+		}
+		styleMap[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
 	}
-	return styleClass{className, styleMap}
+	return styleClass{className, styleMap}, nil
 }
 
 func setArrowWithStyle(lhs, rhs []textNode, label string, isBidirectional bool, stroke edgeStroke, head edgeHead, gp *Properties) []textNode {
@@ -363,7 +413,10 @@ func (gp *Properties) parseString(line string) ([]textNode, error) {
 		{
 			regex: regexp.MustCompile(`^classDef\s+(.+)\s+(.+)$`),
 			handler: func(match []string) ([]textNode, error) {
-				s := parseStyleClass(match)
+				s, err := parseStyleClass(match)
+				if err != nil {
+					return nil, err
+				}
 				(*gp.styleClasses)[s.name] = s
 				return []textNode{}, nil
 			},
@@ -414,10 +467,9 @@ func Parse(mermaid, styleType string) (*Properties, error) {
 			continue
 		}
 
-		// Remove inline comments (anything after %%) and trim resulting whitespace
-		if idx := strings.Index(line, "%%"); idx != -1 {
-			line = strings.TrimSpace(line[:idx])
-		}
+		// Remove inline comments outside quoted labels. A quoted %% sequence is
+		// part of the label text, not a Mermaid comment.
+		line = stripUnquotedComment(line)
 
 		// Skip empty lines after comment removal
 		if len(strings.TrimSpace(line)) > 0 {
@@ -501,6 +553,7 @@ func Parse(mermaid, styleType string) (*Properties, error) {
 	subgraphStack := []*textSubgraph{}
 	subgraphRegex := regexp.MustCompile(`^\s*subgraph\s+(.+)$`)
 	endRegex := regexp.MustCompile(`^\s*end\s*$`)
+	classDefRegex := regexp.MustCompile(`^classDef(?:\s|$)`)
 
 	// Iterate over the lines
 	for _, line := range lines {
@@ -549,6 +602,9 @@ func Parse(mermaid, styleType string) (*Properties, error) {
 		// Parse nodes and edges normally
 		nodes, err := properties.parseString(line)
 		if err != nil {
+			if classDefRegex.MatchString(trimmedLine) {
+				return &properties, err
+			}
 			log.Debugf("Parsing remaining text to node %v", line)
 			node := parseNode(line)
 			addNode(node, properties.data, properties.nodeSpecs)
