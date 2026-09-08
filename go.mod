@@ -9,6 +9,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.19
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
+	golang.org/x/term v0.20.0
 )
 
 require (

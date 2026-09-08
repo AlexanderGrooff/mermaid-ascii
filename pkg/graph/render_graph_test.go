@@ -38,6 +38,22 @@ func TestRenderGraphKeepsDisplayWidthForWideNodeLabels(t *testing.T) {
 	assertUniformDisplayWidth(t, output)
 }
 
+func TestRenderGraphHandlesUnicodeClusterNodeLabels(t *testing.T) {
+	for _, label := range []string{"👩‍💻", "á́́́́"} {
+		t.Run(label, func(t *testing.T) {
+			config := diagram.NewTestConfig(true, "cli")
+			output, err := renderGraph("graph LR\nA[\""+label+"\"] --> B", config)
+			if err != nil {
+				t.Fatalf("renderGraph() error = %v", err)
+			}
+			if !strings.Contains(output, label) || !strings.Contains(output, " B ") {
+				t.Fatalf("output lost Unicode label or target node %q:\n%s", label, output)
+			}
+			assertUniformDisplayWidth(t, output)
+		})
+	}
+}
+
 func TestRenderGraphKeepsDisplayWidthForWideSubgraphTitles(t *testing.T) {
 	config := diagram.NewTestConfig(true, "cli")
 	output, err := renderGraph("graph LR\nsubgraph sg [数据库]\nA --> B\nend", config)

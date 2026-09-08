@@ -198,6 +198,19 @@ $ mermaid-ascii -f ./test.mermaid
 │          │          
 └──────────┘          
 
+# Limit graph output to terminal columns
+$ mermaid-ascii --file test.mermaid --max-width 30
+# Use the detected width when stdout is an interactive terminal
+$ mermaid-ascii --file test.mermaid --max-width auto
+
+`--max-width` accepts a positive terminal-column number or `auto`. `auto`
+detects stdout's terminal width and requires an interactive terminal; invalid
+and non-positive values are rejected. If a graph exceeds the limit, rendering
+retries with compact spacing (`paddingX=1` and `paddingY=1`). Content is never
+wrapped, truncated, cropped, or removed. The CLI notes when compact spacing
+fits and warns when it does not. The flag affects only graph and flowchart
+diagrams.
+
 # Read from stdin
 $ cat test.mermaid | mermaid-ascii
 ┌───┐     ┌───┐     ┌───┐
@@ -467,6 +480,7 @@ Available Commands:
 
 Flags:
   -p, --borderPadding int   Padding between text and border (default 1)
+      --max-width string    Maximum graph width in terminal columns (positive number or auto)
   -c, --coords              Show coordinates
   -f, --file string         Mermaid file to parse
   -h, --help                help for mermaid-ascii
@@ -678,7 +692,7 @@ The baseline components for Mermaid work, but there are a lot of things that are
 - [x] Prevent arrows overlapping nodes
 - [ ] Diagonal arrows
 - [ ] Place nodes in a more compact way
-- [ ] Prevent rendering more than X characters wide (like default 80 for terminal width)
+- [x] Limit graph output to terminal width with `--max-width`
 
 ### Sequence Diagram Improvements
 

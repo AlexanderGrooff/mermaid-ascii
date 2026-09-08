@@ -8,6 +8,7 @@ import (
 
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram"
 	"github.com/AlexanderGrooff/mermaid-ascii/pkg/diagram/testutil"
+	"github.com/mattn/go-runewidth"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -25,11 +26,24 @@ func verifyMap(t *testing.T, testCaseFile string, useAscii bool) {
 	properties.paddingY = tc.PaddingY
 	properties.useAscii = useAscii
 	actualMap := Draw(properties)
+	if tc.MaxWidth > 0 && maxDisplayWidth(actualMap) > tc.MaxWidth {
+		properties.paddingX = 1
+		properties.paddingY = 1
+		actualMap = Draw(properties)
+	}
 	if tc.Expected != actualMap {
 		expectedWithSpaces := testutil.VisualizeWhitespace(tc.Expected)
 		actualWithSpaces := testutil.VisualizeWhitespace(actualMap)
 		t.Errorf("Map didn't match actual map\nExpected:\n%v\nActual:\n%v", expectedWithSpaces, actualWithSpaces)
 	}
+}
+
+func maxDisplayWidth(output string) int {
+	width := 0
+	for _, line := range strings.Split(output, "\n") {
+		width = max(width, runewidth.StringWidth(line))
+	}
+	return width
 }
 
 func TestASCII(t *testing.T) {

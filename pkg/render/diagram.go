@@ -63,7 +63,8 @@ func (sd *SequenceDiagram) Type() string {
 }
 
 type GraphDiagram struct {
-	properties *graph.Properties
+	properties  *graph.Properties
+	widthStatus WidthStatus
 }
 
 func (gd *GraphDiagram) Parse(input string) error {
@@ -84,9 +85,27 @@ func (gd *GraphDiagram) Render(config *diagram.Config) (string, error) {
 		config = diagram.DefaultConfig()
 	}
 
+	gd.widthStatus = WidthStatus{Requested: config.MaxWidth > 0, Limit: config.MaxWidth}
 	gd.properties.Apply(config)
+	output := graph.Draw(gd.properties)
+	gd.widthStatus.Width = displayWidth(output)
+	gd.widthStatus.Met = !gd.widthStatus.Requested || gd.widthStatus.Width <= gd.widthStatus.Limit
+	if gd.widthStatus.Requested && !gd.widthStatus.Met {
+		compactConfig := *config
+		compactConfig.PaddingBetweenX = 1
+		compactConfig.PaddingBetweenY = 1
+		gd.properties.Apply(&compactConfig)
+		output = graph.Draw(gd.properties)
+		gd.widthStatus.Compacted = true
+		gd.widthStatus.Width = displayWidth(output)
+		gd.widthStatus.Met = gd.widthStatus.Width <= gd.widthStatus.Limit
+	}
 
-	return graph.Draw(gd.properties), nil
+	return output, nil
+}
+
+func (gd *GraphDiagram) WidthStatus() WidthStatus {
+	return gd.widthStatus
 }
 
 func (gd *GraphDiagram) Type() string {

@@ -28,6 +28,9 @@ type Config struct {
 	// GraphDirection is the direction of graph layout ("LR" or "TD")
 	GraphDirection string
 
+	// MaxWidth limits graph output width; zero disables fitting.
+	MaxWidth int
+
 	// StyleType determines output format for graph diagrams ("cli" or "html")
 	// This controls whether graphs use colored output (html) or plain text (cli)
 	StyleType string
@@ -159,6 +162,9 @@ func (c *Config) Validate() error {
 	}
 	if c.GraphDirection != "LR" && c.GraphDirection != "TD" {
 		return &ConfigError{Field: "GraphDirection", Value: c.GraphDirection, Message: "must be \"LR\" or \"TD\""}
+	}
+	if c.MaxWidth < 0 {
+		return &ConfigError{Field: "MaxWidth", Value: c.MaxWidth, Message: "must be positive or zero to disable"}
 	}
 	if c.StyleType != "cli" && c.StyleType != "html" {
 		return &ConfigError{Field: "StyleType", Value: c.StyleType, Message: "must be \"cli\" or \"html\""}
