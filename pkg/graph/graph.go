@@ -89,7 +89,7 @@ func mkGraph(data *orderedmap.OrderedMap[string, []textEdge], nodeSpecs map[stri
 		// Get or create parent node
 		parentNode, err := g.getNode(nodeName)
 		if err != nil {
-			parentNode = &node{name: nodeName, label: spec.label, index: index, styleClassName: spec.styleClass}
+			parentNode = &node{name: nodeName, label: spec.label, shape: spec.shape, index: index, styleClassName: spec.styleClass}
 			g.appendNode(parentNode)
 			index += 1
 		}
@@ -97,7 +97,7 @@ func mkGraph(data *orderedmap.OrderedMap[string, []textEdge], nodeSpecs map[stri
 			childSpec := nodeSpecs[textEdge.child.name]
 			childNode, err := g.getNode(textEdge.child.name)
 			if err != nil {
-				childNode = &node{name: textEdge.child.name, label: childSpec.label, index: index, styleClassName: childSpec.styleClass}
+				childNode = &node{name: textEdge.child.name, label: childSpec.label, shape: childSpec.shape, index: index, styleClassName: childSpec.styleClass}
 				g.appendNode(childNode)
 				index += 1
 			}

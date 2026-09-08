@@ -112,14 +112,14 @@ func (g *graph) drawArrow(from gridCoord, to gridCoord, e *edge) (*drawing, *dra
 	log.Debugf("Drawing arrow from %v to %v with path %v", from, to, e.path)
 	dLabel := g.drawArrowLabel(e)
 	dPath, linesDrawn, lineDirs := g.drawPath(e)
-	dBoxStart := g.drawBoxStart(e.path, linesDrawn[0], e.stroke)
+	dBoxStart := g.drawBoxStart(e.path, linesDrawn[0], e.stroke, e.from)
 	skipHead := e.head == headNone
 	if skipHead && len(linesDrawn) > 0 {
 		// headNone (open links like ---) has no arrowhead glyph to mark the
 		// connection at the destination, unlike every other head; touch up
 		// the destination box's own border the same way drawBoxStart does
 		// for the source, so the join is visible there too.
-		dBoxEnd := g.drawBoxEnd(linesDrawn[len(linesDrawn)-1], lineDirs[len(lineDirs)-1], e.stroke)
+		dBoxEnd := g.drawBoxEnd(linesDrawn[len(linesDrawn)-1], lineDirs[len(lineDirs)-1], e.stroke, e.to)
 		dBoxStart = g.mergeDrawings(dBoxStart, drawingCoord{0, 0}, dBoxEnd)
 	}
 	var dArrowHead *drawing
@@ -202,13 +202,13 @@ func (g *graph) drawPath(e *edge) (*drawing, [][]drawingCoord, []direction) {
 	return d, linesDrawn, lineDirs
 }
 
-func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord, stroke edgeStroke) *drawing {
+func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord, stroke edgeStroke, n *node) *drawing {
 	d := *(copyCanvas(g.drawing))
 	from := firstLine[0]
 	dir := determineDirection(genericCoord(path[0]), genericCoord(path[1]))
 	log.Debugf("Drawing box start at %v with direction %v for line %v", from, dir, path)
 
-	if g.useAscii {
+	if g.useAscii || n.shape != shapeRectangle {
 		return &d
 	}
 
@@ -233,14 +233,14 @@ func (g *graph) drawBoxStart(path []gridCoord, firstLine []drawingCoord, stroke 
 }
 
 // drawBoxEnd is drawBoxStart's mirror for the destination end of a path.
-func (g *graph) drawBoxEnd(lastLine []drawingCoord, dir direction, stroke edgeStroke) *drawing {
+func (g *graph) drawBoxEnd(lastLine []drawingCoord, dir direction, stroke edgeStroke, n *node) *drawing {
 	d := *(copyCanvas(g.drawing))
 	if len(lastLine) == 0 {
 		return &d
 	}
 	to := lastLine[len(lastLine)-1]
 
-	if g.useAscii || stroke == strokeThick {
+	if g.useAscii || stroke == strokeThick || n.shape != shapeRectangle {
 		return &d
 	}
 

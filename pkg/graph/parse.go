@@ -42,12 +42,14 @@ type Properties struct {
 type textNode struct {
 	name       string
 	label      graphLabel
+	shape      nodeShape
 	hasLabel   bool
 	styleClass string
 }
 
 type graphNodeSpec struct {
 	label           graphLabel
+	shape           nodeShape
 	labelIsExplicit bool
 	styleClass      string
 }
@@ -213,13 +215,14 @@ func parseNode(line string) textNode {
 	for _, shape := range []struct {
 		open  string
 		close string
+		kind  nodeShape
 	}{
-		{open: "[(", close: ")]"},
-		{open: "{{", close: "}}"},
-		{open: "{", close: "}"},
-		{open: "[", close: "]"},
-		{open: "(", close: ")"},
-		{open: ">", close: "]"},
+		{open: "[(", close: ")]", kind: shapeRectangle},
+		{open: "{{", close: "}}", kind: shapeRectangle},
+		{open: "{", close: "}", kind: shapeDiamond},
+		{open: "[", close: "]", kind: shapeRectangle},
+		{open: "(", close: ")", kind: shapeRounded},
+		{open: ">", close: "]", kind: shapeRectangle},
 	} {
 		if open := strings.Index(trimmedLine, shape.open); open > 0 && strings.HasSuffix(trimmedLine, shape.close) {
 			candidateLabel := strings.TrimSpace(trimmedLine[open+len(shape.open) : len(trimmedLine)-len(shape.close)])
@@ -228,7 +231,7 @@ func parseNode(line string) textNode {
 			}
 			name = strings.TrimSpace(trimmedLine[:open])
 			labelText = trimIntentionalOuterQuotes(candidateLabel)
-			return textNode{name: name, label: newGraphLabel(labelText), hasLabel: true, styleClass: styleClass}
+			return textNode{name: name, label: newGraphLabel(labelText), shape: shape.kind, hasLabel: true, styleClass: styleClass}
 		}
 	}
 
@@ -284,6 +287,7 @@ func rememberNode(node textNode, nodeSpecs map[string]graphNodeSpec) {
 	spec := nodeSpecs[node.name]
 	if node.hasLabel || len(spec.label.lines) == 0 {
 		spec.label = node.label
+		spec.shape = node.shape
 		spec.labelIsExplicit = node.hasLabel
 	}
 	if node.styleClass != "" {

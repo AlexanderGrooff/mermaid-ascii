@@ -268,66 +268,23 @@ func Draw(properties *Properties) string {
 }
 
 func drawBox(n *node, g graph) *drawing {
-	// Box is always 3x3 on the grid
-	w := 0
-	for i := 0; i < 2; i++ {
-		w += g.columnWidth[n.gridCoord.x+i]
-	}
-	h := 0
-	for i := 0; i < 2; i++ {
-		h += g.rowHeight[n.gridCoord.y+i]
-	}
+	w := g.columnWidth[n.gridCoord.x] + g.columnWidth[n.gridCoord.x+1]
+	h := g.rowHeight[n.gridCoord.y] + g.rowHeight[n.gridCoord.y+1]
 
 	from := drawingCoord{0, 0}
 	to := drawingCoord{w, h}
-	boxDrawing := *(mkDrawing(Max(from.x, to.x), Max(from.y, to.y)))
-	log.Debug("Drawing box from ", from, " to ", to)
-	if !g.useAscii {
-		// Draw top border
-		for x := from.x + 1; x < to.x; x++ {
-			boxDrawing[x][from.y] = "─" // Horizontal line
-		}
-		// Draw bottom border
-		for x := from.x + 1; x < to.x; x++ {
-			boxDrawing[x][to.y] = "─" // Horizontal line
-		}
-		// Draw left border
-		for y := from.y + 1; y < to.y; y++ {
-			boxDrawing[from.x][y] = "│" // Vertical line
-		}
-		// Draw right border
-		for y := from.y + 1; y < to.y; y++ {
-			boxDrawing[to.x][y] = "│" // Vertical line
-		}
-		// Draw corners
-		boxDrawing[from.x][from.y] = "┌" // Top left corner
-		boxDrawing[to.x][from.y] = "┐"   // Top right corner
-		boxDrawing[from.x][to.y] = "└"   // Bottom left corner
-		boxDrawing[to.x][to.y] = "┘"     // Bottom right corner
-	} else {
-		// Draw top border
-		for x := from.x + 1; x < to.x; x++ {
-			boxDrawing[x][from.y] = "-" // Horizontal line
-		}
-		// Draw bottom border
-		for x := from.x + 1; x < to.x; x++ {
-			boxDrawing[x][to.y] = "-" // Horizontal line
-		}
-		// Draw left border
-		for y := from.y + 1; y < to.y; y++ {
-			boxDrawing[from.x][y] = "|" // Vertical line
-		}
-		// Draw right border
-		for y := from.y + 1; y < to.y; y++ {
-			boxDrawing[to.x][y] = "|" // Vertical line
-		}
-		// Draw corners
-		boxDrawing[from.x][from.y] = "+" // Top left corner
-		boxDrawing[to.x][from.y] = "+"   // Top right corner
-		boxDrawing[from.x][to.y] = "+"   // Bottom left corner
-		boxDrawing[to.x][to.y] = "+"     // Bottom right corner
+	boxDrawing := *(mkDrawing(w, h))
+	log.Debug("Drawing node from ", from, " to ", to)
+
+	switch n.shape {
+	case shapeDiamond:
+		drawDiamondBorder(&boxDrawing, w, h, n.label.contentHeight(), g.useAscii)
+	case shapeRounded:
+		drawRoundedBorder(&boxDrawing, w, h, g.useAscii)
+	default:
+		drawRectangleBorder(&boxDrawing, w, h, g.useAscii)
 	}
-	// Draw label lines inside the padded content area.
+
 	innerTop := from.y + 1
 	innerHeight := h - 1
 	contentTop := innerTop + (innerHeight-n.label.contentHeight())/2
@@ -344,6 +301,81 @@ func drawBox(n *node, g graph) *drawing {
 	}
 
 	return &boxDrawing
+}
+
+func drawRectangleBorder(d *drawing, w, h int, useASCII bool) {
+	horizontal, vertical, topLeft, topRight, bottomLeft, bottomRight := "-", "|", "+", "+", "+", "+"
+	if !useASCII {
+		horizontal, vertical = "─", "│"
+		topLeft, topRight, bottomLeft, bottomRight = "┌", "┐", "└", "┘"
+	}
+	for x := 1; x < w; x++ {
+		(*d)[x][0], (*d)[x][h] = horizontal, horizontal
+	}
+	for y := 1; y < h; y++ {
+		(*d)[0][y], (*d)[w][y] = vertical, vertical
+	}
+	(*d)[0][0], (*d)[w][0] = topLeft, topRight
+	(*d)[0][h], (*d)[w][h] = bottomLeft, bottomRight
+}
+
+func drawRoundedBorder(d *drawing, w, h int, useASCII bool) {
+	horizontal, leftVertical, rightVertical := "-", "(", ")"
+	topLeft, topRight, bottomLeft, bottomRight := ".", ".", "'", "'"
+	if !useASCII {
+		horizontal, leftVertical, rightVertical = "─", "│", "│"
+		topLeft, topRight, bottomLeft, bottomRight = "╭", "╮", "╰", "╯"
+	}
+	for x := 1; x < w; x++ {
+		(*d)[x][0], (*d)[x][h] = horizontal, horizontal
+	}
+	for y := 1; y < h; y++ {
+		(*d)[0][y], (*d)[w][y] = leftVertical, rightVertical
+	}
+	(*d)[0][0], (*d)[w][0] = topLeft, topRight
+	(*d)[0][h], (*d)[w][h] = bottomLeft, bottomRight
+}
+
+func drawDiamondBorder(d *drawing, w, h, contentHeight int, useASCII bool) {
+	leftGlyph, rightGlyph := "/", "\\"
+	if !useASCII {
+		leftGlyph, rightGlyph = "╱", "╲"
+	}
+	mid := h / 2
+	apexLeft := Max(0, w/2-1)
+	apexRight := Min(w, apexLeft+1)
+	contentTop := 1 + (h-1-contentHeight)/2
+	contentBottom := contentTop + contentHeight - 1
+
+	for y := 0; y <= h; y++ {
+		if y == 0 {
+			(*d)[apexLeft][y] = leftGlyph
+			(*d)[apexRight][y] = rightGlyph
+			continue
+		}
+		if y == h {
+			(*d)[apexLeft][y] = rightGlyph
+			(*d)[apexRight][y] = leftGlyph
+			continue
+		}
+
+		progressRow := y
+		if y > mid {
+			progressRow = h - y
+		}
+		left, right := 0, w
+		if y < contentTop || y > contentBottom {
+			left = apexLeft - (apexLeft*progressRow+Max(1, mid)/2)/Max(1, mid)
+			right = apexRight + ((w-apexRight)*progressRow+Max(1, mid)/2)/Max(1, mid)
+			left = Max(0, left)
+			right = Min(w, right)
+		}
+		if y <= mid {
+			(*d)[left][y], (*d)[right][y] = leftGlyph, rightGlyph
+		} else {
+			(*d)[left][y], (*d)[right][y] = rightGlyph, leftGlyph
+		}
+	}
 }
 
 func drawSubgraph(sg *subgraph, g graph) *drawing {
