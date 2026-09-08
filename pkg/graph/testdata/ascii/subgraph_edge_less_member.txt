@@ -1,0 +1,35 @@
+flowchart TB
+  subgraph a["Frontend tier"]
+    a1["load balancer"]
+  end
+  subgraph b["Application tier"]
+    b1["worker pool"]
+    b2["api server"]
+  end
+  a1 --> b1
+---
++-------------------+ +-----------------+
+|   Frontend tier   | |Application tier |
+|                   | |                 |
+|                   | |                 |
+| +---------------+ | | +-------------+ |
+| |               | | | |             | |
+| | load balancer | | | |  api server | |
+| |               | | | |             | |
+| +---------------+ | | +-------------+ |
+|         |         | |                 |
++---------|---------+ |                 |
+          |           |                 |
+          |           |                 |
+          |           |                 |
+          |           |                 |
+          |           |                 |
+          |           |                 |
+          |           |                 |
+          |           | +-------------+ |
+          |           | |             | |
+          +------------>| worker pool | |
+                      | |             | |
+                      | +-------------+ |
+                      |                 |
+                      +-----------------+

@@ -624,7 +624,7 @@ Note that with `--coords` enabled, the grid-coords shown show the starting locat
 - [x] `A & B` syntax
 - [x] `classDef` and `class` for colored output
 - [x] Prevent arrows overlapping nodes
-- [ ] `subgraph` support
+- [x] `subgraph` layout, including edge-less declared members in distinct frames
 - [ ] Shapes other than rectangles
 - [ ] Diagonal arrows
 
@@ -669,7 +669,7 @@ The baseline components for Mermaid work, but there are a lot of things that are
 - [x] `classDef` and `class`
 - [x] `A & B`
 - [x] Multiple arrows on one line (like `A --> B --> C`)
-- [ ] `subgraph`
+- [x] `subgraph` layout, including edge-less declared members in distinct frames
 - [ ] Shapes other than rectangles
 - [ ] Whitespacing and comments
 

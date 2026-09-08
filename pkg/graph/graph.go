@@ -283,14 +283,26 @@ func (g *graph) createMapping() {
 			}
 
 			var mappingCoord *gridCoord
-			if g.graphDirection == "LR" {
+			if anchor := g.mappedSubgraphSibling(child); anchor != nil {
+				if g.graphDirection == "LR" {
+					mappingCoord = g.reserveSpotInGrid(g.nodes[child.index], &gridCoord{x: childLevel, y: anchor.y})
+				} else {
+					mappingCoord = g.reserveSpotInGrid(g.nodes[child.index], &gridCoord{x: anchor.x, y: childLevel})
+				}
+			} else if g.graphDirection == "LR" {
 				mappingCoord = g.reserveSpotInGrid(g.nodes[child.index], &gridCoord{x: childLevel, y: highestPosition})
 			} else {
 				mappingCoord = g.reserveSpotInGrid(g.nodes[child.index], &gridCoord{x: highestPosition, y: childLevel})
 			}
 			log.Debugf("Setting mapping coord for child %s of parent %s to %v", child.name, n.name, mappingCoord)
 			g.nodes[child.index].gridCoord = mappingCoord
-			highestPositionPerLevel[childLevel] = highestPosition + 4
+			position := highestPosition + 4
+			if g.graphDirection == "LR" {
+				position = Max(position, mappingCoord.y+4)
+			} else {
+				position = Max(position, mappingCoord.x+4)
+			}
+			highestPositionPerLevel[childLevel] = position
 		}
 	}
 
@@ -345,6 +357,28 @@ func (g *graph) isNodeInAnySubgraph(n *node) bool {
 		}
 	}
 	return false
+}
+
+func (g *graph) mappedSubgraphSibling(n *node) *gridCoord {
+	for i := len(g.subgraphs) - 1; i >= 0; i-- {
+		sg := g.subgraphs[i]
+		containsNode := false
+		for _, sgNode := range sg.nodes {
+			if sgNode == n {
+				containsNode = true
+				break
+			}
+		}
+		if !containsNode {
+			continue
+		}
+		for _, sgNode := range sg.nodes {
+			if sgNode != n && sgNode.gridCoord != nil {
+				return sgNode.gridCoord
+			}
+		}
+	}
+	return nil
 }
 
 func (g *graph) getNodeSubgraph(n *node) *subgraph {
