@@ -1,6 +1,9 @@
 package graph
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestSplitGraphLines(t *testing.T) {
 	input := "graph LR\\nA[\"line1\\nline2\"] --> B\\nC --> D"
@@ -404,4 +407,295 @@ func TestGraphTypeDetection(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParsePreservesAmpersandInsideNodeLabel(t *testing.T) {
+	input := `flowchart TD
+A["Stage 1: Track & Commit Canonical Profiles"] --> B["Stage 2: Author Skill"]`
+	properties, err := Parse(input, "cli")
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	if len(properties.nodeSpecs) != 2 {
+		t.Fatalf("expected 2 node specs, got %d: %#v", len(properties.nodeSpecs), properties.nodeSpecs)
+	}
+	specA, ok := properties.nodeSpecs["A"]
+	if !ok {
+		t.Fatalf("expected node A in nodeSpecs")
+	}
+	if len(specA.label.lines) != 1 || specA.label.lines[0] != "Stage 1: Track & Commit Canonical Profiles" {
+		t.Fatalf("node A label = %#v, want [Stage 1: Track & Commit Canonical Profiles]", specA.label.lines)
+	}
+	specB, ok := properties.nodeSpecs["B"]
+	if !ok {
+		t.Fatalf("expected node B in nodeSpecs")
+	}
+	if len(specB.label.lines) != 1 || specB.label.lines[0] != "Stage 2: Author Skill" {
+		t.Fatalf("node B label = %#v, want [Stage 2: Author Skill]", specB.label.lines)
+	}
+	edges, ok := properties.data.Get("A")
+	if !ok || len(edges) != 1 || edges[0].child.name != "B" {
+		t.Fatalf("edges from A = %#v, want one edge to B", edges)
+	}
+}
+
+func TestParseAmpersandEdgeCases(t *testing.T) {
+	t.Run("ampersand inside unquoted shapes with outer fanout", func(t *testing.T) {
+		shapes := []struct {
+			name   string
+			declA  string
+			declB  string
+			labelA string
+			labelB string
+		}{
+			{name: "brackets", declA: "A[Track & Commit]", declB: "B[Build & Deploy]", labelA: "Track & Commit", labelB: "Build & Deploy"},
+			{name: "parens", declA: "A(Track & Commit)", declB: "B(Build & Deploy)", labelA: "Track & Commit", labelB: "Build & Deploy"},
+			{name: "braces", declA: "A{Track & Commit}", declB: "B{Build & Deploy}", labelA: "Track & Commit", labelB: "Build & Deploy"},
+			{name: "hexagon", declA: "A{{Track & Commit}}", declB: "B{{Build & Deploy}}", labelA: "Track & Commit", labelB: "Build & Deploy"},
+			{name: "cylinder", declA: "A[(Track & Commit)]", declB: "B[(Build & Deploy)]", labelA: "Track & Commit", labelB: "Build & Deploy"},
+			{name: "asymmetric", declA: "A>Track & Commit]", declB: "B>Build & Deploy]", labelA: "Track & Commit", labelB: "Build & Deploy"},
+		}
+
+		for _, tc := range shapes {
+			t.Run(tc.name, func(t *testing.T) {
+				input := fmt.Sprintf("graph LR\n%s & %s --> C", tc.declA, tc.declB)
+				props, err := Parse(input, "cli")
+				if err != nil {
+					t.Fatalf("Parse() error = %v", err)
+				}
+				specA, ok := props.nodeSpecs["A"]
+				if !ok || len(specA.label.lines) != 1 || specA.label.lines[0] != tc.labelA {
+					t.Fatalf("A spec = %#v, want label %q", specA, tc.labelA)
+				}
+				specB, ok := props.nodeSpecs["B"]
+				if !ok || len(specB.label.lines) != 1 || specB.label.lines[0] != tc.labelB {
+					t.Fatalf("B spec = %#v, want label %q", specB, tc.labelB)
+				}
+				edgesA, okA := props.data.Get("A")
+				edgesB, okB := props.data.Get("B")
+				if !okA || len(edgesA) != 1 || edgesA[0].child.name != "C" {
+					t.Fatalf("edges from A = %#v, want edge to C", edgesA)
+				}
+				if !okB || len(edgesB) != 1 || edgesB[0].child.name != "C" {
+					t.Fatalf("edges from B = %#v, want edge to C", edgesB)
+				}
+			})
+		}
+	})
+
+	t.Run("ampersand on RHS with fan-out", func(t *testing.T) {
+		input := "graph LR\nA --> B & C[\"Foo & Bar\"]"
+		props, err := Parse(input, "cli")
+		if err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		specC, ok := props.nodeSpecs["C"]
+		if !ok || len(specC.label.lines) != 1 || specC.label.lines[0] != "Foo & Bar" {
+			t.Fatalf("C spec = %#v, want label 'Foo & Bar'", specC)
+		}
+		edgesA, okA := props.data.Get("A")
+		if !okA || len(edgesA) != 2 {
+			t.Fatalf("edges from A = %#v, want 2 edges", edgesA)
+		}
+	})
+
+	t.Run("bare node name containing ampersand without spaces", func(t *testing.T) {
+		input := "graph LR\nAT&T & R&D --> Verizon"
+		props, err := Parse(input, "cli")
+		if err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		edgesATT, ok1 := props.data.Get("AT&T")
+		edgesRD, ok2 := props.data.Get("R&D")
+		if !ok1 || len(edgesATT) != 1 || edgesATT[0].child.name != "Verizon" {
+			t.Fatalf("edges from AT&T = %#v, want edge to Verizon", edgesATT)
+		}
+		if !ok2 || len(edgesRD) != 1 || edgesRD[0].child.name != "Verizon" {
+			t.Fatalf("edges from R&D = %#v, want edge to Verizon", edgesRD)
+		}
+	})
+
+	t.Run("escaped quotes in node label containing ampersand", func(t *testing.T) {
+		input := `graph LR
+A["He said \"Fish & Chips\""] --> B`
+		props, err := Parse(input, "cli")
+		if err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		specA, ok := props.nodeSpecs["A"]
+		if !ok || len(specA.label.lines) != 1 || specA.label.lines[0] != `He said \"Fish & Chips\"` {
+			t.Fatalf("A spec = %#v, want label with escaped quotes", specA)
+		}
+	})
+
+	t.Run("bidirectional arrow with ampersand labels", func(t *testing.T) {
+		input := `graph LR
+A["Left & Right"] <--> B["North & South"]`
+		props, err := Parse(input, "cli")
+		if err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		specA := props.nodeSpecs["A"]
+		specB := props.nodeSpecs["B"]
+		if specA.label.lines[0] != "Left & Right" || specB.label.lines[0] != "North & South" {
+			t.Fatalf("labels mismatch: A=%v, B=%v", specA.label.lines, specB.label.lines)
+		}
+	})
+
+	t.Run("edge label containing ampersand", func(t *testing.T) {
+		input := `graph LR
+A -->|Save & Exit| B`
+		props, err := Parse(input, "cli")
+		if err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		edgesA, ok := props.data.Get("A")
+		if !ok || len(edgesA) != 1 || edgesA[0].label != "Save & Exit" {
+			t.Fatalf("edges from A = %#v, want label 'Save & Exit'", edgesA)
+		}
+	})
+
+	t.Run("standalone node declaration with ampersand", func(t *testing.T) {
+		input := `flowchart TD
+A["Phase 1: Track & Commit"]`
+		props, err := Parse(input, "cli")
+		if err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		if len(props.nodeSpecs) != 1 {
+			t.Fatalf("expected 1 node, got %d", len(props.nodeSpecs))
+		}
+		specA, ok := props.nodeSpecs["A"]
+		if !ok || specA.label.lines[0] != "Phase 1: Track & Commit" {
+			t.Fatalf("A spec = %#v", specA)
+		}
+	})
+
+	t.Run("multiple ampersand chain", func(t *testing.T) {
+		input := "graph LR\nA & B & C & D --> E"
+		props, err := Parse(input, "cli")
+		if err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		for _, name := range []string{"A", "B", "C", "D"} {
+			edges, ok := props.data.Get(name)
+			if !ok || len(edges) != 1 || edges[0].child.name != "E" {
+				t.Fatalf("edges from %s = %#v, want 1 edge to E", name, edges)
+			}
+		}
+	})
+
+	t.Run("quoted shapes with fanout on LHS and RHS", func(t *testing.T) {
+		input := `graph LR
+A["Track & Commit"] & B["Build & Deploy"] --> C["Deploy & Run"] & D["Alert & Oncall"]`
+		props, err := Parse(input, "cli")
+		if err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		for _, name := range []string{"A", "B"} {
+			edges, ok := props.data.Get(name)
+			if !ok || len(edges) != 2 {
+				t.Fatalf("edges from %s = %#v, want 2 edges", name, edges)
+			}
+			destMap := map[string]bool{}
+			for _, e := range edges {
+				destMap[e.child.name] = true
+			}
+			if !destMap["C"] || !destMap["D"] {
+				t.Fatalf("edges from %s do not contain C and D: %#v", name, edges)
+			}
+		}
+		specA := props.nodeSpecs["A"]
+		if specA.label.lines[0] != "Track & Commit" {
+			t.Fatalf("specA label = %v", specA.label.lines)
+		}
+		specC := props.nodeSpecs["C"]
+		if specC.label.lines[0] != "Deploy & Run" {
+			t.Fatalf("specC label = %v", specC.label.lines)
+		}
+	})
+
+	t.Run("RHS multi-ampersand chain", func(t *testing.T) {
+		input := "graph LR\nA --> B & C & D"
+		props, err := Parse(input, "cli")
+		if err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		edgesA, ok := props.data.Get("A")
+		if !ok || len(edgesA) != 3 {
+			t.Fatalf("edges from A = %#v, want 3 edges", edgesA)
+		}
+	})
+
+	t.Run("mixed shapes with ampersand in fanout chain", func(t *testing.T) {
+		input := `graph LR
+A[Track & Commit] & B(Author & Skill) & C{Review & Approve} & D>Qux & Test] --> E`
+		props, err := Parse(input, "cli")
+		if err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		for _, name := range []string{"A", "B", "C", "D"} {
+			edges, ok := props.data.Get(name)
+			if !ok || len(edges) != 1 || edges[0].child.name != "E" {
+				t.Fatalf("edges from %s = %#v, want 1 edge to E", name, edges)
+			}
+		}
+	})
+
+	t.Run("nested angle brackets inside node label", func(t *testing.T) {
+		input := "graph LR\nA[x > y & z] & B --> C"
+		props, err := Parse(input, "cli")
+		if err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		specA := props.nodeSpecs["A"]
+		if specA.label.lines[0] != "x > y & z" {
+			t.Fatalf("specA label = %v, want 'x > y & z'", specA.label.lines)
+		}
+		edgesA, okA := props.data.Get("A")
+		edgesB, okB := props.data.Get("B")
+		if !okA || len(edgesA) != 1 || edgesA[0].child.name != "C" {
+			t.Fatalf("edges from A = %#v, want edge to C", edgesA)
+		}
+		if !okB || len(edgesB) != 1 || edgesB[0].child.name != "C" {
+			t.Fatalf("edges from B = %#v, want edge to C", edgesB)
+		}
+	})
+
+	t.Run("subgraph fanout with ampersand in labels", func(t *testing.T) {
+		input := `graph TD
+subgraph S[Service Group]
+A["Auth & Security"] & B["Billing & Payments"]
+end
+A --> C`
+		props, err := Parse(input, "cli")
+		if err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		if len(props.subgraphs) != 1 {
+			t.Fatalf("expected 1 subgraph, got %d", len(props.subgraphs))
+		}
+		sg := props.subgraphs[0]
+		foundA, foundB := false, false
+		for _, n := range sg.nodes {
+			if n == "A" {
+				foundA = true
+			}
+			if n == "B" {
+				foundB = true
+			}
+		}
+		if !foundA || !foundB {
+			t.Fatalf("subgraph nodes = %#v, want A and B", sg.nodes)
+		}
+		specA := props.nodeSpecs["A"]
+		if specA.label.lines[0] != "Auth & Security" {
+			t.Fatalf("specA label = %v", specA.label.lines)
+		}
+		specB := props.nodeSpecs["B"]
+		if specB.label.lines[0] != "Billing & Payments" {
+			t.Fatalf("specB label = %v", specB.label.lines)
+		}
+	})
 }

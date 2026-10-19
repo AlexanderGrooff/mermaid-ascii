@@ -344,6 +344,73 @@ func classifyArrowToken(token string) (edgeStroke, edgeHead) {
 	}
 }
 
+func matchUnquotedAmpersand(line string) []string {
+	bracketDepth := 0
+	parenDepth := 0
+	braceDepth := 0
+	asymDepth := 0
+	inQuotes := false
+	lastAmpIndex := -1
+
+	for i := 0; i < len(line); i++ {
+		ch := line[i]
+		if ch == '"' && !isEscaped(line, i) {
+			inQuotes = !inQuotes
+			continue
+		}
+		if inQuotes {
+			continue
+		}
+
+		switch ch {
+		case '[':
+			bracketDepth++
+		case ']':
+			if bracketDepth > 0 {
+				bracketDepth--
+			} else if asymDepth > 0 {
+				asymDepth--
+			}
+		case '(':
+			parenDepth++
+		case ')':
+			if parenDepth > 0 {
+				parenDepth--
+			}
+		case '{':
+			braceDepth++
+		case '}':
+			if braceDepth > 0 {
+				braceDepth--
+			}
+		case '>':
+			if bracketDepth == 0 && parenDepth == 0 && braceDepth == 0 && asymDepth == 0 &&
+				i > 0 && line[i-1] != ' ' && line[i-1] != '\t' && line[i-1] != '-' && line[i-1] != '=' && line[i-1] != '<' {
+				asymDepth++
+			}
+		case '&':
+			if bracketDepth == 0 && parenDepth == 0 && braceDepth == 0 && asymDepth == 0 {
+				if i > 0 && (line[i-1] == ' ' || line[i-1] == '\t') &&
+					i+1 < len(line) && (line[i+1] == ' ' || line[i+1] == '\t') {
+					lastAmpIndex = i
+				}
+			}
+		}
+	}
+
+	if lastAmpIndex == -1 {
+		return nil
+	}
+
+	lhs := strings.TrimSpace(line[:lastAmpIndex])
+	rhs := strings.TrimSpace(line[lastAmpIndex+1:])
+	if lhs == "" || rhs == "" {
+		return nil
+	}
+
+	return []string{line, lhs, rhs}
+}
+
 func (gp *Properties) parseString(line string) ([]textNode, error) {
 	log.Debugf("Parsing line: %v", line)
 	var lhs, rhs []textNode
@@ -351,6 +418,7 @@ func (gp *Properties) parseString(line string) ([]textNode, error) {
 	// Patterns are matched in order
 	patterns := []struct {
 		regex   *regexp.Regexp
+		match   func(string) []string
 		handler func([]string) ([]textNode, error)
 	}{
 		{
@@ -422,7 +490,7 @@ func (gp *Properties) parseString(line string) ([]textNode, error) {
 			},
 		},
 		{
-			regex: regexp.MustCompile(`(?s)^(.+) & (.+)$`),
+			match: matchUnquotedAmpersand,
 			handler: func(match []string) ([]textNode, error) {
 				log.Debugf("Found & pattern node %v to %v", match[0], match[1])
 				var node textNode
@@ -439,7 +507,13 @@ func (gp *Properties) parseString(line string) ([]textNode, error) {
 		},
 	}
 	for _, pattern := range patterns {
-		if match := pattern.regex.FindStringSubmatch(line); match != nil {
+		var match []string
+		if pattern.match != nil {
+			match = pattern.match(line)
+		} else if pattern.regex != nil {
+			match = pattern.regex.FindStringSubmatch(line)
+		}
+		if match != nil {
 			nodes, err := pattern.handler(match[1:])
 			if err == nil {
 				return nodes, nil
