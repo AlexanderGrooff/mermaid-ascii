@@ -293,3 +293,19 @@ func renderGraph(src string, config *diagram.Config) (string, error) {
 	p.Apply(config)
 	return Draw(p), nil
 }
+
+func TestRenderGraphHandlesAmpersandInsideNodeLabel(t *testing.T) {
+	config := diagram.NewTestConfig(true, "cli")
+	input := `flowchart TD
+A["Stage 1: Track & Commit Canonical Profiles"] --> B["Stage 2: Author Skill"]`
+	output, err := renderGraph(input, config)
+	if err != nil {
+		t.Fatalf("renderGraph() error = %v", err)
+	}
+	if !strings.Contains(output, "Stage 1: Track & Commit Canonical Profiles") {
+		t.Fatalf("expected output to contain full label, got:\n%s", output)
+	}
+	if !strings.Contains(output, "Stage 2: Author Skill") {
+		t.Fatalf("expected output to contain Stage 2: Author Skill, got:\n%s", output)
+	}
+}
