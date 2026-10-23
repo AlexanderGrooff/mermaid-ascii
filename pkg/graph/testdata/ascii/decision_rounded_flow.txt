@@ -1,0 +1,30 @@
+graph TD
+Start(Start) -->|begin| Decision{Ready?}
+Decision -->|yes| Done(Done)
+Done -->|reset| Start
+---
+.--------.        
+(        )        
+( Start  )<---+   
+(        )    |   
+'--------'    |   
+     |        |   
+     |        |   
+   begin      |   
+     |        |   
+     v        |   
+   /\         |   
+ /     \      |   
+/ Ready? \  reset 
+ \     /      |   
+   \/         |   
+     |        |   
+     |        |   
+    yes       |   
+     |        |   
+     v        |   
+.--------.    |   
+(        )    |   
+(  Done  )----+   
+(        )        
+'--------'        

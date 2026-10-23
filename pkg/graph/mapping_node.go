@@ -4,9 +4,18 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type nodeShape int
+
+const (
+	shapeRectangle nodeShape = iota
+	shapeDiamond
+	shapeRounded
+)
+
 type node struct {
 	name           string
 	label          graphLabel
+	shape          nodeShape
 	drawing        *drawing
 	drawingCoord   *drawingCoord
 	gridCoord      *gridCoord

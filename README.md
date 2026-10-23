@@ -639,7 +639,8 @@ Note that with `--coords` enabled, the grid-coords shown show the starting locat
 - [x] `classDef` and `class` for colored output
 - [x] Prevent arrows overlapping nodes
 - [x] `subgraph` layout, including edge-less declared members in distinct frames
-- [ ] Shapes other than rectangles
+- [x] Decision diamonds (`A{label}`) and rounded nodes (`A(label)`)
+- [ ] Other shapes
 - [ ] Diagonal arrows
 
 ### Sequence Diagrams ✅
@@ -684,7 +685,8 @@ The baseline components for Mermaid work, but there are a lot of things that are
 - [x] `A & B`
 - [x] Multiple arrows on one line (like `A --> B --> C`)
 - [x] `subgraph` layout, including edge-less declared members in distinct frames
-- [ ] Shapes other than rectangles
+- [x] Decision diamonds (`A{label}`) and rounded nodes (`A(label)`)
+- [ ] Other shapes
 - [ ] Whitespacing and comments
 
 ### Rendering

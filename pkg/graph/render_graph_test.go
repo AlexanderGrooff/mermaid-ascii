@@ -54,6 +54,30 @@ func TestRenderGraphHandlesUnicodeClusterNodeLabels(t *testing.T) {
 	}
 }
 
+func TestRenderGraphDrawsDecisionAndRoundedNodes(t *testing.T) {
+	source := "graph TD\nStart(Start) -->|begin| Decision{Ready?}\nDecision -->|yes| Done(Done)\nDone -->|reset| Start"
+	for _, useASCII := range []bool{true, false} {
+		config := diagram.NewTestConfig(useASCII, "cli")
+		output, err := renderGraph(source, config)
+		if err != nil {
+			t.Fatalf("renderGraph() error = %v", err)
+		}
+		assertUniformDisplayWidth(t, output)
+		for _, label := range []string{"Start", "Ready?", "Done", "begin", "yes", "reset"} {
+			if !strings.Contains(output, label) {
+				t.Fatalf("expected output to contain %q\noutput:\n%s", label, output)
+			}
+		}
+		if useASCII {
+			if !strings.Contains(output, "/\\") || !strings.Contains(output, "( Start ") {
+				t.Fatalf("expected ASCII decision and rounded borders\noutput:\n%s", output)
+			}
+		} else if !strings.Contains(output, "╱╲") || !strings.Contains(output, "╭") {
+			t.Fatalf("expected Unicode decision and rounded borders\noutput:\n%s", output)
+		}
+	}
+}
+
 func TestRenderGraphKeepsDisplayWidthForWideSubgraphTitles(t *testing.T) {
 	config := diagram.NewTestConfig(true, "cli")
 	output, err := renderGraph("graph LR\nsubgraph sg [数据库]\nA --> B\nend", config)
