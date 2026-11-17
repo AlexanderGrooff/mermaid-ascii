@@ -1,0 +1,28 @@
+graph LR
+place0(["initial_place"])
+place1(("A"))
+place2(("B"))
+place3(("C"))
+transition0["from_initial_place_to_a_and_b"]
+place0-->transition0
+transition0-->place1
+transition0-->place2
+transition1["from_b_to_c"]
+place2-->transition1
+transition1-->place3
+---
++---------------+     +-------------------------------+     +---+     +-------------+     +---+
+|               |     |                               |     |   |     |             |     |   |
+| initial_place |---->| from_initial_place_to_a_and_b |---->| A |     | from_b_to_c |---->| C |
+|               |     |                               |     |   |     |             |     |   |
++---------------+     +-------------------------------+     +---+     +-------------+     +---+
+                                      |                                      ^                 
+                                      |                                      |                 
+                                      |                                      |                 
+                                      |                                      |                 
+                                      |                                      |                 
+                                      |                     +---+            |                 
+                                      |                     |   |            |                 
+                                      +-------------------->| B |------------+                 
+                                                            |   |                              
+                                                            +---+                              
