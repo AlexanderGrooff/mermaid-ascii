@@ -218,6 +218,8 @@ func parseNode(line string) textNode {
 		{open: "{{", close: "}}"},
 		{open: "{", close: "}"},
 		{open: "[", close: "]"},
+		{open: "([", close: "])"},
+		{open: "((", close: "))"},
 		{open: "(", close: ")"},
 		{open: ">", close: "]"},
 	} {

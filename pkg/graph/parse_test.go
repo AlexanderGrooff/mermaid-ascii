@@ -113,6 +113,10 @@ func TestParseNodeShapes(t *testing.T) {
 		{name: "cylindrical", declaration: "D[(Database)]", wantName: "D", wantLabel: "Database"},
 		{name: "asymmetric", declaration: "E>Asymmetric]", wantName: "E", wantLabel: "Asymmetric"},
 		{name: "square bracket", declaration: `F["Rectangle"]`, wantName: "F", wantLabel: "Rectangle"},
+		{name: "stadium", declaration: "G([Stadium])", wantName: "G", wantLabel: "Stadium"},
+		{name: "quoted stadium", declaration: `G(["Stadium"])`, wantName: "G", wantLabel: "Stadium"},
+		{name: "circle", declaration: "H((Circle))", wantName: "H", wantLabel: "Circle"},
+		{name: "quoted circle", declaration: `H(("Circle"))`, wantName: "H", wantLabel: "Circle"},
 	}
 
 	for _, tt := range tests {
