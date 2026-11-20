@@ -622,8 +622,20 @@ func (g *graph) draw() *drawing {
 		labelDrawings = append(labelDrawings, label)
 	}
 
-	// Draw in order
-	g.drawing = g.mergeDrawings(g.drawing, drawingCoord{0, 0}, lineDrawings...)
+	// Draw in order. Dotted lines go down first: where a dotted edge shares
+	// cells with another edge, the other edge's stroke wins, so a dotted
+	// edge never makes a solid edge on the same route look dotted.
+	dottedLines := []*drawing{}
+	otherLines := []*drawing{}
+	for i, edge := range g.edges {
+		if edge.stroke == strokeDotted {
+			dottedLines = append(dottedLines, lineDrawings[i])
+		} else {
+			otherLines = append(otherLines, lineDrawings[i])
+		}
+	}
+	g.drawing = g.mergeDrawings(g.drawing, drawingCoord{0, 0}, dottedLines...)
+	g.drawing = g.mergeDrawings(g.drawing, drawingCoord{0, 0}, otherLines...)
 	g.drawing = g.mergeDrawings(g.drawing, drawingCoord{0, 0}, cornerDrawings...)
 	g.drawing = g.mergeDrawings(g.drawing, drawingCoord{0, 0}, arrowHeadDrawings...)
 	g.drawing = g.mergeDrawings(g.drawing, drawingCoord{0, 0}, boxStartDrawings...)
